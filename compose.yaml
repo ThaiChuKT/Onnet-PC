@@ -1,10 +1,36 @@
 services:
   mysql:
-    image: 'mysql:latest'
+    image: 'mysql:8.4'
     environment:
-      - 'MYSQL_DATABASE=mydatabase'
+      - 'MYSQL_DATABASE=onnetpc'
       - 'MYSQL_PASSWORD=secret'
       - 'MYSQL_ROOT_PASSWORD=verysecret'
       - 'MYSQL_USER=myuser'
     ports:
-      - '3306'
+      - '3307:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "myuser", "-psecret" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    ports:
+      - '8080:8080'
+    environment:
+      - 'SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/onnetpc'
+      - 'SPRING_DATASOURCE_USERNAME=myuser'
+      - 'SPRING_DATASOURCE_PASSWORD=secret'
+      - 'SPRING_PROFILES_ACTIVE=docker'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    profiles:
+      - full
+
+volumes:
+  mysql_data:
