@@ -40,7 +40,7 @@ public class Review {
     private Pc pc;
 
     @Column(name = "rating", nullable = false)
-    private Integer rating;
+    private Byte rating;
 
     @Column(name = "comment")
     private String comment;
