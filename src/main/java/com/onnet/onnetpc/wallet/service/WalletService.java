@@ -7,11 +7,12 @@ import com.onnet.onnetpc.wallet.Wallet;
 import com.onnet.onnetpc.wallet.WalletTransaction;
 import com.onnet.onnetpc.wallet.dto.TopUpRequest;
 import com.onnet.onnetpc.wallet.dto.TopUpResponse;
+import com.onnet.onnetpc.wallet.paypal.PaypalOrderResponse;
+import com.onnet.onnetpc.wallet.paypal.PaypalService;
 import com.onnet.onnetpc.wallet.dto.WalletSummaryResponse;
 import com.onnet.onnetpc.wallet.dto.WalletTransactionResponse;
 import com.onnet.onnetpc.wallet.repository.WalletRepository;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
@@ -24,15 +25,18 @@ public class WalletService {
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final PaypalService paypalService;
 
     public WalletService(
         UserRepository userRepository,
         WalletRepository walletRepository,
-        WalletTransactionRepository walletTransactionRepository
+        WalletTransactionRepository walletTransactionRepository,
+        PaypalService paypalService
     ) {
         this.userRepository = userRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
+        this.paypalService = paypalService;
     }
 
     @Transactional(readOnly = true)
@@ -49,18 +53,15 @@ public class WalletService {
             .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TopUpResponse createTopUp(String email, TopUpRequest request) {
-        Wallet wallet = findWalletByEmail(email);
-        BigDecimal amount = request.amount();
-        if (amount.compareTo(BigDecimal.ONE) < 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Top up amount must be at least 1.0");
-        }
-
+        PaypalOrderResponse order = paypalService.createOrder(email, request.amount());
         return new TopUpResponse(
             "paypal",
-            "PENDING",
-            "PayPal integration endpoint is reserved. Amount " + amount + " prepared for walletId=" + wallet.getId()
+            order.status(),
+            "Approve the payment on PayPal to complete wallet top-up",
+            order.orderId(),
+            order.approvalUrl()
         );
     }
 

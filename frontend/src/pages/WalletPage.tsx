@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, unwrapApi } from '../lib/api.ts'
-import type { ApiEnvelope, TopUpResponse, WalletSummary, WalletTransaction } from '../types/api.ts'
+import type { ApiEnvelope, PaypalCaptureResponse, TopUpResponse, WalletSummary, WalletTransaction } from '../types/api.ts'
 
 export function WalletPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [summary, setSummary] = useState<WalletSummary | null>(null)
   const [transactions, setTransactions] = useState<WalletTransaction[]>([])
   const [amount, setAmount] = useState('10')
@@ -45,6 +48,52 @@ export function WalletPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const paypalStatus = searchParams.get('paypalStatus')
+    const orderId = searchParams.get('token')
+    if (!paypalStatus) {
+      return
+    }
+
+    let cancelled = false
+
+    async function handlePaypalReturn() {
+      setLoading(true)
+      setError('')
+      setSuccess('')
+      try {
+        if (paypalStatus === 'cancel') {
+          setError('PayPal top-up was canceled.')
+          return
+        }
+
+        if (paypalStatus === 'success' && orderId) {
+          const response = await api.post<ApiEnvelope<PaypalCaptureResponse>>(`/paypal/orders/${encodeURIComponent(orderId)}/capture`)
+          const captureResult = unwrapApi(response.data)
+          setSuccess(captureResult.message)
+          await loadWallet()
+          return
+        }
+
+        setError('Missing PayPal order token in callback URL.')
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to finalize PayPal payment')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          navigate('/wallet', { replace: true })
+        }
+      }
+    }
+
+    void handlePaypalReturn()
+    return () => {
+      cancelled = true
+    }
+  }, [navigate, searchParams])
+
   async function onTopUp(event: FormEvent) {
     event.preventDefault()
     setError('')
@@ -54,8 +103,13 @@ export function WalletPage() {
       const response = await api.post<ApiEnvelope<TopUpResponse>>('/wallet/top-up', {
         amount: Number(amount),
       })
-      setSuccess(unwrapApi(response.data).message)
-      await loadWallet()
+      const result = unwrapApi(response.data)
+      setSuccess(result.message)
+      if (result.approvalUrl) {
+        window.location.assign(result.approvalUrl)
+        return
+      }
+      setError('PayPal approval link was not returned by the server.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Top-up failed')
     } finally {

@@ -99,4 +99,13 @@ export type TopUpResponse = {
   paymentProvider: string
   status: string
   message: string
+  orderId: string
+  approvalUrl: string
+}
+
+export type PaypalCaptureResponse = {
+  orderId: string
+  status: string
+  message: string
+  balance: number
 }

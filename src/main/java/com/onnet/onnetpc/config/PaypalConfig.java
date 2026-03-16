@@ -12,11 +12,25 @@ public class PaypalConfig {
 	@Value("${app.paypal.client-secret:}")
 	private String clientSecret;
 
+	@Value("${app.paypal.base-url:https://api-m.sandbox.paypal.com}")
+	private String baseUrl;
+
+	@Value("${app.frontend.base-url:http://localhost:5173}")
+	private String frontendBaseUrl;
+
 	public String getClientId() {
 		return clientId;
 	}
 
 	public String getClientSecret() {
 		return clientSecret;
+	}
+
+	public String getBaseUrl() {
+		return baseUrl;
+	}
+
+	public String getFrontendBaseUrl() {
+		return frontendBaseUrl;
 	}
 }

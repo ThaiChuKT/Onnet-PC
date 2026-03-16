@@ -100,6 +100,7 @@ public class PcService {
     }
 
     private ReviewSummaryResponse toReviewResponse(Review review) {
-        return new ReviewSummaryResponse(review.getRating(), review.getComment(), review.getCreatedAt());
+        Integer rating = review.getRating() == null ? null : review.getRating().intValue();
+        return new ReviewSummaryResponse(rating, review.getComment(), review.getCreatedAt());
     }
 }
