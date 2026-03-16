@@ -103,14 +103,24 @@ public class AuthService {
         EmailVerificationToken token = tokenRepository.findByToken(tokenValue)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Verification token not found"));
 
+        User user = token.getUser();
+
         if (token.getUsedAt() != null) {
+            // Idempotent verify: duplicate requests should still be treated as success.
+            if (!Boolean.TRUE.equals(user.getVerified())) {
+                user.setVerified(true);
+                user.setUpdatedAt(Instant.now());
+                userRepository.save(user);
+            }
+            if (Boolean.TRUE.equals(user.getVerified())) {
+                return;
+            }
             throw new ApiException(HttpStatus.BAD_REQUEST, "Verification token already used");
         }
         if (token.getExpiresAt().isBefore(Instant.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Verification token has expired");
         }
 
-        User user = token.getUser();
         user.setVerified(true);
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);

@@ -17,6 +17,17 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const message = error?.response?.data?.message
+    if (typeof message === 'string' && message.trim().length > 0) {
+      return Promise.reject(new Error(message))
+    }
+    return Promise.reject(error)
+  },
+)
+
 export function unwrapApi<T>(envelope: ApiEnvelope<T>): T {
   if (!envelope.success) {
     throw new Error(envelope.message ?? 'Request failed')

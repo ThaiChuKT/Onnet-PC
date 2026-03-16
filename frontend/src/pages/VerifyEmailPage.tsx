@@ -29,8 +29,14 @@ export function VerifyEmailPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setStatus('error')
-          setMessage(err instanceof Error ? err.message : 'Verification failed')
+          const errorMessage = err instanceof Error ? err.message : 'Verification failed'
+          if (errorMessage.toLowerCase().includes('already used')) {
+            setStatus('ok')
+            setMessage('Email already verified. You can log in now.')
+          } else {
+            setStatus('error')
+            setMessage(errorMessage)
+          }
         }
       }
     }

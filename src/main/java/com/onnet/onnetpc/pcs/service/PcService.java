@@ -46,7 +46,7 @@ public class PcService {
             : Sort.by(Sort.Direction.ASC, "spec.pricePerHour");
 
         Pageable pageable = PageRequest.of(page, size, sortBy);
-        return pcRepository.findByStatusAndDeletedAtIsNull(PcStatus.available, pageable)
+        return pcRepository.findByStatus(PcStatus.available, pageable)
             .map(pc -> new MachineListItemResponse(
                 pc.getId(),
                 pc.getSpec().getId(),
@@ -64,7 +64,6 @@ public class PcService {
     @Transactional(readOnly = true)
     public MachineDetailResponse getMachineDetail(Long pcId) {
         Pc pc = pcRepository.findById(pcId)
-            .filter(v -> v.getDeletedAt() == null)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine not found"));
 
         List<SubscriptionPlanPriceResponse> plans = subscriptionPlanRepository
