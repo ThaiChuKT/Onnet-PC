@@ -146,23 +146,23 @@ export type ReviewSubmitResponse = {
 
 export type AdminUserItem = {
   id: number
-  fullName: string
+  fullName: string | null
   email: string
-  phone: string
+  phone: string | null
   role: string | null
-  active: boolean
-  verified: boolean
+  active: boolean | null
+  verified: boolean | null
 }
 
 export type AdminPcItem = {
   pcId: number
   specId: number
   specName: string
-  cpu: string
-  gpu: string
-  ram: number
-  storage: number
-  operatingSystem: string
+  cpu: string | null
+  gpu: string | null
+  ram: number | null
+  storage: number | null
+  operatingSystem: string | null
   pricePerHour: number
   location: string
   status: string

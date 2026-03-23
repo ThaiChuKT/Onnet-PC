@@ -56,8 +56,18 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public Page<AdminUserItemResponse> listUsers(String keyword, int page, int size) {
-        String search = keyword == null || keyword.isBlank() ? null : keyword.trim();
-        return userRepository.searchUsers(search, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")))
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        if (keyword == null || keyword.isBlank()) {
+            return userRepository.findAll(pageable).map(this::toAdminUser);
+        }
+
+        String search = keyword.trim();
+        return userRepository
+            .findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                search,
+                search,
+                pageable
+            )
             .map(this::toAdminUser);
     }
 
