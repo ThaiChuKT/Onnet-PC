@@ -3,6 +3,7 @@ package com.onnet.onnetpc.admin;
 import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
@@ -12,6 +13,7 @@ import com.onnet.onnetpc.admin.dto.UpdatePcRequest;
 import com.onnet.onnetpc.admin.service.AdminService;
 import com.onnet.onnetpc.common.response.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,17 @@ public class AdminController {
         @Valid @RequestBody SetUserActiveRequest request
     ) {
         return ApiResponse.success(adminService.setUserActive(userId, request));
+    }
+
+    @DeleteMapping("/users/{userId}")
+    public ApiResponse<String> deleteUser(@PathVariable Long userId) {
+        adminService.softDeleteUser(userId);
+        return ApiResponse.success("User deleted");
+    }
+
+    @GetMapping("/users/{userId}/payments")
+    public ApiResponse<List<AdminUserPaymentItemResponse>> listUserPayments(@PathVariable Long userId) {
+        return ApiResponse.success(adminService.listUserPayments(userId));
     }
 
     @GetMapping("/pcs")

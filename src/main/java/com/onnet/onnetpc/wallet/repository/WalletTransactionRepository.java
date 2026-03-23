@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, Long> {
 
     List<WalletTransaction> findTop100ByWalletIdOrderByCreatedAtDesc(Long walletId);
+
+    List<WalletTransaction> findTop100ByWalletUserIdOrderByCreatedAtDesc(Long userId);
 }

@@ -2,16 +2,24 @@ import { useEffect, useState } from 'react'
 import { api, unwrapApi } from '../lib/api.ts'
 import type {
   AdminPcItem,
+  AdminUserPaymentItem,
   AdminUserItem,
   ApiEnvelope,
   Paged,
 } from '../types/api.ts'
 
+type AdminTab = 'users' | 'machines' | 'payments'
+
 export function AdminPage() {
+  const [activeTab, setActiveTab] = useState<AdminTab>('users')
   const [users, setUsers] = useState<AdminUserItem[]>([])
   const [pcs, setPcs] = useState<AdminPcItem[]>([])
+  const [payments, setPayments] = useState<AdminUserPaymentItem[]>([])
+  const [selectedPaymentUserId, setSelectedPaymentUserId] = useState<string>('')
+  const [selectedPaymentUserName, setSelectedPaymentUserName] = useState<string>('')
   const [usersLoading, setUsersLoading] = useState(false)
   const [pcsLoading, setPcsLoading] = useState(false)
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [userKeyword, setUserKeyword] = useState('')
@@ -42,6 +50,21 @@ export function AdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to load users')
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  async function loadUserPayments(userId: number) {
+    setPaymentsLoading(true)
+    setError('')
+    try {
+      const paymentRes = await api.get<ApiEnvelope<AdminUserPaymentItem[]>>(`/admin/users/${userId}/payments`)
+      setPayments(unwrapApi(paymentRes.data))
+      const selectedUser = users.find((item) => item.id === userId)
+      setSelectedPaymentUserName(selectedUser?.fullName ?? selectedUser?.email ?? `User #${userId}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load payment history')
+    } finally {
+      setPaymentsLoading(false)
     }
   }
 
@@ -78,6 +101,38 @@ export function AdminPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user status')
     }
+  }
+
+  async function deleteUser(user: AdminUserItem) {
+    const confirmed = window.confirm(`Delete user ${user.email}? This action cannot be undone.`)
+    if (!confirmed) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+    try {
+      await api.delete(`/admin/users/${user.id}`)
+      setMessage('User deleted')
+      await loadUsers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user')
+    }
+  }
+
+  async function viewPayments(user: AdminUserItem) {
+    setActiveTab('payments')
+    setSelectedPaymentUserId(String(user.id))
+    await loadUserPayments(user.id)
+  }
+
+  async function handlePaymentSearch() {
+    const parsed = Number(selectedPaymentUserId)
+    if (!selectedPaymentUserId.trim() || Number.isNaN(parsed) || parsed <= 0) {
+      setError('Please enter a valid User ID to view payment history')
+      return
+    }
+    await loadUserPayments(parsed)
   }
 
   async function createMachine() {
@@ -151,12 +206,8 @@ export function AdminPage() {
     }
   }
 
-  return (
-    <section className="stack">
-      <h2>Admin Dashboard</h2>
-      {error ? <div className="card error">{error}</div> : null}
-      {message ? <div className="card success">{message}</div> : null}
-
+  function renderUsersSection() {
+    return (
       <article className="card stack">
         <div className="row">
           <h3>Users</h3>
@@ -172,6 +223,7 @@ export function AdminPage() {
           </div>
         </div>
         {usersLoading ? <p className="muted">Loading users...</p> : null}
+        {!usersLoading && users.length === 0 ? <p className="muted">No users found.</p> : null}
         {users.map((user) => (
           <div key={user.id} className="row">
             <span>
@@ -182,11 +234,21 @@ export function AdminPage() {
               <button className="btn ghost" onClick={() => setUserActive(user.id, !user.active)}>
                 {user.active ? 'Lock' : 'Unlock'}
               </button>
+              <button className="btn ghost" onClick={() => void viewPayments(user)}>
+                Payments
+              </button>
+              <button className="btn warn" onClick={() => void deleteUser(user)}>
+                Delete
+              </button>
             </div>
           </div>
         ))}
       </article>
+    )
+  }
 
+  function renderMachinesSection() {
+    return (
       <article className="card stack">
         <div className="row">
           <h3>Machines</h3>
@@ -274,6 +336,7 @@ export function AdminPage() {
         </div>
 
         {pcsLoading ? <p className="muted">Loading machines...</p> : null}
+        {!pcsLoading && pcs.length === 0 ? <p className="muted">No machines found.</p> : null}
         {pcs.map((pc) => (
           <div key={pc.pcId} className="card stack" style={{ padding: 12 }}>
             <div className="row">
@@ -351,6 +414,75 @@ export function AdminPage() {
           </div>
         ))}
       </article>
+    )
+  }
+
+  function renderPaymentsSection() {
+    return (
+      <article className="card stack">
+        <div className="row">
+          <h3>User Payments</h3>
+          <div className="row">
+            <input
+              value={selectedPaymentUserId}
+              onChange={(e) => setSelectedPaymentUserId(e.target.value)}
+              placeholder="Enter user ID"
+            />
+            <button className="btn ghost" onClick={() => void handlePaymentSearch()}>
+              View history
+            </button>
+          </div>
+        </div>
+
+        {selectedPaymentUserName ? <p className="muted">Showing payment history for {selectedPaymentUserName}</p> : null}
+        {paymentsLoading ? <p className="muted">Loading payment history...</p> : null}
+        {!paymentsLoading && payments.length === 0 ? <p className="muted">No payment transactions found.</p> : null}
+
+        {payments.map((tx) => (
+          <div key={tx.transactionId} className="row card" style={{ padding: 12 }}>
+            <div className="stack" style={{ gap: 4 }}>
+              <strong>Transaction #{tx.transactionId}</strong>
+              <span className="meta">
+                {tx.type ?? 'unknown'} • Ref: {tx.referenceId ?? '-'} • Wallet: {tx.walletId ?? '-'}
+              </span>
+              <span className="meta">{tx.note ?? 'No note'}</span>
+            </div>
+            <div className="stack" style={{ alignItems: 'flex-end', gap: 4 }}>
+              <span className="price">${Number(tx.amount).toFixed(2)}</span>
+              <span className="meta">{new Date(tx.createdAt).toLocaleString()}</span>
+            </div>
+          </div>
+        ))}
+      </article>
+    )
+  }
+
+  return (
+    <section className="stack admin-page">
+      <h2>Admin Dashboard</h2>
+      {error ? <div className="card error">{error}</div> : null}
+      {message ? <div className="card success">{message}</div> : null}
+
+      <div className="admin-layout">
+        <aside className="card admin-sidebar">
+          <button className={`tab-link ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+            Users
+          </button>
+          <button className={`tab-link ${activeTab === 'machines' ? 'active' : ''}`} onClick={() => setActiveTab('machines')}>
+            Machines
+          </button>
+          <button className={`tab-link ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>
+            Payments
+          </button>
+        </aside>
+
+        <div className="admin-main">
+          {activeTab === 'users' ? renderUsersSection() : null}
+          {activeTab === 'machines' ? renderMachinesSection() : null}
+          {activeTab === 'payments' ? renderPaymentsSection() : null}
+        </div>
+
+      </div>
     </section>
   )
 }

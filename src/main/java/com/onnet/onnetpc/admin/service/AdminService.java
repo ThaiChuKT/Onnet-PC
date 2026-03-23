@@ -3,6 +3,7 @@ package com.onnet.onnetpc.admin.service;
 import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
@@ -23,7 +24,10 @@ import com.onnet.onnetpc.pcs.repository.PcSpecRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
+import com.onnet.onnetpc.wallet.WalletTransaction;
+import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,36 +43,48 @@ public class AdminService {
     private final PcSpecRepository pcSpecRepository;
     private final BookingRepository bookingRepository;
     private final ReviewRepository reviewRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
 
     public AdminService(
         UserRepository userRepository,
         PcRepository pcRepository,
         PcSpecRepository pcSpecRepository,
         BookingRepository bookingRepository,
-        ReviewRepository reviewRepository
+        ReviewRepository reviewRepository,
+        WalletTransactionRepository walletTransactionRepository
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
         this.pcSpecRepository = pcSpecRepository;
         this.bookingRepository = bookingRepository;
         this.reviewRepository = reviewRepository;
+        this.walletTransactionRepository = walletTransactionRepository;
     }
 
     @Transactional(readOnly = true)
     public Page<AdminUserItemResponse> listUsers(String keyword, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         if (keyword == null || keyword.isBlank()) {
-            return userRepository.findAll(pageable).map(this::toAdminUser);
+            Page<User> filteredPage = userRepository.findByDeletedAtIsNull(pageable);
+            if (filteredPage.isEmpty()) {
+                return userRepository.findAll(pageable).map(this::toAdminUser);
+            }
+            return filteredPage.map(this::toAdminUser);
         }
 
         String search = keyword.trim();
-        return userRepository
-            .findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+        Page<User> filteredSearch = userRepository
+            .findByDeletedAtIsNullAndFullNameContainingIgnoreCaseOrDeletedAtIsNullAndEmailContainingIgnoreCase(
                 search,
                 search,
                 pageable
-            )
-            .map(this::toAdminUser);
+            );
+        if (filteredSearch.isEmpty()) {
+            return userRepository
+                .findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(search, search, pageable)
+                .map(this::toAdminUser);
+        }
+        return filteredSearch.map(this::toAdminUser);
     }
 
     @Transactional
@@ -78,6 +94,32 @@ public class AdminService {
         user.setActive(request.active());
         user.setUpdatedAt(Instant.now());
         return toAdminUser(userRepository.save(user));
+    }
+
+    @Transactional
+    public void softDeleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getRole() != null && user.getRole().name().equalsIgnoreCase("admin")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot delete admin account");
+        }
+
+        user.setActive(false);
+        user.setDeletedAt(Instant.now());
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminUserPaymentItemResponse> listUserPayments(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        return walletTransactionRepository.findTop100ByWalletUserIdOrderByCreatedAtDesc(userId)
+            .stream()
+            .map((tx) -> toAdminUserPayment(user, tx))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -253,6 +295,21 @@ public class AdminService {
             review.getComment(),
             review.getStatus() == null ? null : review.getStatus().name(),
             review.getCreatedAt()
+        );
+    }
+
+    private AdminUserPaymentItemResponse toAdminUserPayment(User user, WalletTransaction tx) {
+        return new AdminUserPaymentItemResponse(
+            tx.getId(),
+            tx.getWallet() == null ? null : tx.getWallet().getId(),
+            user.getId(),
+            user.getEmail(),
+            user.getFullName(),
+            tx.getAmount(),
+            tx.getType() == null ? null : tx.getType().name(),
+            tx.getReferenceId(),
+            tx.getNote(),
+            tx.getCreatedAt()
         );
     }
 

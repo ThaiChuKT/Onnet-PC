@@ -211,6 +211,46 @@ a {
   margin-top: 12px;
 }
 
+.admin-page {
+  gap: 16px;
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-sidebar {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  position: sticky;
+  top: 14px;
+}
+
+.tab-link {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tab-link.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.admin-main {
+  min-width: 0;
+}
+
 @media (max-width: 980px) {
   .grid.cols-2 {
     grid-template-columns: 1fr;
@@ -218,6 +258,19 @@ a {
 
   .machine-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tab-link {
+    text-align: center;
   }
 }
 

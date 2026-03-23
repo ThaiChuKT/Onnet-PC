@@ -10,11 +10,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByIdAndDeletedAtIsNull(Long id);
+
     boolean existsByEmail(String email);
 
     boolean existsByUsername(String username);
 
+    Page<User> findByDeletedAtIsNull(Pageable pageable);
+
     Page<User> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+        String fullNameKeyword,
+        String emailKeyword,
+        Pageable pageable
+    );
+
+    Page<User> findByDeletedAtIsNullAndFullNameContainingIgnoreCaseOrDeletedAtIsNullAndEmailContainingIgnoreCase(
         String fullNameKeyword,
         String emailKeyword,
         Pageable pageable

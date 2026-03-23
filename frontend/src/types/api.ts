@@ -192,3 +192,16 @@ export type AdminReviewItem = {
   status: string
   createdAt: string
 }
+
+export type AdminUserPaymentItem = {
+  transactionId: number
+  walletId: number | null
+  userId: number
+  userEmail: string
+  userFullName: string | null
+  amount: number
+  type: string | null
+  referenceId: number | null
+  note: string | null
+  createdAt: string
+}
