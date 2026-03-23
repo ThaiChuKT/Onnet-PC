@@ -1,15 +1,27 @@
 package com.onnet.onnetpc.wallet.paypal;
 
-import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PaypalPaymentRepository extends JpaRepository<PaypalPayment, Long> {
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<PaypalPayment> findByTransactionIdAndWalletId(String transactionId, Long walletId);
+    @Query(
+        value = """
+            SELECT *
+            FROM payments
+            WHERE transaction_id = :transactionId
+              AND wallet_id = :walletId
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<PaypalPayment> findByTransactionIdAndWalletIdForUpdate(
+        @Param("transactionId") String transactionId,
+        @Param("walletId") Long walletId
+    );
 
     List<PaypalPayment> findTop50ByWalletIdAndPaymentStatusOrderByCreatedAtDesc(Long walletId, PaypalPaymentStatus paymentStatus);
 }

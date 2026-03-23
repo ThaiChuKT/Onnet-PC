@@ -112,7 +112,7 @@ public class PaypalService {
 	public PaypalCaptureResponse captureOrder(String email, String orderId) {
 		Wallet wallet = findWalletByEmail(email);
 		BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
-		PaypalPayment payment = paypalPaymentRepository.findByTransactionIdAndWalletId(orderId, wallet.getId())
+		PaypalPayment payment = paypalPaymentRepository.findByTransactionIdAndWalletIdForUpdate(orderId, wallet.getId())
 			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PayPal order not found for this wallet"));
 
 		if (payment.getPaymentStatus() == PaypalPaymentStatus.success) {
