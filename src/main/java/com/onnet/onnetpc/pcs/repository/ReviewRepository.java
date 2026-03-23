@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findTop20ByPcIdAndStatusOrderByCreatedAtDesc(Long pcId, ReviewStatus status);
+
+    boolean existsByBookingId(Long bookingId);
 }

@@ -49,19 +49,15 @@ export type MachineListItem = {
 }
 
 export type SubscriptionPlanPrice = {
-  planId: number
+  id: number
   planName: string
-  durationMonth: number
-  monthlyPrice: number
-  discountPercent: number
-  finalPrice: number
+  durationDays: number
+  price: number
 }
 
 export type ReviewSummary = {
-  reviewId: number
-  reviewerName: string
-  comment: string
   rating: number
+  comment: string
   createdAt: string
 }
 
@@ -108,4 +104,41 @@ export type PaypalCaptureResponse = {
   status: string
   message: string
   balance: number
+}
+
+export type BookingResponse = {
+  bookingId: number
+  pcId: number | null
+  specName: string | null
+  bookingType: string | null
+  totalHours: number | null
+  startTime: string
+  endTime: string
+  totalPrice: number
+  status: string
+}
+
+export type BookingPaymentResponse = {
+  bookingId: number
+  status: string
+  walletBalance: number
+}
+
+export type BookingHistoryItem = {
+  bookingId: number
+  pcId: number | null
+  specName: string | null
+  totalHours: number | null
+  startTime: string
+  endTime: string
+  totalPrice: number
+  status: string
+  remainingMinutes: number | null
+  createdAt: string
+}
+
+export type ReviewSubmitResponse = {
+  reviewId: number
+  status: string
+  message: string
 }

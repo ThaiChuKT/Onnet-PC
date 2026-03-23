@@ -14,6 +14,14 @@ export function MachinesPage() {
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [sort, setSort] = useState('price_asc')
+  const [keyword, setKeyword] = useState('')
+  const [cpu, setCpu] = useState('')
+  const [gpu, setGpu] = useState('')
+  const [purpose, setPurpose] = useState('')
+  const [ramMin, setRamMin] = useState('')
+  const [storageMin, setStorageMin] = useState('')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -25,7 +33,19 @@ export function MachinesPage() {
       setError('')
       try {
         const response = await api.get<ApiEnvelope<Paged<MachineListItem>>>('/pcs', {
-          params: { page, size: 9, sort },
+          params: {
+            page,
+            size: 9,
+            sort,
+            keyword: keyword.trim() || undefined,
+            cpu: cpu.trim() || undefined,
+            gpu: gpu.trim() || undefined,
+            purpose: purpose.trim() || undefined,
+            ramMin: ramMin.trim() ? Number(ramMin) : undefined,
+            storageMin: storageMin.trim() ? Number(storageMin) : undefined,
+            priceMin: priceMin.trim() ? Number(priceMin) : undefined,
+            priceMax: priceMax.trim() ? Number(priceMax) : undefined,
+          },
         })
         const data = unwrapApi(response.data)
         if (!cancelled) {
@@ -47,7 +67,7 @@ export function MachinesPage() {
     return () => {
       cancelled = true
     }
-  }, [page, sort])
+  }, [page, sort, keyword, cpu, gpu, purpose, ramMin, storageMin, priceMin, priceMax])
 
   return (
     <section className="stack">
@@ -62,6 +82,41 @@ export function MachinesPage() {
               </option>
             ))}
           </select>
+        </label>
+      </div>
+
+      <div className="card grid cols-2">
+        <label className="field">
+          Keyword
+          <input value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(0) }} placeholder="spec name or description" />
+        </label>
+        <label className="field">
+          Purpose
+          <input value={purpose} onChange={(e) => { setPurpose(e.target.value); setPage(0) }} placeholder="gaming, editing, coding..." />
+        </label>
+        <label className="field">
+          CPU contains
+          <input value={cpu} onChange={(e) => { setCpu(e.target.value); setPage(0) }} placeholder="Ryzen, i7..." />
+        </label>
+        <label className="field">
+          GPU contains
+          <input value={gpu} onChange={(e) => { setGpu(e.target.value); setPage(0) }} placeholder="RTX, RX..." />
+        </label>
+        <label className="field">
+          Min RAM (GB)
+          <input value={ramMin} onChange={(e) => { setRamMin(e.target.value); setPage(0) }} type="number" min={0} />
+        </label>
+        <label className="field">
+          Min Storage (GB)
+          <input value={storageMin} onChange={(e) => { setStorageMin(e.target.value); setPage(0) }} type="number" min={0} />
+        </label>
+        <label className="field">
+          Min Price ($/hour)
+          <input value={priceMin} onChange={(e) => { setPriceMin(e.target.value); setPage(0) }} type="number" min={0} step="0.01" />
+        </label>
+        <label className="field">
+          Max Price ($/hour)
+          <input value={priceMax} onChange={(e) => { setPriceMax(e.target.value); setPage(0) }} type="number" min={0} step="0.01" />
         </label>
       </div>
 

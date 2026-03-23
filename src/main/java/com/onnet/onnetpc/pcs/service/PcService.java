@@ -13,6 +13,7 @@ import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.subscription.SubscriptionPlan;
 import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,13 +41,40 @@ public class PcService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MachineListItemResponse> listAvailable(int page, int size, String sort) {
-        Sort sortBy = "price_desc".equalsIgnoreCase(sort)
-            ? Sort.by(Sort.Direction.DESC, "spec.pricePerHour")
-            : Sort.by(Sort.Direction.ASC, "spec.pricePerHour");
+    public Page<MachineListItemResponse> listAvailable(
+        int page,
+        int size,
+        String sort,
+        String keyword,
+        String cpu,
+        String gpu,
+        Integer ramMin,
+        Integer storageMin,
+        BigDecimal priceMin,
+        BigDecimal priceMax,
+        String purpose
+    ) {
+        Sort sortBy;
+        if ("price_desc".equalsIgnoreCase(sort)) {
+            sortBy = Sort.by(Sort.Direction.DESC, "spec.pricePerHour");
+        } else if ("newest".equalsIgnoreCase(sort)) {
+            sortBy = Sort.by(Sort.Direction.DESC, "id");
+        } else {
+            sortBy = Sort.by(Sort.Direction.ASC, "spec.pricePerHour");
+        }
 
         Pageable pageable = PageRequest.of(page, size, sortBy);
-        return pcRepository.findByStatus(PcStatus.available, pageable)
+        return pcRepository.searchAvailable(
+                normalizeText(keyword),
+                normalizeText(cpu),
+                normalizeText(gpu),
+                ramMin,
+                storageMin,
+                priceMin,
+                priceMax,
+                normalizeText(purpose),
+                pageable
+            )
             .map(pc -> new MachineListItemResponse(
                 pc.getId(),
                 pc.getSpec().getId(),
@@ -59,6 +87,13 @@ public class PcService {
                 pc.getLocation(),
                 pc.getStatus() == null ? null : pc.getStatus().name()
             ));
+    }
+
+    private String normalizeText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     @Transactional(readOnly = true)

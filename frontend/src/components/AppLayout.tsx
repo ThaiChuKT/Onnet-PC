@@ -29,6 +29,9 @@ export function AppLayout() {
               <NavLink to="/wallet" className={({ isActive }) => `chip ${isActive ? 'active' : ''}`}>
                 Wallet
               </NavLink>
+              <NavLink to="/rentals" className={({ isActive }) => `chip ${isActive ? 'active' : ''}`}>
+                Rentals
+              </NavLink>
               <button className="btn ghost" onClick={onLogout}>
                 Logout
               </button>

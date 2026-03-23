@@ -8,6 +8,7 @@ import { MachinesPage } from './pages/MachinesPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
 import { RegisterPage } from './pages/RegisterPage.tsx'
+import { RentalHistoryPage } from './pages/RentalHistoryPage.tsx'
 import { VerifyEmailPage } from './pages/VerifyEmailPage.tsx'
 import { WalletPage } from './pages/WalletPage.tsx'
 
@@ -34,6 +35,14 @@ function App() {
           element={
             <ProtectedRoute>
               <WalletPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rentals"
+          element={
+            <ProtectedRoute>
+              <RentalHistoryPage />
             </ProtectedRoute>
           }
         />
