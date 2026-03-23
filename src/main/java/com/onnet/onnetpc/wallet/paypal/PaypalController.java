@@ -5,10 +5,13 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.Map;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +36,15 @@ public class PaypalController {
 	@PostMapping("/orders/{orderId}/capture")
 	public ApiResponse<PaypalCaptureResponse> captureOrder(Authentication authentication, @PathVariable String orderId) {
 		return ApiResponse.success(paypalService.captureOrder(authentication.getName(), orderId));
+	}
+
+	@PostMapping("/webhook")
+	public ApiResponse<Map<String, String>> handleWebhook(
+		@RequestHeader HttpHeaders headers,
+		@RequestBody String payload
+	) {
+		paypalService.handleWebhook(headers, payload);
+		return ApiResponse.success(Map.of("status", "ok"));
 	}
 
 	public record CreatePaypalOrderRequest(@NotNull @DecimalMin("1.0") BigDecimal amount) {

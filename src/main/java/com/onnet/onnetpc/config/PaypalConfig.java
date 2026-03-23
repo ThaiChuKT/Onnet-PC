@@ -15,6 +15,9 @@ public class PaypalConfig {
 	@Value("${app.paypal.base-url:https://api-m.sandbox.paypal.com}")
 	private String baseUrl;
 
+	@Value("${app.paypal.webhook-id:}")
+	private String webhookId;
+
 	@Value("${app.frontend.base-url:http://localhost:5173}")
 	private String frontendBaseUrl;
 
@@ -28,6 +31,10 @@ public class PaypalConfig {
 
 	public String getBaseUrl() {
 		return baseUrl;
+	}
+
+	public String getWebhookId() {
+		return webhookId;
 	}
 
 	public String getFrontendBaseUrl() {
