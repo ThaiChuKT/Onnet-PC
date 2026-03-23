@@ -40,6 +40,7 @@ build/
 .vscode/
 
 ### Frontend (Vite/React) ###
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
@@ -53,6 +54,7 @@ frontend/coverage/
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+src/main/resources/application.properties
 
 ### OS ###
 .DS_Store
