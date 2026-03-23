@@ -23,5 +23,16 @@ public interface PaypalPaymentRepository extends JpaRepository<PaypalPayment, Lo
         @Param("walletId") Long walletId
     );
 
+    @Query(
+        value = """
+            SELECT *
+            FROM payments
+            WHERE transaction_id = :transactionId
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<PaypalPayment> findByTransactionIdForUpdate(@Param("transactionId") String transactionId);
+
     List<PaypalPayment> findTop50ByWalletIdAndPaymentStatusOrderByCreatedAtDesc(Long walletId, PaypalPaymentStatus paymentStatus);
 }

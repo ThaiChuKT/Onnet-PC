@@ -26,6 +26,7 @@ import java.util.Base64;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -170,6 +171,31 @@ public class PaypalService {
 	}
 
 	@Transactional
+	public void handleWebhook(HttpHeaders headers, String payload) {
+		if (payload == null || payload.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "Webhook payload is empty");
+		}
+
+		JsonNode event = parseJson(payload, HttpStatus.BAD_REQUEST, "Invalid PayPal webhook payload");
+		verifyWebhookSignature(headers, event);
+
+		String eventType = event.path("event_type").asText("");
+		if (eventType.isBlank()) {
+			logger.warn("PayPal webhook received without event_type");
+			return;
+		}
+
+		switch (eventType) {
+			case "PAYMENT.CAPTURE.COMPLETED" -> handleCaptureCompletedWebhook(event);
+			case "PAYMENT.CAPTURE.DENIED" -> handleCaptureDeniedWebhook(event);
+			case "CHECKOUT.ORDER.APPROVED", "CHECKOUT.ORDER.COMPLETED", "CHECKOUT.ORDER.CANCELLED" -> {
+				logger.info("PayPal webhook event received: {}", eventType);
+			}
+			default -> logger.debug("Ignored unsupported PayPal webhook event: {}", eventType);
+		}
+	}
+
+	@Transactional
 	public void reconcilePendingPayments(String email) {
 		Wallet wallet = findWalletByEmail(email);
 		String accessToken = fetchAccessToken();
@@ -246,6 +272,120 @@ public class PaypalService {
 		}
 
 		return new PaypalCaptureResponse(orderId, "COMPLETED", "Wallet topped up successfully", wallet.getBalance());
+	}
+
+	private void handleCaptureCompletedWebhook(JsonNode event) {
+		String orderId = extractOrderIdFromWebhook(event);
+		if (orderId.isBlank()) {
+			logger.warn("PAYMENT.CAPTURE.COMPLETED webhook missing order id");
+			return;
+		}
+
+		PaypalPayment payment = paypalPaymentRepository.findByTransactionIdForUpdate(orderId)
+			.orElse(null);
+		if (payment == null) {
+			logger.warn("No local payment found for PayPal order {} during webhook processing", orderId);
+			return;
+		}
+
+		if (payment.getPaymentStatus() == PaypalPaymentStatus.success) {
+			return;
+		}
+
+		Wallet wallet = payment.getWallet();
+		BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+		JsonNode paypalPayload = event.path("resource");
+		completeCaptureLocally(wallet, payment, orderId, currentBalance, paypalPayload);
+	}
+
+	private void handleCaptureDeniedWebhook(JsonNode event) {
+		String orderId = extractOrderIdFromWebhook(event);
+		if (orderId.isBlank()) {
+			logger.warn("PAYMENT.CAPTURE.DENIED webhook missing order id");
+			return;
+		}
+
+		PaypalPayment payment = paypalPaymentRepository.findByTransactionIdForUpdate(orderId)
+			.orElse(null);
+		if (payment == null) {
+			logger.warn("No local payment found for denied PayPal order {}", orderId);
+			return;
+		}
+
+		if (payment.getPaymentStatus() == PaypalPaymentStatus.pending) {
+			payment.setPaymentStatus(PaypalPaymentStatus.failed);
+			paypalPaymentRepository.save(payment);
+		}
+	}
+
+	private void verifyWebhookSignature(HttpHeaders headers, JsonNode webhookEvent) {
+		String webhookId = paypalConfig.getWebhookId();
+		if (webhookId == null || webhookId.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "PayPal webhook id is not configured");
+		}
+
+		String transmissionId = requireHeader(headers, "PAYPAL-TRANSMISSION-ID");
+		String transmissionTime = requireHeader(headers, "PAYPAL-TRANSMISSION-TIME");
+		String certUrl = requireHeader(headers, "PAYPAL-CERT-URL");
+		String authAlgo = requireHeader(headers, "PAYPAL-AUTH-ALGO");
+		String transmissionSig = requireHeader(headers, "PAYPAL-TRANSMISSION-SIG");
+
+		ObjectNode payload = objectMapper.createObjectNode();
+		payload.put("transmission_id", transmissionId);
+		payload.put("transmission_time", transmissionTime);
+		payload.put("cert_url", certUrl);
+		payload.put("auth_algo", authAlgo);
+		payload.put("transmission_sig", transmissionSig);
+		payload.put("webhook_id", webhookId);
+		payload.set("webhook_event", webhookEvent);
+
+		String accessToken = fetchAccessToken();
+		JsonNode verification = sendJsonPost(
+			paypalConfig.getBaseUrl() + "/v1/notifications/verify-webhook-signature",
+			accessToken,
+			payload.toString(),
+			HttpStatus.BAD_GATEWAY,
+			"Failed to verify PayPal webhook signature"
+		);
+
+		String verificationStatus = verification.path("verification_status").asText("");
+		if (!"SUCCESS".equalsIgnoreCase(verificationStatus)) {
+			throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid PayPal webhook signature");
+		}
+	}
+
+	private String requireHeader(HttpHeaders headers, String headerName) {
+		String value = headers.getFirst(headerName);
+		if (value == null || value.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "Missing PayPal webhook header: " + headerName);
+		}
+		return value;
+	}
+
+	private String extractOrderIdFromWebhook(JsonNode event) {
+		String orderId = event.path("resource")
+			.path("supplementary_data")
+			.path("related_ids")
+			.path("order_id")
+			.asText("");
+		if (!orderId.isBlank()) {
+			return orderId;
+		}
+
+		String eventType = event.path("event_type").asText("");
+		if (eventType.startsWith("CHECKOUT.ORDER.")) {
+			orderId = event.path("resource").path("id").asText("");
+		}
+
+		return orderId;
+	}
+
+	private JsonNode parseJson(String raw, HttpStatus status, String message) {
+		try {
+			return objectMapper.readTree(raw);
+		} catch (Exception ex) {
+			throw new ApiException(status, message);
+		}
 	}
 
 	private BigDecimal resolveCapturedAmount(PaypalPayment payment, JsonNode paypalPayload) {
