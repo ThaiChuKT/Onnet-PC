@@ -23,7 +23,7 @@ export type AuthResponse = {
 
 export type RegisterResponse = {
   userId: number
-  verificationToken: string
+  email: string
   message: string
 }
 

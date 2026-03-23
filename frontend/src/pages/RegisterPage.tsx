@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.tsx'
 
 export function RegisterPage() {
   const { register } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     fullName: '',
     email: '',
     phone: '',
     password: '',
   })
-  const [verificationToken, setVerificationToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,7 +21,11 @@ export function RegisterPage() {
     setLoading(true)
     try {
       const response = await register(form)
-      setVerificationToken(response.verificationToken)
+      navigate('/verify-email', {
+        state: {
+          email: response.email,
+        },
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register')
     } finally {
@@ -30,7 +34,7 @@ export function RegisterPage() {
   }
 
   return (
-    <section className="grid cols-2">
+    <section>
       <article className="card stack">
         <h2>Create account</h2>
         <form className="stack" onSubmit={onSubmit}>
@@ -74,21 +78,6 @@ export function RegisterPage() {
             {loading ? 'Creating...' : 'Create account'}
           </button>
         </form>
-      </article>
-
-      <article className="card stack">
-        <h3>Email verification</h3>
-        <p className="muted">Use this token to finish verification.</p>
-        {verificationToken ? (
-          <>
-            <p><strong>Token:</strong> {verificationToken}</p>
-            <Link className="btn" to={`/verify-email/${verificationToken}`}>
-              Verify now
-            </Link>
-          </>
-        ) : (
-          <p className="muted">Token appears after successful registration.</p>
-        )}
       </article>
     </section>
   )

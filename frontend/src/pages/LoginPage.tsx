@@ -53,7 +53,7 @@ export function LoginPage() {
       <article className="card stack">
         <h3>Verification note</h3>
         <p className="muted">
-          If login fails with email verification errors, complete verification from the register page using the returned token.
+          If login fails with email verification errors, complete verification from the register page using the code sent to your email.
         </p>
       </article>
     </section>

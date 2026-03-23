@@ -4,10 +4,10 @@ import com.onnet.onnetpc.auth.dto.AuthResponse;
 import com.onnet.onnetpc.auth.dto.LoginRequest;
 import com.onnet.onnetpc.auth.dto.RegisterRequest;
 import com.onnet.onnetpc.auth.dto.RegisterResponse;
+import com.onnet.onnetpc.auth.dto.VerifyEmailCodeRequest;
 import com.onnet.onnetpc.auth.service.AuthService;
 import com.onnet.onnetpc.common.response.ApiResponse;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,9 +33,9 @@ public class AuthController {
 		return ApiResponse.success(authService.login(request));
 	}
 
-	@PostMapping("/verify-email/{token}")
-	public ApiResponse<String> verifyEmail(@PathVariable String token) {
-		authService.verifyEmail(token);
+	@PostMapping("/verify-email")
+	public ApiResponse<String> verifyEmail(@Valid @RequestBody VerifyEmailCodeRequest request) {
+		authService.verifyEmail(request);
 		return ApiResponse.success("Email verified successfully");
 	}
 }

@@ -8,7 +8,7 @@ type AuthContextValue = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (payload: { fullName: string; email: string; phone: string; password: string }) => Promise<RegisterResponse>
-  verifyEmail: (token: string) => Promise<string>
+  verifyEmail: (payload: { email: string; code: string }) => Promise<string>
   refreshProfile: () => Promise<void>
   logout: () => void
 }
@@ -76,8 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unwrapApi(response.data)
   }, [])
 
-  const verifyEmail = useCallback(async (emailToken: string) => {
-    const response = await api.post<ApiEnvelope<string>>(`/auth/verify-email/${emailToken}`)
+  const verifyEmail = useCallback(async (payload: { email: string; code: string }) => {
+    const response = await api.post<ApiEnvelope<string>>('/auth/verify-email', payload)
     return unwrapApi(response.data)
   }, [])
 

@@ -5,6 +5,7 @@ import com.onnet.onnetpc.auth.dto.AuthResponse;
 import com.onnet.onnetpc.auth.dto.LoginRequest;
 import com.onnet.onnetpc.auth.dto.RegisterRequest;
 import com.onnet.onnetpc.auth.dto.RegisterResponse;
+import com.onnet.onnetpc.auth.dto.VerifyEmailCodeRequest;
 import com.onnet.onnetpc.auth.repository.EmailVerificationTokenRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.common.security.JwtService;
@@ -16,67 +17,103 @@ import com.onnet.onnetpc.wallet.repository.WalletRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.UUID;
+import java.util.Optional;
+import java.security.SecureRandom;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final EmailVerificationTokenRepository tokenRepository;
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final JavaMailSender mailSender;
+    private final String verificationMailFrom;
+    private final long verificationCodeExpiryMinutes;
 
     public AuthService(
         UserRepository userRepository,
         EmailVerificationTokenRepository tokenRepository,
         WalletRepository walletRepository,
         PasswordEncoder passwordEncoder,
-        JwtService jwtService
+        JwtService jwtService,
+        JavaMailSender mailSender,
+        @Value("${app.email.verification.from:no-reply@onnetpc.local}") String verificationMailFrom,
+        @Value("${app.email.verification.expiry-minutes:15}") long verificationCodeExpiryMinutes
     ) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.walletRepository = walletRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.mailSender = mailSender;
+        this.verificationMailFrom = verificationMailFrom;
+        this.verificationCodeExpiryMinutes = verificationCodeExpiryMinutes;
     }
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         String email = request.email().toLowerCase(Locale.ROOT);
-        if (userRepository.existsByEmail(email)) {
-            throw new ApiException(HttpStatus.CONFLICT, "Email already exists");
+        Optional<User> existingUser = userRepository.findByEmail(email);
+
+        User targetUser;
+        if (existingUser.isPresent()) {
+            targetUser = existingUser.get();
+            if (Boolean.TRUE.equals(targetUser.getVerified())) {
+                throw new ApiException(HttpStatus.CONFLICT, "Email already exists");
+            }
+            targetUser.setFullName(request.fullName());
+            targetUser.setPhone(request.phone());
+            targetUser.setPasswordHash(passwordEncoder.encode(request.password()));
+            targetUser.setActive(true);
+            targetUser.setUpdatedAt(Instant.now());
+            targetUser = userRepository.save(targetUser);
+        } else {
+            User user = new User();
+            user.setFullName(request.fullName());
+            user.setEmail(email);
+            user.setPhone(request.phone());
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+            user.setRole(UserRole.user);
+            user.setVerified(false);
+            user.setActive(true);
+            user.setUsername(generateUsernameFromEmail(email));
+            user.setUpdatedAt(Instant.now());
+            targetUser = userRepository.save(user);
+
+            Wallet wallet = new Wallet();
+            wallet.setUser(targetUser);
+            wallet.setBalance(BigDecimal.ZERO);
+            wallet.setUpdatedAt(Instant.now());
+            walletRepository.save(wallet);
         }
 
-        User user = new User();
-        user.setFullName(request.fullName());
-        user.setEmail(email);
-        user.setPhone(request.phone());
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole(UserRole.user);
-        user.setVerified(false);
-        user.setActive(true);
-        user.setUsername(generateUsernameFromEmail(email));
-        user.setUpdatedAt(Instant.now());
-        User saved = userRepository.save(user);
-
-        Wallet wallet = new Wallet();
-        wallet.setUser(saved);
-        wallet.setBalance(BigDecimal.ZERO);
-        wallet.setUpdatedAt(Instant.now());
-        walletRepository.save(wallet);
+        tokenRepository.deleteByUserId(targetUser.getId());
+        String verificationCode = generateVerificationCode();
 
         EmailVerificationToken token = new EmailVerificationToken();
-        token.setUser(saved);
-        token.setToken(UUID.randomUUID().toString());
-        token.setExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
+        token.setUser(targetUser);
+        token.setToken(verificationCode);
+        token.setExpiresAt(Instant.now().plusSeconds(verificationCodeExpiryMinutes * 60));
         tokenRepository.save(token);
 
-        return new RegisterResponse(saved.getId(), token.getToken(), "Account created. Verify email to activate login.");
+        sendVerificationCodeEmail(email, verificationCode);
+
+        return new RegisterResponse(
+            targetUser.getId(),
+            email,
+            "Verification code sent to your email. Enter the code to complete registration."
+        );
     }
 
     @Transactional(readOnly = true)
@@ -99,11 +136,21 @@ public class AuthService {
     }
 
     @Transactional
-    public void verifyEmail(String tokenValue) {
-        EmailVerificationToken token = tokenRepository.findByToken(tokenValue)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Verification token not found"));
+    public void verifyEmail(VerifyEmailCodeRequest request) {
+        String email = request.email().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Account not found"));
 
-        User user = token.getUser();
+        if (Boolean.TRUE.equals(user.getVerified())) {
+            return;
+        }
+
+        EmailVerificationToken token = tokenRepository.findTopByUserIdOrderByCreatedAtDesc(user.getId())
+            .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Verification code not found"));
+
+        if (!token.getToken().equals(request.code())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid verification code");
+        }
 
         if (token.getUsedAt() != null) {
             // Idempotent verify: duplicate requests should still be treated as success.
@@ -127,6 +174,27 @@ public class AuthService {
 
         token.setUsedAt(Instant.now());
         tokenRepository.save(token);
+    }
+
+    private String generateVerificationCode() {
+        int code = 100000 + SECURE_RANDOM.nextInt(900000);
+        return String.valueOf(code);
+    }
+
+    private void sendVerificationCodeEmail(String email, String code) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(verificationMailFrom);
+            message.setTo(email);
+            message.setSubject("Your OnnetPC verification code");
+            message.setText(
+                "Your OnnetPC verification code is: " + code + "\n\n"
+                    + "This code expires in " + verificationCodeExpiryMinutes + " minutes."
+            );
+            mailSender.send(message);
+        } catch (Exception ex) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send verification email");
+        }
     }
 
     private String generateUsernameFromEmail(String email) {

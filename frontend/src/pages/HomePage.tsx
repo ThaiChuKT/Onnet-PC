@@ -32,7 +32,7 @@ export function HomePage() {
         <article className="card stack">
           <h3>Quick Start</h3>
           <p className="muted">1. Register an account.</p>
-          <p className="muted">2. Verify with the token from register response.</p>
+          <p className="muted">2. Verify using the 6-digit code sent to your email.</p>
           <p className="muted">3. Login and browse machine details.</p>
         </article>
         <article className="card stack">

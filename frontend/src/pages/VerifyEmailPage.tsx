@@ -1,66 +1,69 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.tsx'
 
+type VerifyLocationState = {
+  email?: string
+}
+
 export function VerifyEmailPage() {
-  const { token } = useParams()
   const { verifyEmail } = useAuth()
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const location = useLocation()
+  const state = location.state as VerifyLocationState | null
+  const email = state?.email?.trim() ?? ''
+
+  const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('error')
-      setMessage('Missing verification token')
-      return
+  if (!email) {
+    return <Navigate to="/register" replace />
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    setLoading(true)
+    try {
+      const result = await verifyEmail({ email, code: code.trim() })
+      setMessage(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to verify email')
+    } finally {
+      setLoading(false)
     }
-
-    const safeToken = token
-
-    let cancelled = false
-
-    async function run() {
-      setStatus('loading')
-      try {
-        const result = await verifyEmail(safeToken)
-        if (!cancelled) {
-          setStatus('ok')
-          setMessage(result)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const errorMessage = err instanceof Error ? err.message : 'Verification failed'
-          if (errorMessage.toLowerCase().includes('already used')) {
-            setStatus('ok')
-            setMessage('Email already verified. You can log in now.')
-          } else {
-            setStatus('error')
-            setMessage(errorMessage)
-          }
-        }
-      }
-    }
-
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [token, verifyEmail])
+  }
 
   return (
-    <section className="card stack">
-      <h2>Email verification</h2>
-      {status === 'loading' ? <p className="muted">Verifying token...</p> : null}
-      {status === 'ok' ? <p className="success">{message}</p> : null}
-      {status === 'error' ? <p className="error">{message}</p> : null}
-      <div className="row">
-        <Link className="btn" to="/login">
-          Go to login
-        </Link>
-        <Link className="btn ghost" to="/register">
-          Register again
-        </Link>
-      </div>
+    <section>
+      <article className="card stack">
+        <h2>Email verification</h2>
+        <p className="muted">We sent a 6-digit code to {email}.</p>
+        <form className="stack" onSubmit={onSubmit}>
+          <label className="field">
+            Verification code
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+            />
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          {message ? <p className="success">{message}</p> : null}
+          <button className="btn" type="submit" disabled={loading}>
+            {loading ? 'Verifying...' : 'Complete registration'}
+          </button>
+        </form>
+        <p className="muted">
+          Already verified? <Link to="/login">Login here</Link>
+        </p>
+      </article>
     </section>
   )
 }
