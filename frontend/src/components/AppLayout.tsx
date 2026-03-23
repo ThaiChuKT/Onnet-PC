@@ -32,6 +32,11 @@ export function AppLayout() {
               <NavLink to="/rentals" className={({ isActive }) => `chip ${isActive ? 'active' : ''}`}>
                 Rentals
               </NavLink>
+              {(user?.role ?? '').toLowerCase() === 'admin' ? (
+                <NavLink to="/admin" className={({ isActive }) => `chip ${isActive ? 'active' : ''}`}>
+                  Admin
+                </NavLink>
+              ) : null}
               <button className="btn ghost" onClick={onLogout}>
                 Logout
               </button>

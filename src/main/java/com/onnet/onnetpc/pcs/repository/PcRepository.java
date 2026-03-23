@@ -37,4 +37,8 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         @Param("purpose") String purpose,
         Pageable pageable
     );
+
+    Page<Pc> findByDeletedAtIsNull(Pageable pageable);
+
+    Page<Pc> findByDeletedAtIsNullAndStatus(PcStatus status, Pageable pageable);
 }

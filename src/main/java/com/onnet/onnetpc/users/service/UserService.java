@@ -27,7 +27,14 @@ public class UserService {
     @Transactional(readOnly = true)
     public ProfileResponse getProfile(String email) {
         User user = findUserByEmail(email);
-        return new ProfileResponse(user.getId(), user.getFullName(), user.getEmail(), user.getPhone(), user.getAvatar());
+        return new ProfileResponse(
+            user.getId(),
+            user.getFullName(),
+            user.getEmail(),
+            user.getPhone(),
+            user.getAvatar(),
+            user.getRole() == null ? null : user.getRole().name()
+        );
     }
 
     @Transactional
@@ -38,7 +45,14 @@ public class UserService {
         user.setAvatar(request.avatar());
         user.setUpdatedAt(Instant.now());
         User saved = userRepository.save(user);
-        return new ProfileResponse(saved.getId(), saved.getFullName(), saved.getEmail(), saved.getPhone(), saved.getAvatar());
+        return new ProfileResponse(
+            saved.getId(),
+            saved.getFullName(),
+            saved.getEmail(),
+            saved.getPhone(),
+            saved.getAvatar(),
+            saved.getRole() == null ? null : saved.getRole().name()
+        );
     }
 
     @Transactional

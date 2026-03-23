@@ -33,6 +33,7 @@ export type Profile = {
   email: string
   phone: string
   avatar: string | null
+  role: string | null
 }
 
 export type MachineListItem = {
@@ -141,4 +142,53 @@ export type ReviewSubmitResponse = {
   reviewId: number
   status: string
   message: string
+}
+
+export type AdminUserItem = {
+  id: number
+  fullName: string
+  email: string
+  phone: string
+  role: string | null
+  active: boolean
+  verified: boolean
+}
+
+export type AdminPcItem = {
+  pcId: number
+  specId: number
+  specName: string
+  cpu: string
+  gpu: string
+  ram: number
+  storage: number
+  operatingSystem: string
+  pricePerHour: number
+  location: string
+  status: string
+}
+
+export type AdminBookingItem = {
+  bookingId: number
+  userEmail: string
+  specName: string
+  pcId: number | null
+  bookingType: string
+  totalHours: number | null
+  startTime: string
+  endTime: string
+  totalPrice: number
+  status: string
+  createdAt: string
+}
+
+export type AdminReviewItem = {
+  reviewId: number
+  bookingId: number
+  pcId: number
+  userEmail: string
+  rating: number
+  comment: string
+  status: string
+  createdAt: string
 }

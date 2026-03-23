@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AdminRoute } from './components/AdminRoute.tsx'
 import { AppLayout } from './components/AppLayout.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
+import { AdminPage } from './pages/AdminPage.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { MachineDetailPage } from './pages/MachineDetailPage.tsx'
@@ -44,6 +46,14 @@ function App() {
             <ProtectedRoute>
               <RentalHistoryPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminPage />
+            </AdminRoute>
           }
         />
         <Route path="/home" element={<Navigate to="/" replace />} />
