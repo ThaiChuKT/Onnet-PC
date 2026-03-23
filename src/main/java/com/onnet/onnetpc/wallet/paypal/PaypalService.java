@@ -24,12 +24,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaypalService {
+
+	private static final Logger logger = LoggerFactory.getLogger(PaypalService.class);
 
 	private final PaypalConfig paypalConfig;
 	private final ObjectMapper objectMapper = new ObjectMapper();
@@ -107,46 +111,177 @@ public class PaypalService {
 	@Transactional
 	public PaypalCaptureResponse captureOrder(String email, String orderId) {
 		Wallet wallet = findWalletByEmail(email);
+		BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
 		PaypalPayment payment = paypalPaymentRepository.findByTransactionIdAndWalletId(orderId, wallet.getId())
 			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PayPal order not found for this wallet"));
 
 		if (payment.getPaymentStatus() == PaypalPaymentStatus.success) {
-			return new PaypalCaptureResponse(orderId, "COMPLETED", "Order already captured", wallet.getBalance());
+			return new PaypalCaptureResponse(orderId, "COMPLETED", "Order already captured", currentBalance);
 		}
 
 		String accessToken = fetchAccessToken();
-		JsonNode response = sendJsonPost(
-			paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId) + "/capture",
+		JsonNode existingOrder = sendJsonGet(
+			paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId),
 			accessToken,
-			"{}",
 			HttpStatus.BAD_GATEWAY,
-			"Failed to capture PayPal order"
+			"Failed to verify PayPal order status"
 		);
+		if ("COMPLETED".equalsIgnoreCase(extractCaptureStatus(existingOrder))) {
+			return completeCaptureLocally(wallet, payment, orderId, currentBalance, existingOrder);
+		}
+
+		JsonNode response;
+		try {
+			response = sendJsonPost(
+				paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId) + "/capture",
+				accessToken,
+				"{}",
+				HttpStatus.BAD_GATEWAY,
+				"Failed to capture PayPal order"
+			);
+		} catch (ApiException ex) {
+			JsonNode latestOrder = sendJsonGet(
+				paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId),
+				accessToken,
+				HttpStatus.BAD_GATEWAY,
+				"Failed to verify PayPal order status"
+			);
+			if ("COMPLETED".equalsIgnoreCase(extractCaptureStatus(latestOrder))) {
+				return completeCaptureLocally(wallet, payment, orderId, currentBalance, latestOrder);
+			}
+			throw ex;
+		}
 
 		String captureStatus = extractCaptureStatus(response);
 		if (!"COMPLETED".equalsIgnoreCase(captureStatus)) {
-			payment.setPaymentStatus(PaypalPaymentStatus.failed);
-			paypalPaymentRepository.save(payment);
-			throw new ApiException(HttpStatus.BAD_REQUEST, "PayPal payment is not completed yet");
+			JsonNode latestOrder = sendJsonGet(
+				paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId),
+				accessToken,
+				HttpStatus.BAD_GATEWAY,
+				"Failed to verify PayPal order status"
+			);
+			if ("COMPLETED".equalsIgnoreCase(extractCaptureStatus(latestOrder))) {
+				return completeCaptureLocally(wallet, payment, orderId, currentBalance, latestOrder);
+			}
+			throw new ApiException(HttpStatus.CONFLICT, "PayPal payment is still processing. Please try again shortly");
 		}
 
-		wallet.setBalance(wallet.getBalance().add(payment.getAmount()));
+		return completeCaptureLocally(wallet, payment, orderId, currentBalance, response);
+	}
+
+	@Transactional
+	public void reconcilePendingPayments(String email) {
+		Wallet wallet = findWalletByEmail(email);
+		String accessToken = fetchAccessToken();
+
+		for (PaypalPayment payment : paypalPaymentRepository
+			.findTop50ByWalletIdAndPaymentStatusOrderByCreatedAtDesc(wallet.getId(), PaypalPaymentStatus.pending)) {
+			String orderId = payment.getTransactionId();
+			if (orderId == null || orderId.isBlank()) {
+				continue;
+			}
+
+			try {
+				JsonNode order = sendJsonGet(
+					paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId),
+					accessToken,
+					HttpStatus.BAD_GATEWAY,
+					"Failed to verify PayPal order status"
+				);
+				String status = extractCaptureStatus(order);
+
+				if ("COMPLETED".equalsIgnoreCase(status)) {
+					BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+					completeCaptureLocally(wallet, payment, orderId, currentBalance, order);
+					continue;
+				}
+
+				if ("APPROVED".equalsIgnoreCase(status) || "CREATED".equalsIgnoreCase(status)) {
+					JsonNode capture = sendJsonPost(
+						paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId) + "/capture",
+						accessToken,
+						"{}",
+						HttpStatus.BAD_GATEWAY,
+						"Failed to capture PayPal order"
+					);
+					if ("COMPLETED".equalsIgnoreCase(extractCaptureStatus(capture))) {
+						BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+						completeCaptureLocally(wallet, payment, orderId, currentBalance, capture);
+					}
+				}
+			} catch (Exception ex) {
+				logger.warn("Failed to reconcile PayPal order {} for wallet {}", orderId, wallet.getId(), ex);
+			}
+		}
+	}
+
+	private PaypalCaptureResponse completeCaptureLocally(
+		Wallet wallet,
+		PaypalPayment payment,
+		String orderId,
+		BigDecimal currentBalance,
+		JsonNode paypalPayload
+	) {
+		BigDecimal capturedAmount = resolveCapturedAmount(payment, paypalPayload);
+
+		wallet.setBalance(currentBalance.add(capturedAmount));
 		wallet.setUpdatedAt(Instant.now());
 		walletRepository.save(wallet);
 
-		WalletTransaction walletTransaction = new WalletTransaction();
-		walletTransaction.setWallet(wallet);
-		walletTransaction.setAmount(payment.getAmount());
-		walletTransaction.setType(WalletTransactionType.top_up);
-		walletTransaction.setReferenceId(payment.getId());
-		walletTransaction.setNote("PayPal top-up order " + orderId);
-		walletTransactionRepository.save(walletTransaction);
-
+		payment.setAmount(capturedAmount);
 		payment.setPaymentStatus(PaypalPaymentStatus.success);
 		payment.setPaidAt(Instant.now());
 		paypalPaymentRepository.save(payment);
 
+		try {
+			WalletTransaction walletTransaction = new WalletTransaction();
+			walletTransaction.setWallet(wallet);
+			walletTransaction.setAmount(capturedAmount);
+			walletTransaction.setType(WalletTransactionType.top_up);
+			walletTransaction.setReferenceId(payment.getId());
+			walletTransaction.setNote("PayPal top-up order " + orderId);
+			walletTransactionRepository.save(walletTransaction);
+		} catch (Exception ignored) {
+			// Keep capture successful even if local transaction history insert fails.
+		}
+
 		return new PaypalCaptureResponse(orderId, "COMPLETED", "Wallet topped up successfully", wallet.getBalance());
+	}
+
+	private BigDecimal resolveCapturedAmount(PaypalPayment payment, JsonNode paypalPayload) {
+		if (payment.getAmount() != null && payment.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+			return payment.getAmount().setScale(2, RoundingMode.HALF_UP);
+		}
+
+		String amountValue = paypalPayload.path("purchase_units")
+			.path(0)
+			.path("payments")
+			.path("captures")
+			.path(0)
+			.path("amount")
+			.path("value")
+			.asText("");
+		if (amountValue.isBlank()) {
+			amountValue = paypalPayload.path("purchase_units")
+				.path(0)
+				.path("amount")
+				.path("value")
+				.asText("");
+		}
+
+		if (amountValue.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_GATEWAY, "Unable to determine captured PayPal amount");
+		}
+
+		try {
+			BigDecimal parsedAmount = new BigDecimal(amountValue);
+			if (parsedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				throw new ApiException(HttpStatus.BAD_GATEWAY, "Invalid captured PayPal amount");
+			}
+			return parsedAmount.setScale(2, RoundingMode.HALF_UP);
+		} catch (NumberFormatException ex) {
+			throw new ApiException(HttpStatus.BAD_GATEWAY, "Invalid captured PayPal amount");
+		}
 	}
 
 	private String fetchAccessToken() {
@@ -196,8 +331,30 @@ public class PaypalService {
 		HttpRequest request = HttpRequest.newBuilder()
 			.uri(URI.create(url))
 			.header("Authorization", "Bearer " + accessToken)
+			.header("Prefer", "return=representation")
 			.header("Content-Type", "application/json")
 			.POST(HttpRequest.BodyPublishers.ofString(body))
+			.build();
+
+		try {
+			HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+			if (response.statusCode() >= 400) {
+				throw new ApiException(failureStatus, failureMessage);
+			}
+			return objectMapper.readTree(response.body());
+		} catch (ApiException ex) {
+			throw ex;
+		} catch (Exception ex) {
+			throw new ApiException(failureStatus, failureMessage);
+		}
+	}
+
+	private JsonNode sendJsonGet(String url, String accessToken, HttpStatus failureStatus, String failureMessage) {
+		HttpRequest request = HttpRequest.newBuilder()
+			.uri(URI.create(url))
+			.header("Authorization", "Bearer " + accessToken)
+			.header("Content-Type", "application/json")
+			.GET()
 			.build();
 
 		try {

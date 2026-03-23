@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, unwrapApi } from '../lib/api.ts'
 import type { ApiEnvelope, PaypalCaptureResponse, TopUpResponse, WalletSummary, WalletTransaction } from '../types/api.ts'
 
+const PAYPAL_CAPTURE_LOCK_PREFIX = 'onnet_paypal_capture_'
+
 export function WalletPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -51,6 +53,7 @@ export function WalletPage() {
   useEffect(() => {
     const paypalStatus = searchParams.get('paypalStatus')
     const orderId = searchParams.get('token')
+    const captureLockKey = orderId ? `${PAYPAL_CAPTURE_LOCK_PREFIX}${orderId}` : null
     if (!paypalStatus) {
       return
     }
@@ -68,6 +71,14 @@ export function WalletPage() {
         }
 
         if (paypalStatus === 'success' && orderId) {
+          if (captureLockKey && sessionStorage.getItem(captureLockKey) === '1') {
+            return
+          }
+
+          if (captureLockKey) {
+            sessionStorage.setItem(captureLockKey, '1')
+          }
+
           const response = await api.post<ApiEnvelope<PaypalCaptureResponse>>(`/paypal/orders/${encodeURIComponent(orderId)}/capture`)
           const captureResult = unwrapApi(response.data)
           setSuccess(captureResult.message)
@@ -77,6 +88,9 @@ export function WalletPage() {
 
         setError('Missing PayPal order token in callback URL.')
       } catch (err) {
+        if (captureLockKey) {
+          sessionStorage.removeItem(captureLockKey)
+        }
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to finalize PayPal payment')
         }

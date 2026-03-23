@@ -2,6 +2,8 @@ package com.onnet.onnetpc.common.exception;
 
 import com.onnet.onnetpc.common.response.ApiResponse;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 	@ExceptionHandler(ApiException.class)
 	public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException ex) {
@@ -32,6 +36,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex) {
+		logger.error("Unhandled exception", ex);
 		return ResponseEntity.internalServerError().body(ApiResponse.error("Unexpected server error"));
 	}
 }

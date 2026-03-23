@@ -13,6 +13,7 @@ import com.onnet.onnetpc.wallet.dto.WalletSummaryResponse;
 import com.onnet.onnetpc.wallet.dto.WalletTransactionResponse;
 import com.onnet.onnetpc.wallet.repository.WalletRepository;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
@@ -39,10 +40,12 @@ public class WalletService {
         this.paypalService = paypalService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public WalletSummaryResponse getWalletSummary(String email) {
+        paypalService.reconcilePendingPayments(email);
         Wallet wallet = findWalletByEmail(email);
-        return new WalletSummaryResponse(wallet.getId(), wallet.getBalance());
+        BigDecimal balance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+        return new WalletSummaryResponse(wallet.getId(), balance);
     }
 
     @Transactional(readOnly = true)
