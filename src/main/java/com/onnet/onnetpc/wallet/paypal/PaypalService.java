@@ -26,6 +26,7 @@ import java.util.Base64;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -207,6 +208,11 @@ public class PaypalService {
 				continue;
 			}
 
+			PaypalPayment lockedPayment = paypalPaymentRepository.findByTransactionIdForUpdate(orderId).orElse(null);
+			if (lockedPayment == null || lockedPayment.getPaymentStatus() != PaypalPaymentStatus.pending) {
+				continue;
+			}
+
 			try {
 				JsonNode order = sendJsonGet(
 					paypalConfig.getBaseUrl() + "/v2/checkout/orders/" + urlEncode(orderId),
@@ -218,7 +224,7 @@ public class PaypalService {
 
 				if ("COMPLETED".equalsIgnoreCase(status)) {
 					BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
-					completeCaptureLocally(wallet, payment, orderId, currentBalance, order);
+					completeCaptureLocally(wallet, lockedPayment, orderId, currentBalance, order);
 					continue;
 				}
 
@@ -232,7 +238,7 @@ public class PaypalService {
 					);
 					if ("COMPLETED".equalsIgnoreCase(extractCaptureStatus(capture))) {
 						BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
-						completeCaptureLocally(wallet, payment, orderId, currentBalance, capture);
+						completeCaptureLocally(wallet, lockedPayment, orderId, currentBalance, capture);
 					}
 				}
 			} catch (Exception ex) {
@@ -248,6 +254,10 @@ public class PaypalService {
 		BigDecimal currentBalance,
 		JsonNode paypalPayload
 	) {
+		if (payment.getPaymentStatus() == PaypalPaymentStatus.success) {
+			return new PaypalCaptureResponse(orderId, "COMPLETED", "Order already captured", wallet.getBalance());
+		}
+
 		BigDecimal capturedAmount = resolveCapturedAmount(payment, paypalPayload);
 
 		wallet.setBalance(currentBalance.add(capturedAmount));
@@ -259,19 +269,44 @@ public class PaypalService {
 		payment.setPaidAt(Instant.now());
 		paypalPaymentRepository.save(payment);
 
+		recordTopUpTransactionIfAbsent(wallet, payment, capturedAmount, orderId);
+
+		return new PaypalCaptureResponse(orderId, "COMPLETED", "Wallet topped up successfully", wallet.getBalance());
+	}
+
+	private void recordTopUpTransactionIfAbsent(Wallet wallet, PaypalPayment payment, BigDecimal amount, String orderId) {
+		Long referenceId = payment.getId();
+		if (referenceId == null) {
+			return;
+		}
+
+		boolean alreadyRecorded = walletTransactionRepository.existsByWalletIdAndTypeAndReferenceId(
+			wallet.getId(),
+			WalletTransactionType.top_up,
+			referenceId
+		);
+		if (alreadyRecorded) {
+			return;
+		}
+
 		try {
 			WalletTransaction walletTransaction = new WalletTransaction();
 			walletTransaction.setWallet(wallet);
-			walletTransaction.setAmount(capturedAmount);
+			walletTransaction.setAmount(amount);
 			walletTransaction.setType(WalletTransactionType.top_up);
-			walletTransaction.setReferenceId(payment.getId());
+			walletTransaction.setReferenceId(referenceId);
 			walletTransaction.setNote("PayPal top-up order " + orderId);
 			walletTransactionRepository.save(walletTransaction);
+		} catch (DataIntegrityViolationException ex) {
+			logger.info(
+				"Skip duplicate wallet transaction for walletId={}, paymentId={}, orderId={}",
+				wallet.getId(),
+				referenceId,
+				orderId
+			);
 		} catch (Exception ignored) {
 			// Keep capture successful even if local transaction history insert fails.
 		}
-
-		return new PaypalCaptureResponse(orderId, "COMPLETED", "Wallet topped up successfully", wallet.getBalance());
 	}
 
 	private void handleCaptureCompletedWebhook(JsonNode event) {
