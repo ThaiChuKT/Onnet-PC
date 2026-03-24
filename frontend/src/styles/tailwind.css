@@ -1,0 +1,4 @@
+@import "tailwindcss" source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+/* Removed import 'tw-animate-css' to avoid missing dependency during build */
