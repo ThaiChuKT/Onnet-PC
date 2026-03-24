@@ -1,0 +1,46 @@
+Main actor:
+* Guest ( A user who is not logged in, only has the right to view and register )
+* User ( A person who has registered an account can rent a machine and use all its features )
+* Admin ( System administrator, with full administrative privileges )
+
+Guest use case:
+G1 — View list of machines
+Actor: Guest, User
+Description: Users can view a list of computers currently available for rent, including configuration names, brief specifications, and hourly/monthly rental prices.
+
+G2 — View machine details
+Actor: Guest, User
+Description: Users can view detailed information about a specific machine.
+
+G3 — Register an account
+Actor: Guest
+Description: Guests create a new account to be able to use the computer rental service.
+
+G4 — Log in
+Actor: Guest
+Description: Guests log into the system using their email and password.
+
+User use case:
+U1 — Account Management
+U2 — Search and filter machines
+U3 — AI suggests configuration
+U4 — Rent a machine
+U5 — Payment
+U6 — View rental history
+U7 — Machine Review
+U8 — Wallet Management
+U9 — View Membership Packages
+U10 — Register/Upgrade Membership Package
+U11 — Renewal/Cancel Membership
+U12 — View current Membership benefits
+
+Admin use case:
+A1 — User Management
+A2 — PC Management
+A3 — Booking Management
+A4 — Rent Management
+A5 — Payment Management
+A6 — View Dashboard
+A7 — Evaluation Management
+A8 — Membership Package Management
+A9 — User Subscription Tracking

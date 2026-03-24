@@ -13,7 +13,6 @@ Main flow:
 1. Users access the machine list page.
 2. The system displays a list of machines with the status "AVAILABLE" .
 3. Users can paginate or sort by price.
-
 G2 — View machine details
 Actor: Guest, User
 Description: Users can view detailed information about a specific machine.
@@ -22,33 +21,31 @@ Main flow:
 1. The user clicks on a machine in the list.
 2. The system displays detailed information: CPU, GPU, RAM, Storage, OS, and its intended use (gaming, editing, etc.).
 3. The system displays a price list: hourly rates and monthly/yearly package rates.
-4. The system displays approved user reviews (from the `reviews` table where status = 'approved').
-
+4. The system displays previous user reviews.
 G3 — Register an account
 Actor: Guest
 Description: Guests create a new account to be able to use the computer rental service.
 Prerequisite: The guest does not yet have an account.
 Main flow:
 1. Guests fill in the following information: Full name, Email, Phone number, Password.
-2. System checks for existing email in the system.
-3. The system generates a verification token (stored in `email_verification_tokens`) and sends a verification email.
-4. Guest clicks the link in the email → token is validated → account is activated (is_verified = TRUE).
+2. System check for existing email in the system.
+3. The system sends verification emails.
+4. Guest confirms email → account is activated.
 Alternative flow:
 * The email address already exists → the system reports an error and asks you to re-enter it.
-* The verification token has expired → the system offers to resend the verification email.
-
 G4 — Log in
 Actor: Guest
 Description: Guests log into the system using their email and password.
-Prerequisite: The account must be registered and activated (is_verified = TRUE).
+Prerequisite: The account must be registered and activated.
 Main flow:
 1. Guests enter their email and password.
 2. The system verifies information and issues JWT tokens.
 3. The system redirects users back to the main page as the user.
 Alternative flow:
 * Incorrect login information → error message.
-* Account not yet verified → prompt user to check email.
-* Account locked (is_active = FALSE) → contact Admin for notification.
+* Account locked → contact Admin for notification.
+
+
 
 
 User use case:
@@ -64,7 +61,6 @@ Main flow:
 Alternative path — Change password:
 1. The user enters their old password, new password, and confirms the new password.
 2. The system checks if the old password matches → update.
-
 U2 — Search and filter machines
 Actor: User, Guest
 Description: Users search for machines using various criteria.
@@ -73,7 +69,6 @@ Main flow:
 1. Users can enter keywords or select filters: CPU, GPU, RAM, Storage, Price range, Usage purpose (Gaming, Editing, Programming, ...).
 2. The system returns a list of machines that match the AVAILABLE status .
 3. Users can sort results by price in ascending/descending order.
-
 U3 — AI suggests configuration
 Actor: User
 Description: Users chat with AI to receive suggestions for the most suitable computer configuration.
@@ -83,40 +78,36 @@ Main flow:
 2. The AI asks the user about: intended use, budget, and expected rental period.
 3. The system analyzes and recommends 1–3 suitable configurations with reasons.
 4. Users can click directly on the suggested configuration to place a rental order.
-5. The system saves the history of recommendations to the `ai_recommendations` table.
-
+5. The system saves the history of recommendations to the ai_recommendations table .
 U4 — Rent a machine
 Actor: User
 Description: Users can book computer rentals by the hour or by package.
-Prerequisites: User is logged in, machine is in AVAILABLE status.
+Prerequisites: User is logged in, machine is in AVAILABLE status .
 Main flow:
 1. The user selects the computer and rental option: hourly or package (monthly/yearly).
 2. If renting by the hour: The user selects the start date and time, and the number of rental hours.
 3. The system checks if the machine is available during that time slot.
 4. The system displays an order summary and the total amount.
-5. The system displays a confirmation warning: "After payment, the order is non-refundable. Are you sure you want to proceed?"
-6. Booking is created with status PENDING.
+5. The system displays a confirmation warning : "After payment, the order is non-refundable. Are you sure you want to proceed?"
+6. PENDING status .
 7. The system moves the user to the payment step (U5).
 Alternative flow:
 * The machine is already booked during that time slot → the system suggests a different time slot or a similar machine.
-* All machines matching the spec are IN_USE → the user is added to the waiting queue (`session_queue`) with a position based on their membership tier priority.
-
 U5 — Payment
 Actor: User
 Description: Users pay for rental orders via the system's wallet or PayPal.
-Prerequisite: The booking is currently in PENDING status.
+Prerequisite: The booking is currently in PENDING status .
 Main payment method — Payment via Wallet:
 1. The system checks the user's wallet balance.
-2. If sufficient: deduct the amount from the wallet, update the booking to PAID, and save a WalletTransaction (type = 'deduct').
-3. The system sends an order confirmation email to the user.
+2. If sufficient funds are received, deduct the money from your wallet, update the booking to PAID , and save the WalletTransaction .
+3. The system sends order confirmation emails to users.
 Alternative method — Top up your Wallet via PayPal:
 1. The user selects "Deposit" and enters the amount they wish to deposit.
 2. The system creates a PayPal order and redirects the user to the PayPal payment page.
-3. The user confirms the payment via PayPal.
-4. PayPal redirects back to the system → the system captures the order → balance is added to the wallet (type = 'top_up').
+3. The user confirmed the payment via PayPal.
+4. PayPal redirects to the system → the system captures the order → the money is added to the wallet.
 5. The user returns to complete the order payment from their wallet.
-Order status flow: PENDING → PAID → COMPLETED | CANCELLED
-
+Order status: PENDING → PAID → COMPLETED | CANCELLED
 U6 — View rental history
 Actor: User
 Description: Users can review their entire rental history.
@@ -124,20 +115,18 @@ Prerequisite: The user must be logged in.
 Main flow:
 1. The user accesses the "Rental History" page.
 2. The system displays a list of bookings: machine name, rental period, total cost, and status.
-3. For active bookings (PAID), the system displays the remaining time.
+3. For active bookings ( PAID ), the system displays the remaining time .
 4. Users can click on each booking to view details.
-
 U7 — Machine Review
 Actor: User
 Description: Users leave reviews after their rental period ends.
-Prerequisite: The booking for that machine must be in COMPLETED status.
+Prerequisite: The booking for that machine must be in COMPLETED status .
 Main flow:
 1. The user accesses their rental history and selects the completed booking.
 2. User selects the number of stars (1–5) and writes a review.
-3. The system saves the review to the `reviews` table with status PENDING, awaiting Admin approval.
-4. After the admin approves, the review is displayed on the machine's detail page.
-Restriction: Each booking can only be reviewed once (enforced via unique constraint on booking_id in the `reviews` table).
-
+3. The system saves reviews with the status PENDING , awaiting Admin approval.
+4. After the admin approves, the rating will be displayed on the device details page.
+Restriction: Each booking can only be reviewed once.
 U8 — Wallet Management
 Actor: User
 Description: Users can view their balance and transaction history in their personal wallet.
@@ -145,38 +134,12 @@ Prerequisite: The user must be logged in.
 Main flow:
 1. The user accesses the "My Wallet" page.
 2. The system displays the current balance.
-3. The system displays transaction history from `wallet_transactions`: deposits (top_up), order payments (deduct), and refunds (refund).
+3. The system displays transaction history: deposits, order payments, and refunds.
 4. Users can click "Top Up" to make a top-up via PayPal (see U5).
-
-U9 — View Membership Packages*
-Actor: User
-Description: Users can view a list of packages (Silver, Gold, Platinum) with detailed information about benefits and monthly/annual prices.
-Main flow:
-1. The user accesses the "Membership" page.
-2. The system displays active tiers from `membership_tiers`: tier name, monthly fee, discount %, free hours, advance booking days, and support level.
-
-U10 — Register/Upgrade Membership Package*
-Actor: User
-Description: User selects a tier and pays via wallet (linked to U5). The system activates the membership and records the expiration date.
-Main flow:
-1. User selects a tier and confirms.
-2. System deducts the monthly_fee from wallet (type = 'deduct').
-3. System inserts a record into `user_memberships` (status = 'active') and updates users.tier_id.
-
-U11 — Renewal/Cancel Membership
-Actor: User
-Description: Users renew their membership before it expires or cancel it to prevent automatic renewal.
-Main flow:
-1. User accesses their active membership details.
-2. To renew: system extends end_date and charges wallet.
-3. To cancel: system sets auto_renew = FALSE; membership remains active until end_date.
-
-U12 — View current Membership benefits
-Actor: User
-Description: Displays the current package, expiration date, and applicable offers.
-Main flow:
-1. The system reads the active record from `user_memberships` joined with `membership_tiers`.
-2. Displays: tier name, end_date, discount %, free hours remaining, support level.
+U9 — View Membership Packages * : Users can view a list of packages (Basic, Premium, VIP...) with detailed information about benefits and monthly/annual prices.
+U10 — Register/Upgrade Membership Package * : User selects a package and pays via wallet (linked to U5). The system activates the package and records the expiration date.
+U11 — Renewal/Cancel Membership : Users renew their membership before it expires or cancel it to prevent automatic renewal.
+U12 — View current Membership benefits : Displays the current package, expiration date, and applicable offers.
 
 
 ADMIN use case:
@@ -186,17 +149,19 @@ Description: The administrator manages all user accounts in the system.
 Main flow:
 1. Admin views the list of users: name, email, phone number, account status.
 2. Admins can search for users by name or email.
-3. Admins can lock (is_active = FALSE) or unlock (is_active = TRUE) user accounts.
+3. Admins can lock or unlock user accounts.
+
 
 A2 — PC Management
 Actor: Admin
 Description: The administrator manages all computer information within the system.
 Main flow:
 1. Admin can view the list of machines along with their current status.
-2. Admin can add new machines: enter CPU, GPU, RAM, Storage, OS, and rental price (into `pc_specs` and `pcs`).
+2. Admin can add new machines: enter CPU, GPU, RAM, Storage, OS, and rental price.
 3. The admin can update the machine's information or rental price.
-4. The administrator can soft-delete a computer (sets deleted_at timestamp).
-5. Admin can update the machine status: AVAILABLE | IN_USE | MAINTENANCE.
+4. The administrator can erase the computer (soft delete).
+5. Admin updated the machine status: AVAILABLE | RENTED | MAINTENANCE .
+
 
 A3 — Booking Management
 Actor: Admin
@@ -206,21 +171,24 @@ Main flow:
 2. Admin can view the details of each booking: User, machine, time, total price, status.
 3. Admins can update booking status manually when needed.
 
+
 A4 — Rent Management
 Actor: Admin
 Description: Admin adjusts hourly rental prices and monthly/yearly package prices.
 Main flow:
-1. Admin selects the machine spec or subscription plan whose price needs adjusting.
+1. Admin selects the machine or package whose price needs adjusting.
 2. Admin enters the new price and confirms.
-3. The system applies the new price to bookings made after the change, without affecting existing bookings (total_price is stored at booking time).
+3. The system applies the new price to bookings made after the change , without affecting existing bookings.
+
 
 A5 — Payment Management
 Actor: Admin
 Description: The administrator monitors all financial transactions within the system.
 Main flow:
-1. Admin views the list of transactions from `payments` and `wallet_transactions`.
-2. Admin filters transactions by payment_status: PENDING | SUCCESS | FAILED.
-3. For transactions in PENDING state for too long, the administrator can manually check and update the status.
+1. Admin views the list of transactions: wallet top-ups, order payments, refunds.
+2. Admin filters transactions by status: PENDING | SUCCESS | FAILED .
+3. PENDING state for too long, the administrator can manually check and update the status.
+
 
 A6 — View Dashboard
 Actor: Admin
@@ -228,23 +196,20 @@ Description: Admin reviews the overall system performance.
 Main flow:
 1. The system displays the following overview metrics:
    * Total number of users / New users this month.
-   * Number of machines by status: AVAILABLE, IN_USE, MAINTENANCE.
-   * Revenue by day / month / year (from wallet_transactions and payments).
-   * The most frequently rented computer configuration.
+   * Number of machines by status: AVAILABLE , RENTED , MAINTENANCE .
+   * Revenue by day / month / year.
+   * This is the most frequently rented computer configuration.
 2. Admins can filter data by a custom time range.
+
 
 A7 — Evaluation Management
 Actor: Admin
 Description: Admin moderates user reviews before displaying them publicly.
 Main flow:
-1. Admin views the list of pending reviews from the `reviews` table (status = 'pending').
-2. Admins can read the content and choose to: Approve (status → 'approved', review becomes visible) or Reject (status → 'rejected') for violating content.
-3. The system updates the review status accordingly.
+1. pending reviews .
+2. Admins can read the content and may: Approve (allow display) or Reject/Delete (for violating content).
+3. The system updates the rating status accordingly.
 
-A8 — Membership Package Management*
-Actor: Admin
-Description: Admin creates, edits, and deactivates membership tiers in `membership_tiers`, and sets benefits (discount %, priority, free hours, etc.).
 
-A9 — User Subscription Tracking
-Actor: Admin
-Description: Admin views the list of users with active memberships from `user_memberships`, expiration dates, and revenue from membership payments.
+A8 — Membership Package Management* : Admin creates, edits, and deletes membership packages, and sets benefits (% discount, priority hours, etc.).
+A9 — User Subscription Tracking : Admin views the list of users with active subscriptions, expiration dates, and revenue from subscriptions.
