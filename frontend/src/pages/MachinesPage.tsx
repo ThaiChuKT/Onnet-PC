@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, unwrapApi } from '../lib/api.ts'
 import type { ApiEnvelope, MachineListItem, Paged } from '../types/api.ts'
@@ -25,6 +25,54 @@ export function MachinesPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const GROUP_PAGE_SIZE = 9
+
+  type MachineGroupItem = {
+    specId: number
+    representativePcId: number
+    specName: string
+    cpu: string
+    gpu: string
+    ram: number
+    storage: number
+    hourlyPrice: number
+    availableCount: number
+    statusLabel: string
+  }
+
+  const groupedMachines = useMemo<MachineGroupItem[]>(() => {
+    const map = new Map<number, MachineGroupItem>()
+
+    for (const machine of machines) {
+      const found = map.get(machine.specId)
+      if (found) {
+        found.availableCount += 1
+        continue
+      }
+
+      map.set(machine.specId, {
+        specId: machine.specId,
+        representativePcId: machine.pcId,
+        specName: machine.specName,
+        cpu: machine.cpu,
+        gpu: machine.gpu,
+        ram: machine.ram,
+        storage: machine.storage,
+        hourlyPrice: Number(machine.hourlyPrice),
+        availableCount: 1,
+        statusLabel: 'Available',
+      })
+    }
+
+    return Array.from(map.values())
+  }, [machines])
+
+  const visibleGroups = useMemo(() => {
+    const start = page * GROUP_PAGE_SIZE
+    const end = start + GROUP_PAGE_SIZE
+    return groupedMachines.slice(start, end)
+  }, [groupedMachines, page])
+
   useEffect(() => {
     let cancelled = false
 
@@ -34,8 +82,8 @@ export function MachinesPage() {
       try {
         const response = await api.get<ApiEnvelope<Paged<MachineListItem>>>('/pcs', {
           params: {
-            page,
-            size: 9,
+            page: 0,
+            size: 200,
             sort,
             keyword: keyword.trim() || undefined,
             cpu: cpu.trim() || undefined,
@@ -50,7 +98,8 @@ export function MachinesPage() {
         const data = unwrapApi(response.data)
         if (!cancelled) {
           setMachines(data.content)
-          setTotalPages(data.totalPages)
+          setTotalPages(Math.max(1, Math.ceil(data.content.length / GROUP_PAGE_SIZE)))
+          setPage(0)
         }
       } catch (err) {
         if (!cancelled) {
@@ -67,7 +116,7 @@ export function MachinesPage() {
     return () => {
       cancelled = true
     }
-  }, [page, sort, keyword, cpu, gpu, purpose, ramMin, storageMin, priceMin, priceMax])
+  }, [sort, keyword, cpu, gpu, purpose, ramMin, storageMin, priceMin, priceMax])
 
   return (
     <section className="stack">
@@ -120,23 +169,28 @@ export function MachinesPage() {
         </label>
       </div>
 
-      {loading ? <div className="card">Loading machines...</div> : null}
+      {loading ? <div className="card">Loading machine groups...</div> : null}
       {error ? <div className="card error">{error}</div> : null}
 
       <div className="machine-grid">
-        {machines.map((pc) => (
-          <article key={pc.pcId} className="card stack">
-            <h3>{pc.specName}</h3>
-            <p className="meta">{pc.cpu} • {pc.gpu}</p>
-            <p className="meta">RAM {pc.ram} GB • SSD {pc.storage} GB</p>
-            <p className="price">${Number(pc.hourlyPrice).toFixed(2)} / hour</p>
-            <p className="meta">{pc.location}</p>
-            <Link to={`/machines/${pc.pcId}`} className="btn">
+        {visibleGroups.map((group) => (
+          <article key={group.specId} className="card stack">
+            <h3>{group.specName}</h3>
+            <p className="meta">{group.cpu} • {group.gpu}</p>
+            <p className="meta">RAM {group.ram} GB • SSD {group.storage} GB</p>
+            <p className="price">${Number(group.hourlyPrice).toFixed(2)} / hour</p>
+            <p className="meta">Available machines: {group.availableCount}</p>
+            <p className="meta">Status: {group.statusLabel}</p>
+            <Link to={`/machines/${group.representativePcId}`} className="btn">
               View detail
             </Link>
           </article>
         ))}
       </div>
+
+      {!loading && !error && visibleGroups.length === 0 ? (
+        <div className="card">No machine groups found for current filters.</div>
+      ) : null}
 
       <div className="row">
         <button className="btn ghost" onClick={() => setPage((prev) => Math.max(0, prev - 1))} disabled={page <= 0}>

@@ -4,13 +4,22 @@ import { useAuth } from '../context/AuthContext.tsx'
 import { api, unwrapApi } from '../lib/api.ts'
 import type { ApiEnvelope, BookingPaymentResponse, BookingResponse, MachineDetail } from '../types/api.ts'
 
+const RENTAL_UNITS = [
+  { label: 'Hour', value: 'hour', hoursPerUnit: 1 },
+  { label: 'Week', value: 'week', hoursPerUnit: 24 * 7 },
+  { label: 'Month (30 days)', value: 'month', hoursPerUnit: 24 * 30 },
+  { label: 'Year (365 days)', value: 'year', hoursPerUnit: 24 * 365 },
+] as const
+
+type RentalUnitValue = (typeof RENTAL_UNITS)[number]['value']
+
 export function MachineDetailPage() {
   const { pcId } = useParams()
   const { user } = useAuth()
   const [machine, setMachine] = useState<MachineDetail | null>(null)
   const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
-  const [startTime, setStartTime] = useState('')
-  const [totalHours, setTotalHours] = useState(1)
+  const [rentalUnit, setRentalUnit] = useState<RentalUnitValue>('hour')
+  const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
@@ -65,23 +74,53 @@ export function MachineDetailPage() {
     if (!pcId) {
       return
     }
-    if (!startTime) {
-      setError('Please select start time')
+    if (!machine) {
+      setError('Machine detail is not loaded yet')
       return
     }
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      setError('Please enter a valid quantity (at least 1)')
+      return
+    }
+
+    const unit = RENTAL_UNITS.find((item) => item.value === rentalUnit) ?? RENTAL_UNITS[0]
 
     setActionBusy(true)
     setError('')
     setActionMessage('')
     try {
-      const response = await api.post<ApiEnvelope<BookingResponse>>('/bookings/hourly', {
-        pcId: Number(pcId),
-        startTime: new Date(startTime).toISOString(),
-        totalHours,
-      })
+      let response
+
+      if (unit.value === 'hour') {
+        const totalHours = quantity * unit.hoursPerUnit
+        response = await api.post<ApiEnvelope<BookingResponse>>('/bookings/hourly', {
+          pcId: Number(pcId),
+          startTime: new Date().toISOString(),
+          totalHours,
+        })
+      } else {
+        const durationDays =
+          unit.value === 'week' ? 7 :
+          unit.value === 'month' ? 30 :
+          365
+        const matchedPlan = machine.plans.find((plan) => plan.durationDays === durationDays)
+
+        if (!matchedPlan) {
+          throw new Error(`No ${unit.label.toLowerCase()} plan available for this machine group`)
+        }
+
+        response = await api.post<ApiEnvelope<BookingResponse>>('/bookings/subscription', {
+          specId: machine.specId,
+          planId: matchedPlan.id,
+          quantity,
+        })
+      }
+
       const booking = unwrapApi(response.data)
       setCurrentBooking(booking)
-      setActionMessage(`Booking #${booking.bookingId} created. Pay with wallet to confirm.`)
+      setActionMessage(
+        `Booking #${booking.bookingId} created for ${quantity} ${unit.label.toLowerCase()}(s). Pay with wallet to confirm.`,
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create booking')
     } finally {
@@ -138,15 +177,21 @@ export function MachineDetailPage() {
       {user ? (
         <article className="card stack">
           <h3>Rent This Machine</h3>
-          <p className="muted">Hourly booking (non-refundable after payment).</p>
+          <p className="muted">Choose rental unit, then create booking and pay with wallet.</p>
           <div className="grid cols-2">
             <label className="field">
-              Start time
-              <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              Rental unit
+              <select value={rentalUnit} onChange={(e) => setRentalUnit(e.target.value as RentalUnitValue)}>
+                {RENTAL_UNITS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="field">
-              Number of hours
-              <input type="number" min={1} value={totalHours} onChange={(e) => setTotalHours(Number(e.target.value))} />
+              Quantity
+              <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
             </label>
           </div>
           <div className="row">

@@ -5,6 +5,7 @@ import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;
 import com.onnet.onnetpc.booking.dto.BookingResponse;
 import com.onnet.onnetpc.booking.dto.CreateBookingRequest;
 import com.onnet.onnetpc.booking.dto.CreateReviewRequest;
+import com.onnet.onnetpc.booking.dto.CreateSubscriptionBookingRequest;
 import com.onnet.onnetpc.booking.dto.ReviewSubmitResponse;
 import com.onnet.onnetpc.booking.service.BookingService;
 import com.onnet.onnetpc.common.response.ApiResponse;
@@ -35,6 +36,14 @@ public class BookingController {
         @Valid @RequestBody CreateBookingRequest request
     ) {
         return ApiResponse.success(bookingService.createHourlyBooking(authentication.getName(), request));
+    }
+
+    @PostMapping("/subscription")
+    public ApiResponse<BookingResponse> createSubscriptionBooking(
+        Authentication authentication,
+        @Valid @RequestBody CreateSubscriptionBookingRequest request
+    ) {
+        return ApiResponse.success(bookingService.createSubscriptionBooking(authentication.getName(), request));
     }
 
     @PostMapping("/{bookingId}/pay-wallet")

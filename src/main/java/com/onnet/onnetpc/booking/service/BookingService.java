@@ -8,6 +8,7 @@ import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;
 import com.onnet.onnetpc.booking.dto.BookingResponse;
 import com.onnet.onnetpc.booking.dto.CreateBookingRequest;
 import com.onnet.onnetpc.booking.dto.CreateReviewRequest;
+import com.onnet.onnetpc.booking.dto.CreateSubscriptionBookingRequest;
 import com.onnet.onnetpc.booking.dto.ReviewSubmitResponse;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
@@ -19,6 +20,8 @@ import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
+import com.onnet.onnetpc.subscription.SubscriptionPlan;
+import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
 import com.onnet.onnetpc.wallet.Wallet;
 import com.onnet.onnetpc.wallet.WalletTransaction;
 import com.onnet.onnetpc.wallet.WalletTransactionType;
@@ -41,6 +44,7 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final PcRepository pcRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final ReviewRepository reviewRepository;
@@ -49,6 +53,7 @@ public class BookingService {
         BookingRepository bookingRepository,
         UserRepository userRepository,
         PcRepository pcRepository,
+        SubscriptionPlanRepository subscriptionPlanRepository,
         WalletRepository walletRepository,
         WalletTransactionRepository walletTransactionRepository,
         ReviewRepository reviewRepository
@@ -56,6 +61,7 @@ public class BookingService {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
+        this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.reviewRepository = reviewRepository;
@@ -71,10 +77,13 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Machine is not available");
         }
 
-        Instant startTime = request.startTime();
-        if (startTime.isBefore(Instant.now())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "startTime must be in the future");
+        Instant now = Instant.now();
+        Instant requestedStartTime = request.startTime();
+        if (requestedStartTime.isBefore(now.minus(Duration.ofMinutes(5)))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "startTime is too far in the past");
         }
+
+        Instant startTime = requestedStartTime.isBefore(now) ? now : requestedStartTime;
 
         Instant endTime = startTime.plus(Duration.ofHours(request.totalHours()));
         boolean overlaps = bookingRepository.existsByPcIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
@@ -96,6 +105,46 @@ public class BookingService {
         booking.setPc(pc);
         booking.setBookingType(BookingType.hourly);
         booking.setTotalHours(request.totalHours());
+        booking.setStartTime(startTime);
+        booking.setEndTime(endTime);
+        booking.setTotalPrice(totalPrice);
+        booking.setStatus(BookingStatus.pending);
+        booking.setUpdatedAt(Instant.now());
+
+        Booking saved = bookingRepository.save(booking);
+        return toBookingResponse(saved);
+    }
+
+    @Transactional
+    public BookingResponse createSubscriptionBooking(String email, CreateSubscriptionBookingRequest request) {
+        User user = findUserByEmail(email);
+
+        SubscriptionPlan plan = subscriptionPlanRepository.findByIdAndActiveTrue(request.planId())
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Subscription plan not found"));
+
+        if (!plan.getSpec().getId().equals(request.specId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selected plan does not belong to the machine group");
+        }
+
+        if (plan.getDurationDays() == null || plan.getDurationDays() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid plan duration");
+        }
+
+        if (plan.getPrice() == null || plan.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid plan price");
+        }
+
+        Instant startTime = Instant.now();
+        long totalDays = (long) plan.getDurationDays() * request.quantity();
+        Instant endTime = startTime.plus(Duration.ofDays(totalDays));
+        BigDecimal totalPrice = plan.getPrice().multiply(BigDecimal.valueOf(request.quantity()));
+
+        Booking booking = new Booking();
+        booking.setUser(user);
+        booking.setSpec(plan.getSpec());
+        booking.setPc(null);
+        booking.setBookingType(BookingType.subscription);
+        booking.setTotalHours(null);
         booking.setStartTime(startTime);
         booking.setEndTime(endTime);
         booking.setTotalPrice(totalPrice);

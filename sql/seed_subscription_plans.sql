@@ -1,9 +1,9 @@
 -- Seed subscription plans for all active PC specs.
--- Pricing rule (effective hourly):
--- Weekly  = 75% of hourly
--- Monthly = 60% of hourly
--- Yearly  = 45% of hourly
--- This guarantees: yearly <= monthly <= weekly <= hourly
+-- Market-aligned pricing (closer to cloud PC competitors):
+-- Weekly  = hourly * 4
+-- Monthly = hourly * 12
+-- Yearly  = hourly * 120
+-- This guarantees: yearly <= monthly <= weekly <= hourly on effective-hour basis.
 
 USE onnetpc;
 
@@ -32,7 +32,7 @@ SELECT
   CONCAT(ps.spec_name, ' - Weekly') AS plan_name,
   ps.id AS spec_id,
   7 AS duration_days,
-  ROUND(ps.price_per_hour * 24 * 7 * 0.75, 2) AS price,
+  ROUND(ps.price_per_hour * 4, 2) AS price,
   NULL AS max_hours_per_day,
   TRUE AS is_active
 FROM pc_specs ps
@@ -51,7 +51,7 @@ SELECT
   CONCAT(ps.spec_name, ' - Monthly') AS plan_name,
   ps.id AS spec_id,
   30 AS duration_days,
-  ROUND(ps.price_per_hour * 24 * 30 * 0.60, 2) AS price,
+  ROUND(ps.price_per_hour * 12, 2) AS price,
   NULL AS max_hours_per_day,
   TRUE AS is_active
 FROM pc_specs ps
@@ -70,7 +70,7 @@ SELECT
   CONCAT(ps.spec_name, ' - Yearly') AS plan_name,
   ps.id AS spec_id,
   365 AS duration_days,
-  ROUND(ps.price_per_hour * 24 * 365 * 0.45, 2) AS price,
+  ROUND(ps.price_per_hour * 120, 2) AS price,
   NULL AS max_hours_per_day,
   TRUE AS is_active
 FROM pc_specs ps
