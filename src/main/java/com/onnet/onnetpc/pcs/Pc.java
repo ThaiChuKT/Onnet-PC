@@ -39,6 +39,9 @@ public class Pc {
 	@Column(name = "updated_at")
 	private Instant updatedAt;
 
+	@Column(name = "last_used_at")
+	private Instant lastUsedAt;
+
 	@Column(name = "deleted_at")
 	private Instant deletedAt;
 }

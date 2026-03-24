@@ -13,6 +13,7 @@ import com.onnet.onnetpc.booking.entity.Booking;
 import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
+import com.onnet.onnetpc.booking.service.BookingEmailService;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
@@ -24,10 +25,6 @@ import com.onnet.onnetpc.pcs.repository.PcSpecRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
-import com.onnet.onnetpc.session.Session;
-import com.onnet.onnetpc.session.SessionQueue;
-import com.onnet.onnetpc.session.SessionQueueRepository;
-import com.onnet.onnetpc.session.SessionRepository;
 import com.onnet.onnetpc.subscription.SubscriptionPlan;
 import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
 import com.onnet.onnetpc.wallet.Wallet;
@@ -54,11 +51,10 @@ public class BookingService {
     private final PcRepository pcRepository;
     private final PcSpecRepository pcSpecRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final SessionRepository sessionRepository;
-    private final SessionQueueRepository sessionQueueRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final ReviewRepository reviewRepository;
+    private final BookingEmailService bookingEmailService;
 
     public BookingService(
         BookingRepository bookingRepository,
@@ -66,22 +62,20 @@ public class BookingService {
         PcRepository pcRepository,
         PcSpecRepository pcSpecRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
-        SessionRepository sessionRepository,
-        SessionQueueRepository sessionQueueRepository,
         WalletRepository walletRepository,
         WalletTransactionRepository walletTransactionRepository,
-        ReviewRepository reviewRepository
+        ReviewRepository reviewRepository,
+        BookingEmailService bookingEmailService
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
         this.pcSpecRepository = pcSpecRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
-        this.sessionRepository = sessionRepository;
-        this.sessionQueueRepository = sessionQueueRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.reviewRepository = reviewRepository;
+        this.bookingEmailService = bookingEmailService;
     }
 
     @Transactional
@@ -89,118 +83,41 @@ public class BookingService {
         User user = findUserByEmail(email);
         PricingResult pricing = resolvePricing(request.specId(), request.rentalUnit(), request.quantity());
 
-        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
+        Wallet wallet = walletRepository.findByUserId(user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
 
         BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
-        if (currentBalance.compareTo(pricing.totalPrice()) < 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
-        }
 
         Instant startTime = Instant.now();
         Instant endTime = startTime.plus(pricing.duration());
 
-        Pc assignedPc = tryAssignAvailablePc(pricing.spec().getId());
-        if (assignedPc == null) {
-            Booking queuedBooking = buildBooking(
-                user,
-                pricing.spec(),
-                null,
-                pricing.bookingType(),
-                pricing.totalHours(),
-                startTime,
-                endTime,
-                pricing.totalPrice(),
-                BookingStatus.pending
-            );
-            Booking savedBooking = bookingRepository.save(queuedBooking);
-
-            Integer maxPosition = sessionQueueRepository.findMaxWaitingPositionForUpdate(pricing.spec().getId());
-            int queuePosition = (maxPosition == null ? 0 : maxPosition) + 1;
-
-            SessionQueue queue = new SessionQueue();
-            queue.setBooking(savedBooking);
-            queue.setUser(user);
-            queue.setSpec(pricing.spec());
-            queue.setQueuePosition(queuePosition);
-            queue.setStatus("waiting");
-            sessionQueueRepository.save(queue);
-
-            return new RentMachineResponse(
-                savedBooking.getId(),
-                true,
-                queuePosition,
-                null,
-                null,
-                null,
-                pricing.spec().getSpecName(),
-                startTime,
-                endTime,
-                pricing.totalPrice(),
-                currentBalance,
-                savedBooking.getStatus().name(),
-                "All machines are busy. You have been added to the queue."
-            );
-        }
-
-        BigDecimal newBalance = currentBalance.subtract(pricing.totalPrice());
-        wallet.setBalance(newBalance);
-        wallet.setUpdatedAt(Instant.now());
-        walletRepository.save(wallet);
-
-        WalletTransaction tx = new WalletTransaction();
-        tx.setWallet(wallet);
-        tx.setAmount(pricing.totalPrice().negate());
-        tx.setType(WalletTransactionType.deduct);
-        tx.setReferenceId(null);
-        tx.setNote("Rent machine: " + pricing.spec().getSpecName());
-        walletTransactionRepository.save(tx);
-
-        assignedPc.setStatus(PcStatus.in_use);
-        assignedPc.setUpdatedAt(Instant.now());
-        pcRepository.save(assignedPc);
-
         Booking paidBooking = buildBooking(
             user,
             pricing.spec(),
-            assignedPc,
+            null,
             pricing.bookingType(),
             pricing.totalHours(),
             startTime,
             endTime,
             pricing.totalPrice(),
-            BookingStatus.paid
+            BookingStatus.pending
         );
         Booking savedBooking = bookingRepository.save(paidBooking);
-
-        tx.setReferenceId(savedBooking.getId());
-        tx.setNote("Booking payment #" + savedBooking.getId());
-        walletTransactionRepository.save(tx);
-
-        Session session = new Session();
-        session.setBooking(savedBooking);
-        session.setUser(user);
-        session.setPc(assignedPc);
-        session.setStartTime(startTime);
-        session.setEndTime(endTime);
-        session.setTotalCost(pricing.totalPrice());
-        session.setStatus("active");
-        Session savedSession = sessionRepository.save(session);
 
         return new RentMachineResponse(
             savedBooking.getId(),
             false,
             null,
-            savedSession.getId(),
-            assignedPc.getId(),
-            assignedPc.getLocation(),
+            null,
+            null,
+            null,
             pricing.spec().getSpecName(),
             startTime,
             endTime,
             pricing.totalPrice(),
-            newBalance,
+            currentBalance,
             savedBooking.getStatus().name(),
-            "Machine assigned successfully"
+            "Booking created as pending. Please pay from wallet to start session."
         );
     }
 
@@ -295,7 +212,7 @@ public class BookingService {
     @Transactional
     public BookingPaymentResponse payWithWallet(String email, Long bookingId) {
         User user = findUserByEmail(email);
-        Booking booking = bookingRepository.findByIdAndUserId(bookingId, user.getId())
+        Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
 
         if (booking.getStatus() != BookingStatus.pending) {
@@ -306,7 +223,7 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid booking total price");
         }
 
-        Wallet wallet = walletRepository.findByUserId(user.getId())
+        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
 
         BigDecimal balance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
@@ -330,6 +247,8 @@ public class BookingService {
         booking.setStatus(BookingStatus.paid);
         booking.setUpdatedAt(Instant.now());
         bookingRepository.save(booking);
+
+        bookingEmailService.sendPaymentConfirmation(user.getEmail(), booking);
 
         return new BookingPaymentResponse(booking.getId(), booking.getStatus().name(), newBalance);
     }
@@ -440,10 +359,6 @@ public class BookingService {
             Duration.ofDays((long) durationDays * quantity),
             plan.getPrice().multiply(BigDecimal.valueOf(quantity))
         );
-    }
-
-    private Pc tryAssignAvailablePc(Long specId) {
-        return pcRepository.findNextAvailableBySpecIdForUpdate(specId).orElse(null);
     }
 
     private Booking buildBooking(

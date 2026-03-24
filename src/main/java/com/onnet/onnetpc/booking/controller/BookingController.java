@@ -11,6 +11,8 @@ import com.onnet.onnetpc.booking.dto.RentMachineResponse;
 import com.onnet.onnetpc.booking.dto.ReviewSubmitResponse;
 import com.onnet.onnetpc.booking.service.BookingService;
 import com.onnet.onnetpc.common.response.ApiResponse;
+import com.onnet.onnetpc.session.dto.StartSessionResponse;
+import com.onnet.onnetpc.session.service.SessionLifecycleService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
@@ -27,9 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final SessionLifecycleService sessionLifecycleService;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService, SessionLifecycleService sessionLifecycleService) {
         this.bookingService = bookingService;
+        this.sessionLifecycleService = sessionLifecycleService;
     }
 
     @PostMapping("/hourly")
@@ -59,6 +63,11 @@ public class BookingController {
     @PostMapping("/{bookingId}/pay-wallet")
     public ApiResponse<BookingPaymentResponse> payWithWallet(Authentication authentication, @PathVariable Long bookingId) {
         return ApiResponse.success(bookingService.payWithWallet(authentication.getName(), bookingId));
+    }
+
+    @PostMapping("/{bookingId}/start-session")
+    public ApiResponse<StartSessionResponse> startSession(Authentication authentication, @PathVariable Long bookingId) {
+        return ApiResponse.success(sessionLifecycleService.startSession(authentication.getName(), bookingId));
     }
 
     @GetMapping("/my")

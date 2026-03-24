@@ -48,13 +48,45 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
             SELECT *
             FROM pcs
             WHERE spec_id = :specId
-              AND deleted_at IS NULL
-              AND status = 'available'
-            ORDER BY COALESCE(updated_at, '1970-01-01 00:00:00') ASC, id ASC
+                            AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+                            AND LOWER(status) = 'available'
+                        ORDER BY COALESCE(last_used_at, '1970-01-01 00:00:00') ASC, id ASC
             LIMIT 1
             FOR UPDATE
             """,
         nativeQuery = true
     )
     Optional<Pc> findNextAvailableBySpecIdForUpdate(@Param("specId") Long specId);
+
+    @Query(
+        value = """
+            SELECT p.*
+            FROM pcs p
+            WHERE p.spec_id = :specId
+                            AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+                            AND LOWER(p.status) = 'in_use'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sessions s
+                  WHERE s.pc_id = p.id
+                    AND LOWER(s.status) = 'active'
+              )
+            ORDER BY COALESCE(p.last_used_at, '1970-01-01 00:00:00') ASC, p.id ASC
+            LIMIT 1
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<Pc> findNextStaleReservedBySpecIdForUpdate(@Param("specId") Long specId);
+
+    @Query(
+        value = """
+            SELECT *
+            FROM pcs
+            WHERE id = :pcId
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<Pc> findByIdForUpdate(@Param("pcId") Long pcId);
 }

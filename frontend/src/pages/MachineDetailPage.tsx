@@ -101,6 +101,10 @@ export function MachineDetailPage() {
         setActionMessage(
           `Booking #${result.bookingId} has been added to queue at position #${result.queuePosition}.`,
         )
+      } else if ((result.status ?? '').toLowerCase() === 'pending') {
+        setActionMessage(
+          `Booking #${result.bookingId} is pending. Please go to Rentals and pay with wallet.`,
+        )
       } else {
         setActionMessage(
           `Session #${result.sessionId} started on machine #${result.pcId} (${result.pcLocation}).`,
@@ -167,10 +171,13 @@ export function MachineDetailPage() {
           {rentResult ? (
             <p className="muted">
               Booking #{rentResult.bookingId} • Status: {rentResult.status} • Total: ${Number(rentResult.totalPrice).toFixed(2)}
-              {rentResult.walletBalance !== null && Number.isFinite(rentResult.walletBalance)
+              {!rentResult.queued && rentResult.walletBalance !== null && Number.isFinite(rentResult.walletBalance)
                 ? ` • Wallet: $${Number(rentResult.walletBalance).toFixed(2)}`
                 : ''}
             </p>
+          ) : null}
+          {rentResult?.queued ? (
+            <p className="meta">Queued booking is not charged yet. Wallet will be deducted when a machine is assigned.</p>
           ) : null}
           {actionMessage ? <p className="success">{actionMessage}</p> : null}
         </article>

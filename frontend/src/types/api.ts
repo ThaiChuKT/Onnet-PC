@@ -141,6 +141,41 @@ export type RentMachineResponse = {
   message: string
 }
 
+export type StartSessionResponse = {
+  sessionId: number
+  bookingId: number
+  pcId: number
+  pcLocation: string
+  startedAt: string
+  expectedEndTime: string | null
+  remainingSeconds: number
+  connectionInfo: string
+  status: string
+  message: string
+}
+
+export type ActiveSessionResponse = {
+  sessionId: number
+  bookingId: number
+  pcId: number
+  pcLocation: string
+  startedAt: string
+  expectedEndTime: string | null
+  remainingSeconds: number
+  warning15Minutes: boolean
+  status: string
+  message: string
+}
+
+export type EndSessionResponse = {
+  sessionId: number
+  bookingId: number
+  endedAt: string
+  noRefundApplied: boolean
+  status: string
+  message: string
+}
+
 export type BookingHistoryItem = {
   bookingId: number
   pcId: number | null
