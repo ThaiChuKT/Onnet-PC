@@ -1,6 +1,8 @@
 package com.onnet.onnetpc.users;
 
 import com.onnet.onnetpc.memberships.MembershipTier;
+import com.onnet.onnetpc.users.UserRole;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

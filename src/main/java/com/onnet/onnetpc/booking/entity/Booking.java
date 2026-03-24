@@ -1,5 +1,7 @@
-package com.onnet.onnetpc.booking;
+package com.onnet.onnetpc.booking.entity;
 
+import com.onnet.onnetpc.booking.enums.BookingStatus;
+import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.users.User;

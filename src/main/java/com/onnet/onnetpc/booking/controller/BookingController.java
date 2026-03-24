@@ -1,4 +1,4 @@
-package com.onnet.onnetpc.booking;
+package com.onnet.onnetpc.booking.controller;
 
 import com.onnet.onnetpc.booking.dto.BookingHistoryItemResponse;
 import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;

@@ -1,6 +1,6 @@
 package com.onnet.onnetpc.pcs;
 
-import com.onnet.onnetpc.booking.Booking;
+import com.onnet.onnetpc.booking.entity.Booking;
 import com.onnet.onnetpc.users.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

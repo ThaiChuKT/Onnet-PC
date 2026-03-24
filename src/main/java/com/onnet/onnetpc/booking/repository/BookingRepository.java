@@ -1,7 +1,8 @@
 package com.onnet.onnetpc.booking.repository;
 
-import com.onnet.onnetpc.booking.Booking;
-import com.onnet.onnetpc.booking.BookingStatus;
+import com.onnet.onnetpc.booking.entity.Booking;
+import com.onnet.onnetpc.booking.enums.BookingStatus;
+
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;

@@ -1,8 +1,5 @@
 package com.onnet.onnetpc.booking.service;
 
-import com.onnet.onnetpc.booking.Booking;
-import com.onnet.onnetpc.booking.BookingStatus;
-import com.onnet.onnetpc.booking.BookingType;
 import com.onnet.onnetpc.booking.dto.BookingHistoryItemResponse;
 import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;
 import com.onnet.onnetpc.booking.dto.BookingResponse;
@@ -12,6 +9,9 @@ import com.onnet.onnetpc.booking.dto.CreateSubscriptionBookingRequest;
 import com.onnet.onnetpc.booking.dto.RentMachineRequest;
 import com.onnet.onnetpc.booking.dto.RentMachineResponse;
 import com.onnet.onnetpc.booking.dto.ReviewSubmitResponse;
+import com.onnet.onnetpc.booking.entity.Booking;
+import com.onnet.onnetpc.booking.enums.BookingStatus;
+import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.pcs.Pc;

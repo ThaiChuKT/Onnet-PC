@@ -10,7 +10,7 @@ import com.onnet.onnetpc.auth.repository.EmailVerificationTokenRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.common.security.JwtService;
 import com.onnet.onnetpc.users.User;
-import com.onnet.onnetpc.users.UserRole;
+import com.onnet.onnetpc.users.enums.UserRole;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import com.onnet.onnetpc.wallet.Wallet;
 import com.onnet.onnetpc.wallet.repository.WalletRepository;
