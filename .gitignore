@@ -59,3 +59,4 @@ src/main/resources/application.properties
 ### OS ###
 .DS_Store
 Thumbs.db
+seed_pcs.sql
