@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.security.SecureRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
@@ -193,6 +196,7 @@ public class AuthService {
             );
             mailSender.send(message);
         } catch (Exception ex) {
+            LOGGER.error("Failed to send verification email to {} via SMTP", email, ex);
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send verification email");
         }
     }
