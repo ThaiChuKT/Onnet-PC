@@ -3,6 +3,7 @@ package com.onnet.onnetpc.pcs.repository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcStatus;
 import java.math.BigDecimal;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,4 +42,19 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
     Page<Pc> findByDeletedAtIsNull(Pageable pageable);
 
     Page<Pc> findByDeletedAtIsNullAndStatus(PcStatus status, Pageable pageable);
+
+    @Query(
+        value = """
+            SELECT *
+            FROM pcs
+            WHERE spec_id = :specId
+              AND deleted_at IS NULL
+              AND status = 'available'
+            ORDER BY COALESCE(updated_at, '1970-01-01 00:00:00') ASC, id ASC
+            LIMIT 1
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<Pc> findNextAvailableBySpecIdForUpdate(@Param("specId") Long specId);
 }

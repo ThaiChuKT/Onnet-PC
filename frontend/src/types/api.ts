@@ -125,6 +125,22 @@ export type BookingPaymentResponse = {
   walletBalance: number
 }
 
+export type RentMachineResponse = {
+  bookingId: number
+  queued: boolean
+  queuePosition: number | null
+  sessionId: number | null
+  pcId: number | null
+  pcLocation: string | null
+  specName: string
+  startTime: string
+  expectedEndTime: string
+  totalPrice: number
+  walletBalance: number
+  status: string
+  message: string
+}
+
 export type BookingHistoryItem = {
   bookingId: number
   pcId: number | null

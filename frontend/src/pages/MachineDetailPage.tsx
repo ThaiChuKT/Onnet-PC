@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.tsx'
 import { api, unwrapApi } from '../lib/api.ts'
-import type { ApiEnvelope, BookingPaymentResponse, BookingResponse, MachineDetail } from '../types/api.ts'
+import type { ApiEnvelope, MachineDetail, RentMachineResponse } from '../types/api.ts'
 
 const RENTAL_UNITS = [
   { label: 'Hour', value: 'hour', hoursPerUnit: 1 },
@@ -17,7 +17,7 @@ export function MachineDetailPage() {
   const { pcId } = useParams()
   const { user } = useAuth()
   const [machine, setMachine] = useState<MachineDetail | null>(null)
-  const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
+  const [rentResult, setRentResult] = useState<RentMachineResponse | null>(null)
   const [rentalUnit, setRentalUnit] = useState<RentalUnitValue>('hour')
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -89,60 +89,25 @@ export function MachineDetailPage() {
     setError('')
     setActionMessage('')
     try {
-      let response
+      const response = await api.post<ApiEnvelope<RentMachineResponse>>('/bookings/rent', {
+        specId: machine.specId,
+        rentalUnit: unit.value,
+        quantity,
+      })
 
-      if (unit.value === 'hour') {
-        const totalHours = quantity * unit.hoursPerUnit
-        response = await api.post<ApiEnvelope<BookingResponse>>('/bookings/hourly', {
-          pcId: Number(pcId),
-          startTime: new Date().toISOString(),
-          totalHours,
-        })
+      const result = unwrapApi(response.data)
+      setRentResult(result)
+      if (result.queued) {
+        setActionMessage(
+          `Booking #${result.bookingId} has been added to queue at position #${result.queuePosition}.`,
+        )
       } else {
-        const durationDays =
-          unit.value === 'week' ? 7 :
-          unit.value === 'month' ? 30 :
-          365
-        const matchedPlan = machine.plans.find((plan) => plan.durationDays === durationDays)
-
-        if (!matchedPlan) {
-          throw new Error(`No ${unit.label.toLowerCase()} plan available for this machine group`)
-        }
-
-        response = await api.post<ApiEnvelope<BookingResponse>>('/bookings/subscription', {
-          specId: machine.specId,
-          planId: matchedPlan.id,
-          quantity,
-        })
+        setActionMessage(
+          `Session #${result.sessionId} started on machine #${result.pcId} (${result.pcLocation}).`,
+        )
       }
-
-      const booking = unwrapApi(response.data)
-      setCurrentBooking(booking)
-      setActionMessage(
-        `Booking #${booking.bookingId} created for ${quantity} ${unit.label.toLowerCase()}(s). Pay with wallet to confirm.`,
-      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create booking')
-    } finally {
-      setActionBusy(false)
-    }
-  }
-
-  async function payBookingWithWallet() {
-    if (!currentBooking) {
-      return
-    }
-
-    setActionBusy(true)
-    setError('')
-    setActionMessage('')
-    try {
-      const response = await api.post<ApiEnvelope<BookingPaymentResponse>>(`/bookings/${currentBooking.bookingId}/pay-wallet`)
-      const payment = unwrapApi(response.data)
-      setCurrentBooking((prev) => (prev ? { ...prev, status: payment.status } : prev))
-      setActionMessage(`Booking paid successfully. Wallet balance: $${Number(payment.walletBalance).toFixed(2)}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Payment failed')
     } finally {
       setActionBusy(false)
     }
@@ -177,7 +142,7 @@ export function MachineDetailPage() {
       {user ? (
         <article className="card stack">
           <h3>Rent This Machine</h3>
-          <p className="muted">Choose rental unit, then create booking and pay with wallet.</p>
+          <p className="muted">Choose rental unit and confirm once. System will auto charge wallet and assign machine or enqueue you.</p>
           <div className="grid cols-2">
             <label className="field">
               Rental unit
@@ -196,19 +161,15 @@ export function MachineDetailPage() {
           </div>
           <div className="row">
             <button className="btn" onClick={createBooking} disabled={actionBusy}>
-              Create booking
-            </button>
-            <button
-              className="btn ghost"
-              onClick={payBookingWithWallet}
-              disabled={actionBusy || !currentBooking || currentBooking.status !== 'pending'}
-            >
-              Pay with wallet
+              Confirm rent
             </button>
           </div>
-          {currentBooking ? (
+          {rentResult ? (
             <p className="muted">
-              Booking #{currentBooking.bookingId} • Status: {currentBooking.status} • Total: ${Number(currentBooking.totalPrice).toFixed(2)}
+              Booking #{rentResult.bookingId} • Status: {rentResult.status} • Total: ${Number(rentResult.totalPrice).toFixed(2)}
+              {rentResult.walletBalance !== null && Number.isFinite(rentResult.walletBalance)
+                ? ` • Wallet: $${Number(rentResult.walletBalance).toFixed(2)}`
+                : ''}
             </p>
           ) : null}
           {actionMessage ? <p className="success">{actionMessage}</p> : null}

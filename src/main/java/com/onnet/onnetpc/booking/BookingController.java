@@ -6,6 +6,8 @@ import com.onnet.onnetpc.booking.dto.BookingResponse;
 import com.onnet.onnetpc.booking.dto.CreateBookingRequest;
 import com.onnet.onnetpc.booking.dto.CreateReviewRequest;
 import com.onnet.onnetpc.booking.dto.CreateSubscriptionBookingRequest;
+import com.onnet.onnetpc.booking.dto.RentMachineRequest;
+import com.onnet.onnetpc.booking.dto.RentMachineResponse;
 import com.onnet.onnetpc.booking.dto.ReviewSubmitResponse;
 import com.onnet.onnetpc.booking.service.BookingService;
 import com.onnet.onnetpc.common.response.ApiResponse;
@@ -44,6 +46,14 @@ public class BookingController {
         @Valid @RequestBody CreateSubscriptionBookingRequest request
     ) {
         return ApiResponse.success(bookingService.createSubscriptionBooking(authentication.getName(), request));
+    }
+
+    @PostMapping("/rent")
+    public ApiResponse<RentMachineResponse> rentMachine(
+        Authentication authentication,
+        @Valid @RequestBody RentMachineRequest request
+    ) {
+        return ApiResponse.success(bookingService.rentMachine(authentication.getName(), request));
     }
 
     @PostMapping("/{bookingId}/pay-wallet")
