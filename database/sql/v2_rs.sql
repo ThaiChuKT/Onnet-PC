@@ -96,6 +96,7 @@ CREATE TABLE `pcs` (
   `status`     VARCHAR(50) DEFAULT 'available',          -- 'available', 'in_use', 'maintenance'
   `location`   VARCHAR(255),
   `updated_at` TIMESTAMP,
+  `last_used_at` TIMESTAMP NULL,
   `deleted_at` TIMESTAMP                                 -- soft delete
 );
 
