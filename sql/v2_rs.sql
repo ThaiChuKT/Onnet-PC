@@ -218,7 +218,9 @@ CREATE TABLE `wallet_transactions` (
   `type`         VARCHAR(50) NOT NULL,                   -- 'top_up', 'deduct', 'refund'
   `reference_id` BIGINT,                                 -- booking_id nếu là deduct/refund
   `note`         VARCHAR(255),
-  `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_wallet_tx_wallet_type_ref` (`wallet_id`, `type`, `reference_id`),
+  KEY `idx_wallet_tx_wallet_created` (`wallet_id`, `created_at`)
 );
 
 -- Lịch sử giao dịch với cổng thanh toán bên ngoài (chỉ dùng khi nạp ví)
