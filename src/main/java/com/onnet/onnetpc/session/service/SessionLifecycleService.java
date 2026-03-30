@@ -136,12 +136,13 @@ public class SessionLifecycleService {
 
         Instant now = Instant.now();
         session.setEndTime(now);
-        session.setStatus("completed");
+        session.setStatus("ended");
         sessionRepository.save(session);
 
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(session.getBooking().getId(), user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
-        booking.setStatus(BookingStatus.completed);
+        boolean hasRemainingTime = booking.getEndTime() != null && now.isBefore(booking.getEndTime());
+        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.completed);
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
@@ -159,7 +160,9 @@ public class SessionLifecycleService {
             now,
             true,
             session.getStatus(),
-            "Session ended. Remaining time is not refundable."
+            hasRemainingTime
+                ? "Session stopped. You can start again until booking time ends."
+                : "Session ended. Booking time is fully used."
         );
     }
 
