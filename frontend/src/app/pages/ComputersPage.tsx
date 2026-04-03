@@ -24,108 +24,30 @@ import {
   Zap,
   MessageSquare,
 } from "lucide-react";
+import { useEffect } from "react";
+import { apiGet } from "../api/http";
+import { toast } from "sonner";
 
 interface Computer {
-  id: string;
-  name: string;
-  category: string;
+  pcId: number;
+  specId: number;
+  specName: string;
   cpu: string;
   gpu: string;
-  ram: string;
-  storage: string;
-  status: "available" | "rented";
+  ram: number;
+  storage: number;
   hourlyPrice: number;
-  dailyPrice: number;
-  monthlyPrice: number;
-  image: string;
+  location: string;
+  status: string;
 }
 
-const computers: Computer[] = [
-  {
-    id: "PC001",
-    name: "Basic Gaming #1",
-    category: "Basic",
-    cpu: "Intel i5-12400F",
-    gpu: "GTX 1660 Super",
-    ram: "16GB DDR4",
-    storage: "500GB NVMe SSD",
-    status: "rented",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-    image: "gaming-setup",
-  },
-  {
-    id: "PC002",
-    name: "Basic Gaming #2",
-    category: "Basic",
-    cpu: "Intel i5-12400F",
-    gpu: "GTX 1660 Super",
-    ram: "16GB DDR4",
-    storage: "500GB NVMe SSD",
-    status: "available",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-    image: "gaming-setup",
-  },
-  {
-    id: "PC003",
-    name: "Pro Gaming #1",
-    category: "Pro",
-    cpu: "Intel i7-13700K",
-    gpu: "RTX 4060 Ti",
-    ram: "32GB DDR5",
-    storage: "1TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-    image: "gaming-setup",
-  },
-  {
-    id: "PC004",
-    name: "Pro Gaming #2",
-    category: "Pro",
-    cpu: "Intel i7-13700K",
-    gpu: "RTX 4060 Ti",
-    ram: "32GB DDR5",
-    storage: "1TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-    image: "gaming-setup",
-  },
-  {
-    id: "PC005",
-    name: "Ultra Gaming #1",
-    category: "Ultra",
-    cpu: "Intel i9-13900K",
-    gpu: "RTX 4080",
-    ram: "64GB DDR5",
-    storage: "2TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 50000,
-    dailyPrice: 350000,
-    monthlyPrice: 7000000,
-    image: "gaming-setup",
-  },
-  {
-    id: "PC006",
-    name: "Ultra Gaming #2",
-    category: "Ultra",
-    cpu: "AMD Ryzen 9 7950X",
-    gpu: "RTX 4090",
-    ram: "64GB DDR5",
-    storage: "2TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 60000,
-    dailyPrice: 400000,
-    monthlyPrice: 8000000,
-    image: "gaming-setup",
-  },
-];
+type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
 
 export function ComputersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -134,28 +56,61 @@ export function ComputersPage() {
   const [gpuFilter, setGpuFilter] = useState("all");
   const [ramFilter, setRamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [_showFilters, _setShowFilters] = useState(false);
   const navigate = useNavigate();
+  const [computers, setComputers] = useState<Computer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Get unique values for filters
-  const cpuOptions = Array.from(new Set(computers.map((c) => c.cpu)));
-  const gpuOptions = Array.from(new Set(computers.map((c) => c.gpu)));
-  const ramOptions = Array.from(new Set(computers.map((c) => c.ram)));
+  const cpuOptions = Array.from(new Set(computers.map((c) => c.cpu))).filter(Boolean);
+  const gpuOptions = Array.from(new Set(computers.map((c) => c.gpu))).filter(Boolean);
+  const ramOptions = Array.from(new Set(computers.map((c) => String(c.ram)))).filter(Boolean);
+
+  useEffect(() => {
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const page = await apiGet<PageResponse<Computer>>("/pcs", {
+          page: 0,
+          size: 50,
+          sort: "price_asc",
+          keyword: searchTerm || undefined,
+        });
+        if (!cancelled) setComputers(page.content ?? []);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Không thể tải danh sách máy";
+        if (!cancelled) {
+          setLoadError(msg);
+          toast.error(msg);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [searchTerm]);
 
   // Filter computers
   const filteredComputers = computers.filter((computer) => {
     const matchSearch =
-      computer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       computer.cpu.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      computer.gpu.toLowerCase().includes(searchTerm.toLowerCase());
+      computer.gpu.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      computer.specName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchCategory =
-      categoryFilter === "all" || computer.category === categoryFilter;
+      categoryFilter === "all" ||
+      computer.specName.toLowerCase().includes(categoryFilter.toLowerCase());
     const matchCpu = cpuFilter === "all" || computer.cpu === cpuFilter;
     const matchGpu = gpuFilter === "all" || computer.gpu === gpuFilter;
-    const matchRam = ramFilter === "all" || computer.ram === ramFilter;
+    const matchRam = ramFilter === "all" || String(computer.ram) === ramFilter;
     const matchStatus =
-      statusFilter === "all" || computer.status === statusFilter;
+      statusFilter === "all" ||
+      computer.status.toLowerCase() === statusFilter.toLowerCase();
 
     return (
       matchSearch &&
@@ -354,11 +309,28 @@ export function ComputersPage() {
 
               {/* Computer Grid */}
               <div className="grid md:grid-cols-2 gap-6">
+                {isLoading && (
+                  <Card className="p-12 border-border text-center md:col-span-2">
+                    <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-bold mb-2">Đang tải danh sách...</h3>
+                    <p className="text-muted-foreground">Vui lòng chờ trong giây lát</p>
+                  </Card>
+                )}
+
+                {!isLoading &&
+                  loadError && (
+                    <Card className="p-12 border-border text-center md:col-span-2">
+                      <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-xl font-bold mb-2">Không thể tải danh sách</h3>
+                      <p className="text-muted-foreground">{loadError}</p>
+                    </Card>
+                  )}
+
                 {filteredComputers.map((computer) => (
                   <Card
-                    key={computer.id}
+                    key={computer.pcId}
                     className="p-6 border-border hover:border-primary/50 transition-all cursor-pointer group"
-                    onClick={() => navigate(`/computers/${computer.id}`)}
+                    onClick={() => navigate(`/computers/${computer.pcId}`)}
                   >
                     {/* Image Placeholder */}
                     <div className="w-full h-48 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
@@ -368,22 +340,20 @@ export function ComputersPage() {
                     {/* Info */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold">{computer.name}</h3>
+                        <h3 className="text-xl font-bold">{computer.specName}</h3>
                         <Badge
                           className={
-                            computer.status === "available"
+                            computer.status.toLowerCase() === "available"
                               ? "bg-accent/20 text-accent border-accent/50"
                               : "bg-muted text-muted-foreground border-border"
                           }
                         >
-                          {computer.status === "available"
-                            ? "Có sẵn"
-                            : "Đang thuê"}
+                          {computer.status.toLowerCase() === "available" ? "Có sẵn" : computer.status}
                         </Badge>
                       </div>
 
                       <Badge className="bg-primary/20 text-primary border-primary/50">
-                        {computer.category}
+                        PC #{computer.pcId}
                       </Badge>
 
                       {/* Specs */}
@@ -403,40 +373,24 @@ export function ComputersPage() {
                         <div className="flex items-center gap-2">
                           <MemoryStick className="w-4 h-4 text-muted-foreground" />
                           <span className="text-muted-foreground">
-                            {computer.ram}
+                            {computer.ram}GB
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <HardDrive className="w-4 h-4 text-muted-foreground" />
                           <span className="text-muted-foreground">
-                            {computer.storage}
+                            {computer.storage}GB
                           </span>
                         </div>
                       </div>
 
                       {/* Pricing */}
                       <div className="pt-3 border-t border-border">
-                        <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="grid grid-cols-1 gap-2 text-sm">
                           <div>
-                            <p className="text-muted-foreground text-xs">Giờ</p>
+                            <p className="text-muted-foreground text-xs">Giá theo giờ</p>
                             <p className="font-bold text-primary">
-                              {computer.hourlyPrice.toLocaleString()}đ
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">
-                              Ngày
-                            </p>
-                            <p className="font-bold text-primary">
-                              {computer.dailyPrice.toLocaleString()}đ
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">
-                              Tháng
-                            </p>
-                            <p className="font-bold text-primary">
-                              {computer.monthlyPrice.toLocaleString()}đ
+                              {Number(computer.hourlyPrice).toLocaleString("vi-VN")}đ
                             </p>
                           </div>
                         </div>
@@ -444,22 +398,20 @@ export function ComputersPage() {
 
                       <Button
                         className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                        disabled={computer.status === "rented"}
+                        disabled={computer.status.toLowerCase() !== "available"}
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/computers/${computer.id}`);
+                          navigate(`/computers/${computer.pcId}`);
                         }}
                       >
-                        {computer.status === "available"
-                          ? "Xem Chi Tiết"
-                          : "Không Khả Dụng"}
+                        Xem Chi Tiết
                       </Button>
                     </div>
                   </Card>
                 ))}
               </div>
 
-              {filteredComputers.length === 0 && (
+              {!isLoading && !loadError && filteredComputers.length === 0 && (
                 <Card className="p-12 border-border text-center">
                   <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-xl font-bold mb-2">

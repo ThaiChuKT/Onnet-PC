@@ -43,6 +43,9 @@ public class SessionLifecycleService {
 
     @Transactional
     public StartSessionResponse startSession(String email, Long bookingId) {
+        // Ensure overdue active sessions are closed so stale machines can be reused.
+        expireOverdueActiveSessions();
+
         User user = findUserByEmail(email);
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
@@ -133,12 +136,13 @@ public class SessionLifecycleService {
 
         Instant now = Instant.now();
         session.setEndTime(now);
-        session.setStatus("completed");
+        session.setStatus("ended");
         sessionRepository.save(session);
 
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(session.getBooking().getId(), user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
-        booking.setStatus(BookingStatus.completed);
+        boolean hasRemainingTime = booking.getEndTime() != null && now.isBefore(booking.getEndTime());
+        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.completed);
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
@@ -156,7 +160,9 @@ public class SessionLifecycleService {
             now,
             true,
             session.getStatus(),
-            "Session ended. Remaining time is not refundable."
+            hasRemainingTime
+                ? "Session stopped. You can start again until booking time ends."
+                : "Session ended. Booking time is fully used."
         );
     }
 
@@ -168,14 +174,61 @@ public class SessionLifecycleService {
         return sessions.get(0);
     }
 
+    private void expireOverdueActiveSessions() {
+        Instant now = Instant.now();
+        List<Long> expiredSessionIds = sessionRepository.findExpiredActiveSessionIds(now);
+        for (Long sessionId : expiredSessionIds) {
+            Session expired = sessionRepository.findByIdAndStatusForUpdate(sessionId, "active").orElse(null);
+            if (expired == null) {
+                continue;
+            }
+
+            expired.setStatus("expired");
+            sessionRepository.save(expired);
+
+            Booking booking = bookingRepository.findByIdAndStatusForUpdate(
+                expired.getBooking().getId(),
+                BookingStatus.paid.name()
+            ).orElse(null);
+            if (booking != null) {
+                booking.setStatus(BookingStatus.completed);
+                booking.setUpdatedAt(now);
+                bookingRepository.save(booking);
+            }
+
+            Pc pc = pcRepository.findByIdForUpdate(expired.getPc().getId()).orElse(null);
+            if (pc == null) {
+                continue;
+            }
+
+            if (pc.getStatus() != PcStatus.maintenance) {
+                pc.setStatus(PcStatus.available);
+            }
+            pc.setUpdatedAt(now);
+            pcRepository.save(pc);
+        }
+    }
+
     private Pc resolvePcForSessionStart(Booking booking) {
         Pc availablePc = pcRepository.findNextAvailableBySpecIdForUpdate(booking.getSpec().getId()).orElse(null);
+        if (availablePc == null) {
+            // Backward compatibility for databases where deleted_at was auto-populated unexpectedly.
+            availablePc = pcRepository.findNextAvailableBySpecIdAnyDeletedForUpdate(booking.getSpec().getId()).orElse(null);
+        }
         if (availablePc != null) {
             return availablePc;
         }
 
-        return pcRepository.findNextStaleReservedBySpecIdForUpdate(booking.getSpec().getId())
-            .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "No available machine to start session"));
+        Pc staleReserved = pcRepository.findNextStaleReservedBySpecIdForUpdate(booking.getSpec().getId()).orElse(null);
+        if (staleReserved == null) {
+            staleReserved = pcRepository.findNextStaleReservedBySpecIdAnyDeletedForUpdate(booking.getSpec().getId()).orElse(null);
+        }
+
+        if (staleReserved != null) {
+            return staleReserved;
+        }
+
+        throw new ApiException(HttpStatus.CONFLICT, "No available machine to start session");
     }
 
     private StartSessionResponse toStartResponse(Session session, String message) {

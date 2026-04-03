@@ -9,97 +9,36 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiGet, apiPatch } from "../../api/http";
+import { toast } from "sonner";
 
-interface Order {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  computerName: string;
-  computerId: string;
-  package: string;
-  duration: string;
-  price: number;
-  status: "pending" | "active" | "completed" | "cancelled";
-  orderDate: string;
-  startDate: string;
-  endDate: string;
-}
+type AdminBookingItemResponse = {
+  bookingId: number;
+  userEmail: string;
+  specName: string;
+  pcId: number | null;
+  bookingType: string;
+  totalHours: number | null;
+  startTime: string;
+  endTime: string;
+  totalPrice: number;
+  status: string;
+  createdAt: string;
+};
 
-const initialOrders: Order[] = [
-  {
-    id: "ORD001",
-    customerName: "Nguyễn Văn A",
-    customerEmail: "nguyenvana@gmail.com",
-    computerName: "Basic Gaming #1",
-    computerId: "PC001",
-    package: "Basic",
-    duration: "30 ngày",
-    price: 2500000,
-    status: "active",
-    orderDate: "01/03/2026",
-    startDate: "01/03/2026",
-    endDate: "31/03/2026",
-  },
-  {
-    id: "ORD002",
-    customerName: "Trần Thị B",
-    customerEmail: "tranthib@gmail.com",
-    computerName: "Pro Gaming #1",
-    computerId: "PC003",
-    package: "Pro",
-    duration: "15 ngày",
-    price: 3000000,
-    status: "active",
-    orderDate: "05/03/2026",
-    startDate: "05/03/2026",
-    endDate: "20/03/2026",
-  },
-  {
-    id: "ORD003",
-    customerName: "Lê Văn C",
-    customerEmail: "levanc@gmail.com",
-    computerName: "Ultra Gaming #1",
-    computerId: "PC005",
-    package: "Ultra",
-    duration: "7 ngày",
-    price: 2100000,
-    status: "pending",
-    orderDate: "10/03/2026",
-    startDate: "15/03/2026",
-    endDate: "22/03/2026",
-  },
-  {
-    id: "ORD004",
-    customerName: "Phạm Thị D",
-    customerEmail: "phamthid@gmail.com",
-    computerName: "Basic Gaming #2",
-    computerId: "PC002",
-    package: "Basic",
-    duration: "30 ngày",
-    price: 2500000,
-    status: "completed",
-    orderDate: "01/02/2026",
-    startDate: "01/02/2026",
-    endDate: "03/03/2026",
-  },
-  {
-    id: "ORD005",
-    customerName: "Hoàng Văn E",
-    customerEmail: "hoangvane@gmail.com",
-    computerName: "Pro Gaming #2",
-    computerId: "PC004",
-    package: "Pro",
-    duration: "7 ngày",
-    price: 1400000,
-    status: "cancelled",
-    orderDate: "12/03/2026",
-    startDate: "12/03/2026",
-    endDate: "19/03/2026",
-  },
-];
+type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
 
-const statusConfig = {
+const statusConfig: Record<
+  string,
+  { label: string; className: string; icon: typeof Clock }
+> = {
   pending: {
     label: "Chờ xử lý",
     className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
@@ -123,31 +62,50 @@ const statusConfig = {
 };
 
 export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<AdminBookingItemResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<AdminBookingItemResponse | null>(null);
 
-  const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
-    setOrders(
-      orders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
-    setSelectedOrder(null);
+  const loadOrders = async () => {
+    setIsLoading(true);
+    try {
+      const page = await apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", { page: 0, size: 50 });
+      setOrders(page.content ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể tải danh sách đơn");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === "pending").length,
-    active: orders.filter((o) => o.status === "active").length,
-    completed: orders.filter((o) => o.status === "completed").length,
-    totalRevenue: orders
-      .filter((o) => o.status === "completed" || o.status === "active")
-      .reduce((sum, o) => sum + o.price, 0),
+  useEffect(() => {
+    void loadOrders();
+  }, []);
+
+  const handleStatusChange = async (bookingId: number, status: string) => {
+    try {
+      await apiPatch<AdminBookingItemResponse, { status: string }>(`/admin/bookings/${bookingId}/status`, { status });
+      toast.success("Cập nhật trạng thái thành công");
+      setSelectedOrder(null);
+      await loadOrders();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể cập nhật trạng thái");
+    }
   };
+
+  const stats = useMemo(() => {
+    const total = orders.length;
+    const pending = orders.filter((o) => (o.status ?? "").toLowerCase() === "pending").length;
+    const active = orders.filter((o) => (o.status ?? "").toLowerCase() === "active").length;
+    const completed = orders.filter((o) => (o.status ?? "").toLowerCase() === "completed").length;
+    const totalRevenue = orders
+      .filter((o) => ["active", "completed"].includes((o.status ?? "").toLowerCase()))
+      .reduce((sum, o) => sum + Number(o.totalPrice ?? 0), 0);
+    return { total, pending, active, completed, totalRevenue };
+  }, [orders]);
 
   return (
     <div>
-      {/* Stats Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="p-4 border-border bg-card/50">
           <div className="flex items-center gap-3">
@@ -205,68 +163,80 @@ export function OrderManagement() {
             <div>
               <p className="text-sm text-muted-foreground">Doanh thu</p>
               <p className="text-lg font-bold text-primary">
-                {(stats.totalRevenue / 1000000).toFixed(1)}M
+                {(stats.totalRevenue / 1_000_000).toFixed(1)}M
               </p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Orders List */}
       <div className="space-y-4">
+        {isLoading && (
+          <Card className="p-12 border-border text-center">
+            <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Đang tải danh sách đơn...</p>
+          </Card>
+        )}
+
         {orders.map((order) => {
-          const StatusIcon = statusConfig[order.status].icon;
+          const key = (order.status ?? "").toLowerCase();
+          const cfg = statusConfig[key] ?? {
+            label: order.status ?? "N/A",
+            className: "bg-muted text-muted-foreground border-border",
+            icon: Clock,
+          };
+          const StatusIcon = cfg.icon;
+
           return (
-            <Card
-              key={order.id}
-              className="p-6 border-border hover:border-primary/50 transition-all"
-            >
+            <Card key={order.bookingId} className="p-6 border-border hover:border-primary/50 transition-all">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-xl font-bold">{order.id}</h3>
-                    <Badge className={statusConfig[order.status].className}>
+                    <h3 className="text-xl font-bold">#{order.bookingId}</h3>
+                    <Badge className={cfg.className}>
                       <StatusIcon className="w-3 h-3 mr-1" />
-                      {statusConfig[order.status].label}
+                      {cfg.label}
                     </Badge>
-                    <Badge className="bg-primary/20 text-primary border-primary/50">
-                      {order.package}
-                    </Badge>
+                    <Badge className="bg-primary/20 text-primary border-primary/50">{order.bookingType}</Badge>
                   </div>
 
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                     <div>
-                      <span className="text-muted-foreground">Khách hàng:</span>{" "}
-                      <span className="font-medium">{order.customerName}</span>
+                      <span className="text-muted-foreground">Khách:</span>{" "}
+                      <span className="font-medium">{order.userEmail}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Email:</span>{" "}
-                      <span className="font-medium">{order.customerEmail}</span>
+                      <span className="text-muted-foreground">Spec:</span>{" "}
+                      <span className="font-medium">{order.specName}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Máy:</span>{" "}
-                      <span className="font-medium">{order.computerName}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Thời gian:</span>{" "}
-                      <span className="font-medium">{order.duration}</span>
+                      <span className="text-muted-foreground">PC:</span>{" "}
+                      <span className="font-medium">{order.pcId ?? "—"}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Giá:</span>{" "}
                       <span className="font-bold text-primary">
-                        {order.price.toLocaleString("vi-VN")}đ
+                        {Number(order.totalPrice ?? 0).toLocaleString("vi-VN")}đ
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Ngày đặt:</span>{" "}
-                      <span className="font-medium">{order.orderDate}</span>
+                      <span className="text-muted-foreground">Bắt đầu:</span>{" "}
+                      <span className="font-medium">
+                        {order.startTime ? new Date(order.startTime).toLocaleString("vi-VN") : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Kết thúc:</span>{" "}
+                      <span className="font-medium">
+                        {order.endTime ? new Date(order.endTime).toLocaleString("vi-VN") : "—"}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <Dialog
-                    open={selectedOrder?.id === order.id}
+                    open={selectedOrder?.bookingId === order.bookingId}
                     onOpenChange={(open) => !open && setSelectedOrder(null)}
                   >
                     <DialogTrigger asChild>
@@ -282,105 +252,53 @@ export function OrderManagement() {
                     </DialogTrigger>
                     <DialogContent className="bg-card border-border max-w-2xl">
                       <DialogHeader>
-                        <DialogTitle>Chi Tiết Đơn Hàng</DialogTitle>
+                        <DialogTitle>Chi Tiết Đơn</DialogTitle>
                       </DialogHeader>
                       {selectedOrder && (
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                             <div>
                               <p className="text-sm text-muted-foreground">Mã đơn</p>
-                              <p className="font-bold">{selectedOrder.id}</p>
+                              <p className="font-bold">#{selectedOrder.bookingId}</p>
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Trạng thái</p>
-                              <Badge className={statusConfig[selectedOrder.status].className}>
-                                {statusConfig[selectedOrder.status].label}
+                              <Badge className={(statusConfig[(selectedOrder.status ?? "").toLowerCase()]?.className) ?? "bg-muted text-muted-foreground border-border"}>
+                                {selectedOrder.status}
                               </Badge>
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <h4 className="font-bold">Thông tin khách hàng</h4>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Tên</p>
-                                <p className="font-medium">{selectedOrder.customerName}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Email</p>
-                                <p className="font-medium">{selectedOrder.customerEmail}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <h4 className="font-bold">Chi tiết dịch vụ</h4>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Máy</p>
-                                <p className="font-medium">{selectedOrder.computerName}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Mã máy</p>
-                                <p className="font-medium">{selectedOrder.computerId}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Gói</p>
-                                <p className="font-medium">{selectedOrder.package}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Thời gian thuê</p>
-                                <p className="font-medium">{selectedOrder.duration}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Ngày bắt đầu</p>
-                                <p className="font-medium">{selectedOrder.startDate}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Ngày kết thúc</p>
-                                <p className="font-medium">{selectedOrder.endDate}</p>
-                              </div>
-                            </div>
+                          <div className="space-y-2 text-sm">
+                            <div><span className="text-muted-foreground">User:</span> <span className="font-medium">{selectedOrder.userEmail}</span></div>
+                            <div><span className="text-muted-foreground">Spec:</span> <span className="font-medium">{selectedOrder.specName}</span></div>
+                            <div><span className="text-muted-foreground">PC:</span> <span className="font-medium">{selectedOrder.pcId ?? "—"}</span></div>
+                            <div><span className="text-muted-foreground">BookingType:</span> <span className="font-medium">{selectedOrder.bookingType}</span></div>
                           </div>
 
                           <div className="p-4 bg-primary/10 rounded-lg">
                             <div className="flex justify-between items-center">
                               <span className="font-bold">Tổng tiền:</span>
                               <span className="text-2xl font-bold text-primary">
-                                {selectedOrder.price.toLocaleString("vi-VN")}đ
+                                {Number(selectedOrder.totalPrice ?? 0).toLocaleString("vi-VN")}đ
                               </span>
                             </div>
                           </div>
 
-                          {selectedOrder.status === "pending" && (
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => handleStatusChange(selectedOrder.id, "active")}
-                                className="flex-1 bg-accent hover:bg-accent/90"
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Xác nhận đơn
-                              </Button>
-                              <Button
-                                onClick={() => handleStatusChange(selectedOrder.id, "cancelled")}
-                                variant="outline"
-                                className="flex-1 border-destructive text-destructive hover:bg-destructive/10"
-                              >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Hủy đơn
-                              </Button>
-                            </div>
-                          )}
-
-                          {selectedOrder.status === "active" && (
-                            <Button
-                              onClick={() => handleStatusChange(selectedOrder.id, "completed")}
-                              className="w-full bg-blue-500 hover:bg-blue-600"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Hoàn thành đơn
+                          <div className="flex flex-wrap gap-2">
+                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "pending")} variant="outline">
+                              Pending
                             </Button>
-                          )}
+                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "active")} className="bg-accent hover:bg-accent/90">
+                              Active
+                            </Button>
+                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "completed")} className="bg-blue-500 hover:bg-blue-600">
+                              Completed
+                            </Button>
+                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "cancelled")} variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
+                              Cancelled
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </DialogContent>
@@ -392,15 +310,14 @@ export function OrderManagement() {
         })}
       </div>
 
-      {orders.length === 0 && (
+      {!isLoading && orders.length === 0 && (
         <Card className="p-12 border-border text-center">
           <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-xl font-bold mb-2">Chưa có đơn hàng nào</h3>
-          <p className="text-muted-foreground">
-            Đơn hàng từ khách hàng sẽ hiển thị ở đây
-          </p>
+          <h3 className="text-xl font-bold mb-2">Chưa có đơn nào</h3>
+          <p className="text-muted-foreground">Đơn hàng sẽ hiển thị ở đây</p>
         </Card>
       )}
     </div>
   );
 }
+

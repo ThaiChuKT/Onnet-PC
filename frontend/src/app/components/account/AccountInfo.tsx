@@ -3,20 +3,47 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { User, Mail, Phone, Eye, EyeOff, Edit2, Lock } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "../../auth/AuthProvider";
+import { apiPatch } from "../../api/http";
+import { toast } from "sonner";
 
 export function AccountInfo() {
+  const { user, refreshMe } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    username: "Nguyễn Văn A",
-    email: "example@gmail.com",
-    phone: "0123456789",
+    fullName: "",
+    email: "",
+    phone: "",
   });
 
-  const handleSave = () => {
-    // Xử lý lưu thông tin
-    setIsEditing(false);
+  useEffect(() => {
+    if (!user) return;
+    setFormData({
+      fullName: user.fullName ?? "",
+      email: user.email ?? "",
+      phone: user.phone ?? "",
+    });
+  }, [user]);
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await apiPatch<{ id: number; fullName: string; email: string; phone: string; avatar: string | null; role: string }, { fullName: string; phone: string; avatar?: string | null }>(
+        "/users/me",
+        { fullName: formData.fullName, phone: formData.phone, avatar: null },
+      );
+      await refreshMe();
+      toast.success("Cập nhật thông tin thành công");
+      setIsEditing(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể cập nhật thông tin");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -53,7 +80,7 @@ export function AccountInfo() {
               <User className="w-10 h-10 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-lg">{formData.username}</h3>
+              <h3 className="font-bold text-lg">{formData.fullName || "—"}</h3>
               <p className="text-sm text-muted-foreground">Thành viên từ 01/2026</p>
             </div>
           </div>
@@ -62,14 +89,14 @@ export function AccountInfo() {
           <div className="grid gap-6">
             {/* Username */}
             <div className="space-y-2">
-              <Label htmlFor="username" className="flex items-center gap-2">
+              <Label htmlFor="fullName" className="flex items-center gap-2">
                 <User className="w-4 h-4 text-primary" />
-                Tên Tài Khoản
+                Họ và Tên
               </Label>
               <Input
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                id="fullName"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 disabled={!isEditing}
                 className="bg-input-background border-border"
               />
@@ -117,8 +144,7 @@ export function AccountInfo() {
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={!isEditing}
+                disabled
                 className="bg-input-background border-border"
               />
             </div>
@@ -145,9 +171,10 @@ export function AccountInfo() {
             <div className="flex gap-3 pt-4 border-t border-border">
               <Button
                 onClick={handleSave}
+                disabled={isSaving}
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
-                Lưu Thay Đổi
+                {isSaving ? "Đang lưu..." : "Lưu Thay Đổi"}
               </Button>
               <Button
                 onClick={() => setIsEditing(false)}

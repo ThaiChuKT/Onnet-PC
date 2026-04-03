@@ -4,7 +4,9 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Wallet, CreditCard, QrCode, DollarSign, Check } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiGet, apiPost } from "../../api/http";
+import { toast } from "sonner";
 
 const quickAmounts = [50000, 100000, 200000, 500000, 1000000, 2000000];
 
@@ -13,22 +15,67 @@ export function TopUp() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [selectedMethod, setSelectedMethod] = useState<"email" | "qr" | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const wallet = await apiGet<{ walletId: number; balance: number }>("/wallet");
+        if (!cancelled) setBalance(Number(wallet.balance));
+      } catch {
+        if (!cancelled) setBalance(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleQuickAmount = (value: number) => {
     setAmount(String(value));
   };
 
-  const handleTopUp = () => {
+  const handleTopUp = async () => {
     if (!amount || !selectedMethod) return;
+    if (selectedMethod === "email" && !paypalEmail) return;
+    if (isSubmitting) return;
+    const parsed = Number(amount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error("Số tiền không hợp lệ");
+      return;
+    }
     
-    // Mock payment processing
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
+    setIsSubmitting(true);
+    try {
+      const res = await apiPost<
+        { paymentProvider: string; status: string; message: string; orderId: string | null; approvalUrl: string | null },
+        { amount: number }
+      >("/wallet/top-up", { amount: parsed });
+
+      if (res.approvalUrl) {
+        toast.message(res.message || "Vui lòng hoàn tất thanh toán", {
+          description: "Đang mở trang thanh toán...",
+        });
+        window.open(res.approvalUrl, "_blank", "noopener,noreferrer");
+      } else {
+        toast.success(res.message || "Nạp tiền thành công");
+      }
+
+      const wallet = await apiGet<{ walletId: number; balance: number }>("/wallet");
+      setBalance(Number(wallet.balance));
+
+      setShowSuccess(true);
+      window.setTimeout(() => setShowSuccess(false), 2500);
       setAmount("");
       setPaypalEmail("");
       setSelectedMethod(null);
-    }, 3000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể nạp tiền");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const exchangeRate = 25000; // 1 USD = 25,000 VND
@@ -121,7 +168,9 @@ export function TopUp() {
               <Wallet className="w-5 h-5 text-primary" />
               <span className="text-muted-foreground">Số dư hiện tại</span>
             </div>
-            <p className="text-3xl font-bold text-primary">2,500,000đ</p>
+            <p className="text-3xl font-bold text-primary">
+              {balance === null ? "—" : `${balance.toLocaleString("vi-VN")}đ`}
+            </p>
           </Card>
         </div>
 
@@ -234,7 +283,7 @@ export function TopUp() {
             className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
           >
             <Wallet className="w-5 h-5 mr-2" />
-            Xác Nhận Nạp Tiền
+            {isSubmitting ? "Đang xử lý..." : "Xác Nhận Nạp Tiền"}
           </Button>
         </div>
       </div>

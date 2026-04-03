@@ -10,157 +10,183 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
-import { Monitor, Plus, Edit, Trash2, Search, Power, Key } from "lucide-react";
-import { useState } from "react";
+import { Monitor, Plus, Edit, Trash2, Search, Power } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
+import { toast } from "sonner";
 
 interface Computer {
-  id: string;
-  name: string;
-  specs: string;
-  status: "available" | "rented";
-  connectionCode: string;
-  category: string;
-  rentedBy?: string;
-  hourlyPrice: number;
-  dailyPrice: number;
-  monthlyPrice: number;
+  pcId: number;
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  operatingSystem: string;
+  pricePerHour: number;
+  location: string;
+  status: string;
 }
 
-const initialComputers: Computer[] = [
-  {
-    id: "PC001",
-    name: "Basic Gaming #1",
-    specs: "i5-12400F | GTX 1660S | 16GB RAM",
-    status: "rented",
-    connectionCode: "BGM-001-X7K9",
-    category: "Basic",
-    rentedBy: "Nguyễn Văn A",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-  },
-  {
-    id: "PC002",
-    name: "Basic Gaming #2",
-    specs: "i5-12400F | GTX 1660S | 16GB RAM",
-    status: "available",
-    connectionCode: "BGM-002-P4L2",
-    category: "Basic",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-  },
-  {
-    id: "PC003",
-    name: "Pro Gaming #1",
-    specs: "i7-13700K | RTX 4060Ti | 32GB RAM",
-    status: "rented",
-    connectionCode: "PRO-003-M9N5",
-    category: "Pro",
-    rentedBy: "Trần Thị B",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-  },
-  {
-    id: "PC004",
-    name: "Pro Gaming #2",
-    specs: "i7-13700K | RTX 4060Ti | 32GB RAM",
-    status: "available",
-    connectionCode: "PRO-004-Q8W3",
-    category: "Pro",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-  },
-  {
-    id: "PC005",
-    name: "Ultra Gaming #1",
-    specs: "i9-13900K | RTX 4080 | 64GB RAM",
-    status: "available",
-    connectionCode: "ULT-005-R2T7",
-    category: "Ultra",
-    hourlyPrice: 50000,
-    dailyPrice: 350000,
-    monthlyPrice: 7000000,
-  },
-];
+type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
+
+type CreatePcRequest = {
+  specName: string;
+  cpu?: string;
+  gpu?: string;
+  ram?: number;
+  storage?: number;
+  operatingSystem?: string;
+  description?: string;
+  pricePerHour: number;
+  location: string;
+  status?: string;
+};
+
+type UpdatePcRequest = Partial<CreatePcRequest>;
 
 export function ComputerList() {
-  const [computers, setComputers] = useState<Computer[]>(initialComputers);
+  const [computers, setComputers] = useState<Computer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingComputer, setEditingComputer] = useState<Computer | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
-    name: "",
-    specs: "",
-    category: "",
-    connectionCode: "",
-    hourlyPrice: 0,
-    dailyPrice: 0,
-    monthlyPrice: 0,
+    specName: "",
+    cpu: "",
+    gpu: "",
+    ram: 16,
+    storage: 512,
+    operatingSystem: "",
+    pricePerHour: 0,
+    location: "",
+    status: "available",
   });
 
-  const filteredComputers = computers.filter(
-    (pc) =>
-      pc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pc.connectionCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const loadComputers = async () => {
+    setIsLoading(true);
+    try {
+      const page = await apiGet<PageResponse<Computer>>("/admin/pcs", { page: 0, size: 50 });
+      setComputers(page.content ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể tải danh sách máy");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const handleAdd = () => {
-    const newComputer: Computer = {
-      id: `PC${String(computers.length + 1).padStart(3, "0")}`,
-      name: formData.name,
-      specs: formData.specs,
-      category: formData.category,
-      connectionCode: formData.connectionCode,
-      status: "available",
-      hourlyPrice: formData.hourlyPrice,
-      dailyPrice: formData.dailyPrice,
-      monthlyPrice: formData.monthlyPrice,
-    };
-    setComputers([...computers, newComputer]);
-    setFormData({ name: "", specs: "", category: "", connectionCode: "", hourlyPrice: 0, dailyPrice: 0, monthlyPrice: 0 });
-    setIsAddDialogOpen(false);
+  useEffect(() => {
+    void loadComputers();
+  }, []);
+
+  const filteredComputers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return computers;
+    return computers.filter((pc) => {
+      return (
+        String(pc.pcId).includes(q) ||
+        pc.specName.toLowerCase().includes(q) ||
+        pc.cpu.toLowerCase().includes(q) ||
+        pc.gpu.toLowerCase().includes(q) ||
+        pc.location.toLowerCase().includes(q) ||
+        pc.status.toLowerCase().includes(q)
+      );
+    });
+  }, [computers, searchTerm]);
+
+  const handleAdd = async () => {
+    try {
+      const payload: CreatePcRequest = {
+        specName: formData.specName,
+        cpu: formData.cpu,
+        gpu: formData.gpu,
+        ram: formData.ram,
+        storage: formData.storage,
+        operatingSystem: formData.operatingSystem,
+        pricePerHour: formData.pricePerHour,
+        location: formData.location,
+        status: formData.status,
+      };
+      await apiPost<Computer, CreatePcRequest>("/admin/pcs", payload);
+      toast.success("Tạo máy thành công");
+      setFormData({
+        specName: "",
+        cpu: "",
+        gpu: "",
+        ram: 16,
+        storage: 512,
+        operatingSystem: "",
+        pricePerHour: 0,
+        location: "",
+        status: "available",
+      });
+      setIsAddDialogOpen(false);
+      await loadComputers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể tạo máy");
+    }
   };
 
   const handleEdit = (computer: Computer) => {
     setEditingComputer(computer);
     setFormData({
-      name: computer.name,
-      specs: computer.specs,
-      category: computer.category,
-      connectionCode: computer.connectionCode,
-      hourlyPrice: computer.hourlyPrice,
-      dailyPrice: computer.dailyPrice,
-      monthlyPrice: computer.monthlyPrice,
+      specName: computer.specName,
+      cpu: computer.cpu,
+      gpu: computer.gpu,
+      ram: computer.ram,
+      storage: computer.storage,
+      operatingSystem: computer.operatingSystem,
+      pricePerHour: computer.pricePerHour,
+      location: computer.location,
+      status: computer.status,
     });
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingComputer) return;
-    setComputers(
-      computers.map((pc) =>
-        pc.id === editingComputer.id
-          ? { ...pc, ...formData }
-          : pc
-      )
-    );
-    setEditingComputer(null);
-    setFormData({ name: "", specs: "", category: "", connectionCode: "", hourlyPrice: 0, dailyPrice: 0, monthlyPrice: 0 });
+    try {
+      const payload: UpdatePcRequest = {
+        specName: formData.specName,
+        cpu: formData.cpu,
+        gpu: formData.gpu,
+        ram: formData.ram,
+        storage: formData.storage,
+        operatingSystem: formData.operatingSystem,
+        pricePerHour: formData.pricePerHour,
+        location: formData.location,
+        status: formData.status,
+      };
+      await apiPatch<Computer, UpdatePcRequest>(`/admin/pcs/${editingComputer.pcId}`, payload);
+      toast.success("Cập nhật máy thành công");
+      setEditingComputer(null);
+      await loadComputers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể cập nhật máy");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa máy này?")) {
-      setComputers(computers.filter((pc) => pc.id !== id));
+  const handleDelete = async (pcId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa máy này?")) return;
+    try {
+      await apiDelete<string>(`/admin/pcs/${pcId}`);
+      toast.success("Đã xóa máy");
+      await loadComputers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể xóa máy");
     }
   };
 
   const stats = {
     total: computers.length,
-    available: computers.filter((pc) => pc.status === "available").length,
-    rented: computers.filter((pc) => pc.status === "rented").length,
+    available: computers.filter((pc) => (pc.status ?? "").toLowerCase() === "available").length,
+    rented: computers.filter((pc) => (pc.status ?? "").toLowerCase() !== "available").length,
   };
 
   return (
@@ -228,75 +254,84 @@ export function ComputerList() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Tên Máy</Label>
+                <Label htmlFor="specName">Tên cấu hình (Spec)</Label>
                 <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="VD: Pro Gaming #3"
+                  id="specName"
+                  value={formData.specName}
+                  onChange={(e) => setFormData({ ...formData, specName: e.target.value })}
+                  placeholder="VD: Pro Gaming"
                   className="bg-input-background border-border"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Phân Loại</Label>
+                <Label htmlFor="cpu">CPU</Label>
                 <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="VD: Pro, Basic, Ultra"
+                  id="cpu"
+                  value={formData.cpu}
+                  onChange={(e) => setFormData({ ...formData, cpu: e.target.value })}
+                  placeholder="VD: Intel i7-13700K"
                   className="bg-input-background border-border"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="specs">Cấu Hình</Label>
+                <Label htmlFor="gpu">GPU</Label>
                 <Input
-                  id="specs"
-                  value={formData.specs}
-                  onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
-                  placeholder="VD: i7-13700K | RTX 4060Ti | 32GB RAM"
+                  id="gpu"
+                  value={formData.gpu}
+                  onChange={(e) => setFormData({ ...formData, gpu: e.target.value })}
+                  placeholder="VD: RTX 4060 Ti"
                   className="bg-input-background border-border"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connectionCode">Mã Kết Nối</Label>
+                <Label htmlFor="ram">RAM (GB)</Label>
                 <Input
-                  id="connectionCode"
-                  value={formData.connectionCode}
-                  onChange={(e) => setFormData({ ...formData, connectionCode: e.target.value })}
-                  placeholder="VD: PRO-006-X3Y9"
-                  className="bg-input-background border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hourlyPrice">Giá Theo Giờ</Label>
-                <Input
-                  id="hourlyPrice"
+                  id="ram"
                   type="number"
-                  value={formData.hourlyPrice}
-                  onChange={(e) => setFormData({ ...formData, hourlyPrice: parseFloat(e.target.value) })}
+                  value={formData.ram}
+                  onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
+                  className="bg-input-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="storage">Storage (GB)</Label>
+                <Input
+                  id="storage"
+                  type="number"
+                  value={formData.storage}
+                  onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
+                  placeholder="VD: 1024"
+                  className="bg-input-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="operatingSystem">Hệ điều hành</Label>
+                <Input
+                  id="operatingSystem"
+                  value={formData.operatingSystem}
+                  onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })}
+                  placeholder="VD: Windows 11"
+                  className="bg-input-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Vị trí</Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="VD: HCM-DC1"
+                  className="bg-input-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pricePerHour">Giá theo giờ</Label>
+                <Input
+                  id="pricePerHour"
+                  type="number"
+                  value={formData.pricePerHour}
+                  onChange={(e) => setFormData({ ...formData, pricePerHour: Number(e.target.value) || 0 })}
                   placeholder="VD: 20000"
-                  className="bg-input-background border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dailyPrice">Giá Theo Ngày</Label>
-                <Input
-                  id="dailyPrice"
-                  type="number"
-                  value={formData.dailyPrice}
-                  onChange={(e) => setFormData({ ...formData, dailyPrice: parseFloat(e.target.value) })}
-                  placeholder="VD: 150000"
-                  className="bg-input-background border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="monthlyPrice">Giá Theo Tháng</Label>
-                <Input
-                  id="monthlyPrice"
-                  type="number"
-                  value={formData.monthlyPrice}
-                  onChange={(e) => setFormData({ ...formData, monthlyPrice: parseFloat(e.target.value) })}
-                  placeholder="VD: 2500000"
                   className="bg-input-background border-border"
                 />
               </div>
@@ -310,72 +345,65 @@ export function ComputerList() {
 
       {/* Computer List */}
       <div className="space-y-4">
+        {isLoading && (
+          <Card className="p-12 border-border text-center">
+            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Đang tải danh sách máy...</p>
+          </Card>
+        )}
+
         {filteredComputers.map((computer) => (
           <Card
-            key={computer.id}
+            key={computer.pcId}
             className="p-6 border-border hover:border-primary/50 transition-all"
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <h3 className="text-xl font-bold">{computer.name}</h3>
+                  <h3 className="text-xl font-bold">{computer.specName}</h3>
                   <Badge
                     className={
-                      computer.status === "available"
+                      (computer.status ?? "").toLowerCase() === "available"
                         ? "bg-accent/20 text-accent border-accent/50"
                         : "bg-secondary/20 text-secondary border-secondary/50"
                     }
                   >
-                    {computer.status === "available" ? "Máy Trống" : "Đang Thuê"}
+                    {(computer.status ?? "").toLowerCase() === "available" ? "Máy Trống" : computer.status}
                   </Badge>
-                  <Badge className="bg-primary/20 text-primary border-primary/50">
-                    {computer.category}
-                  </Badge>
+                  <Badge className="bg-primary/20 text-primary border-primary/50">PC #{computer.pcId}</Badge>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Monitor className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-medium">{computer.id}</span>
+                    <span className="text-muted-foreground">Location:</span>
+                    <span className="font-medium">{computer.location}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Key className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Mã kết nối:</span>
-                    <span className="font-mono font-medium text-primary">{computer.connectionCode}</span>
+                    <span className="text-muted-foreground">CPU:</span>
+                    <span className="font-medium">{computer.cpu}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">GPU:</span>
+                    <span className="font-medium">{computer.gpu}</span>
                   </div>
                 </div>
 
                 <div className="mt-2 text-sm text-muted-foreground">
-                  {computer.specs}
+                  {computer.ram}GB RAM • {computer.storage}GB • {computer.operatingSystem || "OS N/A"}
                 </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
                   <div className="p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground block">Giờ</span>
-                    <span className="font-bold text-primary">{computer.hourlyPrice.toLocaleString()}đ</span>
-                  </div>
-                  <div className="p-2 bg-muted/50 rounded">
-                    <span className="text-muted-foreground block">Ngày</span>
-                    <span className="font-bold text-primary">{computer.dailyPrice.toLocaleString()}đ</span>
-                  </div>
-                  <div className="p-2 bg-muted/50 rounded">
-                    <span className="text-muted-foreground block">Tháng</span>
-                    <span className="font-bold text-primary">{computer.monthlyPrice.toLocaleString()}đ</span>
+                    <span className="font-bold text-primary">{Number(computer.pricePerHour).toLocaleString("vi-VN")}đ</span>
                   </div>
                 </div>
-
-                {computer.rentedBy && (
-                  <div className="mt-2 text-sm">
-                    <span className="text-muted-foreground">Thuê bởi:</span>{" "}
-                    <span className="font-medium text-secondary">{computer.rentedBy}</span>
-                  </div>
-                )}
               </div>
 
               <div className="flex gap-2">
                 <Dialog
-                  open={editingComputer?.id === computer.id}
+                  open={editingComputer?.pcId === computer.pcId}
                   onOpenChange={(open) => !open && setEditingComputer(null)}
                 >
                   <DialogTrigger asChild>
@@ -394,68 +422,77 @@ export function ComputerList() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="edit-name">Tên Máy</Label>
+                        <Label htmlFor="edit-specName">Tên cấu hình (Spec)</Label>
                         <Input
-                          id="edit-name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          id="edit-specName"
+                          value={formData.specName}
+                          onChange={(e) => setFormData({ ...formData, specName: e.target.value })}
                           className="bg-input-background border-border"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-category">Phân Loại</Label>
+                        <Label htmlFor="edit-cpu">CPU</Label>
                         <Input
-                          id="edit-category"
-                          value={formData.category}
-                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          id="edit-cpu"
+                          value={formData.cpu}
+                          onChange={(e) => setFormData({ ...formData, cpu: e.target.value })}
                           className="bg-input-background border-border"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-specs">Cấu Hình</Label>
+                        <Label htmlFor="edit-gpu">GPU</Label>
                         <Input
-                          id="edit-specs"
-                          value={formData.specs}
-                          onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
+                          id="edit-gpu"
+                          value={formData.gpu}
+                          onChange={(e) => setFormData({ ...formData, gpu: e.target.value })}
                           className="bg-input-background border-border"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-code">Mã Kết Nối</Label>
+                        <Label htmlFor="edit-ram">RAM (GB)</Label>
                         <Input
-                          id="edit-code"
-                          value={formData.connectionCode}
-                          onChange={(e) => setFormData({ ...formData, connectionCode: e.target.value })}
-                          className="bg-input-background border-border"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-hourlyPrice">Giá Theo Giờ</Label>
-                        <Input
-                          id="edit-hourlyPrice"
+                          id="edit-ram"
                           type="number"
-                          value={formData.hourlyPrice}
-                          onChange={(e) => setFormData({ ...formData, hourlyPrice: parseFloat(e.target.value) })}
+                          value={formData.ram}
+                          onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
                           className="bg-input-background border-border"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-dailyPrice">Giá Theo Ngày</Label>
+                        <Label htmlFor="edit-storage">Storage (GB)</Label>
                         <Input
-                          id="edit-dailyPrice"
+                          id="edit-storage"
                           type="number"
-                          value={formData.dailyPrice}
-                          onChange={(e) => setFormData({ ...formData, dailyPrice: parseFloat(e.target.value) })}
+                          value={formData.storage}
+                          onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
                           className="bg-input-background border-border"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-monthlyPrice">Giá Theo Tháng</Label>
+                        <Label htmlFor="edit-operatingSystem">Hệ điều hành</Label>
                         <Input
-                          id="edit-monthlyPrice"
+                          id="edit-operatingSystem"
+                          value={formData.operatingSystem}
+                          onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })}
+                          className="bg-input-background border-border"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-location">Vị trí</Label>
+                        <Input
+                          id="edit-location"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          className="bg-input-background border-border"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-pricePerHour">Giá theo giờ</Label>
+                        <Input
+                          id="edit-pricePerHour"
                           type="number"
-                          value={formData.monthlyPrice}
-                          onChange={(e) => setFormData({ ...formData, monthlyPrice: parseFloat(e.target.value) })}
+                          value={formData.pricePerHour}
+                          onChange={(e) => setFormData({ ...formData, pricePerHour: Number(e.target.value) || 0 })}
                           className="bg-input-background border-border"
                         />
                       </div>
@@ -469,7 +506,7 @@ export function ComputerList() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDelete(computer.id)}
+                  onClick={() => handleDelete(computer.pcId)}
                   className="border-destructive text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -480,7 +517,7 @@ export function ComputerList() {
         ))}
       </div>
 
-      {filteredComputers.length === 0 && (
+      {!isLoading && filteredComputers.length === 0 && (
         <Card className="p-12 border-border text-center">
           <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">Không tìm thấy máy nào</h3>

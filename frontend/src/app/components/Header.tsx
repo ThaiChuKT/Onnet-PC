@@ -2,31 +2,35 @@ import { Monitor, Menu, User, Wallet, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
+import { useAuth } from "../auth/AuthProvider";
+import { apiGet } from "../api/http";
 
 export function Header() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const userBalance = 2500000;
-  const [userEmail, setUserEmail] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated, isAdmin, user, logout } = useAuth();
+  const [balance, setBalance] = useState<number | null>(null);
 
   useEffect(() => {
-    // Check login status from localStorage
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-    const email = localStorage.getItem("userEmail") || "";
-    const admin = email === "admin@rentpc.com"; // Mock admin check
-
-    setIsLoggedIn(loggedIn);
-    setUserEmail(email);
-    setIsAdmin(admin);
-  }, []);
+    let cancelled = false;
+    (async () => {
+      if (!isAuthenticated) {
+        setBalance(null);
+        return;
+      }
+      try {
+        const wallet = await apiGet<{ walletId: number; balance: number }>("/wallet");
+        if (!cancelled) setBalance(Number(wallet.balance));
+      } catch {
+        if (!cancelled) setBalance(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userEmail");
-    setIsLoggedIn(false);
-    setUserEmail("");
-    setIsAdmin(false);
+    logout();
     navigate("/");
   };
 
@@ -84,7 +88,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             <>
               {/* Wallet */}
               <div className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
@@ -92,7 +96,7 @@ export function Header() {
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground">Số dư</span>
                   <span className="text-sm font-bold text-primary">
-                    {userBalance.toLocaleString("vi-VN")}đ
+                    {balance === null ? "—" : `${balance.toLocaleString("vi-VN")}đ`}
                   </span>
                 </div>
               </div>
@@ -107,7 +111,7 @@ export function Header() {
                 </div>
                 <div className="hidden md:flex flex-col">
                   <span className="text-sm font-bold">
-                    {userEmail.split("@")[0]}
+                    {user?.email?.split("@")[0] ?? "User"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Tài khoản

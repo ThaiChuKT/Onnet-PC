@@ -4,6 +4,8 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Lock, Eye, EyeOff, Shield } from "lucide-react";
 import { useState } from "react";
+import { apiPost } from "../../api/http";
+import { toast } from "sonner";
 
 export function ChangePassword() {
   const [showPasswords, setShowPasswords] = useState({
@@ -17,11 +19,28 @@ export function ChangePassword() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Xử lý đổi mật khẩu
-    console.log("Changing password...");
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await apiPost<string, { oldPassword: string; newPassword: string; confirmPassword: string }>(
+        "/users/me/change-password",
+        {
+          oldPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+          confirmPassword: formData.confirmPassword,
+        },
+      );
+      toast.success("Đổi mật khẩu thành công");
+      setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể đổi mật khẩu");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -145,9 +164,10 @@ export function ChangePassword() {
           <div className="flex gap-3 pt-4 border-t border-border">
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
             >
-              Đổi Mật Khẩu
+              {isSubmitting ? "Đang xử lý..." : "Đổi Mật Khẩu"}
             </Button>
             <Button
               type="button"

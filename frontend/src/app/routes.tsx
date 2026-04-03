@@ -14,6 +14,8 @@ import { ComputerList } from "./components/dashboard/ComputerList";
 import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
 import { OrderManagement } from "./components/dashboard/OrderManagement";
+import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { AdminRoute } from "./auth/AdminRoute";
 
 export const router = createBrowserRouter([
   {
@@ -38,7 +40,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/account",
-    Component: AccountPage,
+    element: (
+      <ProtectedRoute>
+        <AccountPage />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -60,7 +66,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    Component: DashboardPage,
+    element: (
+      <AdminRoute>
+        <DashboardPage />
+      </AdminRoute>
+    ),
     children: [
       {
         index: true,
@@ -85,3 +95,4 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+

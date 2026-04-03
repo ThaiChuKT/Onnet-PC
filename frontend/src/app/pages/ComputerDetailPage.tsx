@@ -4,6 +4,7 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   Monitor,
@@ -24,152 +25,115 @@ import {
   Clock,
   DollarSign,
 } from "lucide-react";
+import { apiGet, apiPost } from "../api/http";
+import { toast } from "sonner";
+import { useAuth } from "../auth/AuthProvider";
 
-// Mock data - trong thực tế sẽ fetch từ API
-const computerData: { [key: string]: any } = {
-  PC001: {
-    id: "PC001",
-    name: "Basic Gaming #1",
-    category: "Basic",
-    cpu: "Intel i5-12400F",
-    gpu: "GTX 1660 Super",
-    ram: "16GB DDR4",
-    storage: "500GB NVMe SSD",
-    status: "rented",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-    description:
-      "Cấu hình Basic Gaming phù hợp cho game thủ mới bắt đầu. Có thể chơi mượt các tựa game eSports như CSGO, Valorant, League of Legends ở mức cài đặt cao.",
-    features: [
-      "Chơi game eSports mượt mà 144+ FPS",
-      "Streaming chất lượng 1080p",
-      "Thiết kế tản nhiệt tối ưu",
-      "Kết nối internet tốc độ cao",
-      "Hỗ trợ kỹ thuật 24/7",
-    ],
-  },
-  PC002: {
-    id: "PC002",
-    name: "Basic Gaming #2",
-    category: "Basic",
-    cpu: "Intel i5-12400F",
-    gpu: "GTX 1660 Super",
-    ram: "16GB DDR4",
-    storage: "500GB NVMe SSD",
-    status: "available",
-    hourlyPrice: 20000,
-    dailyPrice: 150000,
-    monthlyPrice: 2500000,
-    description:
-      "Cấu hình Basic Gaming phù hợp cho game thủ mới bắt đầu. Có thể chơi mượt các tựa game eSports như CSGO, Valorant, League of Legends ở mức cài đặt cao.",
-    features: [
-      "Chơi game eSports mượt mà 144+ FPS",
-      "Streaming chất lượng 1080p",
-      "Thiết kế tản nhiệt tối ưu",
-      "Kết nối internet tốc độ cao",
-      "Hỗ trợ kỹ thuật 24/7",
-    ],
-  },
-  PC003: {
-    id: "PC003",
-    name: "Pro Gaming #1",
-    category: "Pro",
-    cpu: "Intel i7-13700K",
-    gpu: "RTX 4060 Ti",
-    ram: "32GB DDR5",
-    storage: "1TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-    description:
-      "Cấu hình Pro Gaming cho game thủ chuyên nghiệp. Xử lý mượt mà các tựa game AAA ở cài đặt cao đến ultra với FPS ổn định.",
-    features: [
-      "Chơi game AAA ultra settings 100+ FPS",
-      "Streaming + Recording đồng thời",
-      "Ray Tracing & DLSS 3.0",
-      "Tản nhiệt nước AIO cao cấp",
-      "Ưu tiên hỗ trợ kỹ thuật",
-    ],
-  },
-  PC004: {
-    id: "PC004",
-    name: "Pro Gaming #2",
-    category: "Pro",
-    cpu: "Intel i7-13700K",
-    gpu: "RTX 4060 Ti",
-    ram: "32GB DDR5",
-    storage: "1TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 35000,
-    dailyPrice: 250000,
-    monthlyPrice: 4500000,
-    description:
-      "Cấu hình Pro Gaming cho game thủ chuyên nghiệp. Xử lý mượt mà các tựa game AAA ở cài đặt cao đến ultra với FPS ổn định.",
-    features: [
-      "Chơi game AAA ultra settings 100+ FPS",
-      "Streaming + Recording đồng thời",
-      "Ray Tracing & DLSS 3.0",
-      "Tản nhiệt nước AIO cao cấp",
-      "Ưu tiên hỗ trợ kỹ thuật",
-    ],
-  },
-  PC005: {
-    id: "PC005",
-    name: "Ultra Gaming #1",
-    category: "Ultra",
-    cpu: "Intel i9-13900K",
-    gpu: "RTX 4080",
-    ram: "64GB DDR5",
-    storage: "2TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 50000,
-    dailyPrice: 350000,
-    monthlyPrice: 7000000,
-    description:
-      "Cấu hình Ultra Gaming đỉnh cao cho các streamer, content creator chuyên nghiệp. Xử lý mượt mà mọi tác vụ nặng nhất.",
-    features: [
-      "Chơi game 4K ultra settings 144+ FPS",
-      "Streaming 4K + Recording đồng thời",
-      "Ray Tracing & DLSS 3.0 tối ưu",
-      "Render video & 3D siêu nhanh",
-      "VIP support & setup tùy chỉnh",
-    ],
-  },
-  PC006: {
-    id: "PC006",
-    name: "Ultra Gaming #2",
-    category: "Ultra",
-    cpu: "AMD Ryzen 9 7950X",
-    gpu: "RTX 4090",
-    ram: "64GB DDR5",
-    storage: "2TB NVMe SSD",
-    status: "available",
-    hourlyPrice: 60000,
-    dailyPrice: 400000,
-    monthlyPrice: 8000000,
-    description:
-      "Cấu hình Ultra Gaming đỉnh cao nhất với RTX 4090. Dành cho những người yêu cầu hiệu năng tối đa trong mọi tình huống.",
-    features: [
-      "Hiệu năng gaming đỉnh cao nhất",
-      "Streaming & Recording 8K",
-      "Ray Tracing hoàn hảo",
-      "Đa nhiệm cực mạnh",
-      "Dịch vụ VIP cao cấp nhất",
-    ],
-  },
+type SubscriptionPlanPriceResponse = {
+  id: number;
+  planName: string;
+  durationDays: number;
+  price: number;
+};
+
+type MachineDetailResponse = {
+  pcId: number;
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  operatingSystem: string;
+  description: string;
+  hourlyPrice: number;
+  location: string;
+  plans: SubscriptionPlanPriceResponse[];
+  approvedReviews: unknown[];
+};
+
+type RentMachineResponse = {
+  bookingId: number;
+  queued: boolean;
+  queuePosition: number | null;
+  sessionId: number | null;
+  pcId: number | null;
+  pcLocation: string | null;
+  specName: string;
+  startTime: string;
+  expectedEndTime: string;
+  totalPrice: number;
+  walletBalance: number;
+  status: string;
+  message: string | null;
 };
 
 export function ComputerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [rentalDuration, setRentalDuration] = useState("monthly");
+  const { isAuthenticated } = useAuth();
+  type RentalUnit = "hour" | "week" | "month" | "year";
+  const [rentalUnit, setRentalUnit] = useState<RentalUnit>("month");
+  const [quantity, setQuantity] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [computer, setComputer] = useState<MachineDetailResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isRenting, setIsRenting] = useState(false);
 
-  const computer = computerData[id || ""];
+  const pcId = useMemo(() => {
+    const n = Number(id);
+    return Number.isFinite(n) ? n : null;
+  }, [id]);
 
-  if (!computer) {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!pcId) {
+        setIsLoading(false);
+        setLoadError("ID máy không hợp lệ");
+        return;
+      }
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const detail = await apiGet<MachineDetailResponse>(`/pcs/${pcId}`);
+        if (!cancelled) setComputer(detail);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Không thể tải thông tin máy";
+        if (!cancelled) setLoadError(msg);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pcId]);
+
+  const currentPlan = useMemo(() => {
+    if (!computer) return null;
+    const durationDays = rentalUnit === "week" ? 7 : rentalUnit === "month" ? 30 : rentalUnit === "year" ? 365 : null;
+    if (!durationDays) return null;
+    return computer.plans?.find((p) => p.durationDays === durationDays) ?? null;
+  }, [computer, rentalUnit]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 pt-20 pb-12 flex items-center justify-center">
+          <Card className="p-12 border-border text-center">
+            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">Đang tải thông tin máy...</h3>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!computer || loadError) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -177,6 +141,7 @@ export function ComputerDetailPage() {
           <Card className="p-12 border-border text-center">
             <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-bold mb-2">Không tìm thấy máy</h3>
+            {loadError && <p className="text-muted-foreground">{loadError}</p>}
             <Button onClick={() => navigate("/computers")} className="mt-4">
               Quay lại danh sách
             </Button>
@@ -187,26 +152,36 @@ export function ComputerDetailPage() {
     );
   }
 
-  const calculatePrice = () => {
-    switch (rentalDuration) {
-      case "hourly":
-        return computer.hourlyPrice;
-      case "daily":
-        return computer.dailyPrice;
-      case "monthly":
-        return computer.monthlyPrice;
-      default:
-        return 0;
-    }
+  const estimatedPrice = () => {
+    if (rentalUnit === "hour") return Number(computer.hourlyPrice) * quantity;
+    if (!currentPlan) return 0;
+    return Number(currentPlan.price) * quantity;
   };
 
-  const handleRent = () => {
-    // Mock rental process
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      navigate("/account/rental-history");
-    }, 2000);
+  const handleRent = async () => {
+    if (isRenting) return;
+    if (!isAuthenticated) {
+      toast.message("Vui lòng đăng nhập để thuê máy");
+      navigate("/login", { replace: false, state: { from: `/computers/${computer.pcId}` } });
+      return;
+    }
+    setIsRenting(true);
+    try {
+      const res = await apiPost<RentMachineResponse, { specId: number; rentalUnit: string; quantity: number }>(
+        "/bookings/rent",
+        { specId: computer.specId, rentalUnit, quantity },
+      );
+      setShowSuccess(true);
+      toast.success(res.message ?? "Tạo yêu cầu thuê máy thành công");
+      window.setTimeout(() => {
+        setShowSuccess(false);
+        navigate("/account/rental-history");
+      }, 1500);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể thuê máy");
+    } finally {
+      setIsRenting(false);
+    }
   };
 
   return (
@@ -253,20 +228,12 @@ export function ComputerDetailPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h1 className="text-3xl font-bold">{computer.name}</h1>
-                    <Badge
-                      className={
-                        computer.status === "available"
-                          ? "bg-accent/20 text-accent border-accent/50"
-                          : "bg-muted text-muted-foreground border-border"
-                      }
-                    >
-                      {computer.status === "available" ? "Có sẵn" : "Đang thuê"}
-                    </Badge>
+                    <h1 className="text-3xl font-bold">{computer.specName}</h1>
+                    <Badge className="bg-accent/20 text-accent border-accent/50">Chi tiết</Badge>
                   </div>
 
                   <Badge className="bg-primary/20 text-primary border-primary/50">
-                    {computer.category}
+                    PC #{computer.pcId}
                   </Badge>
 
                   <p className="text-muted-foreground">{computer.description}</p>
@@ -303,7 +270,7 @@ export function ComputerDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">RAM</p>
-                      <p className="font-bold">{computer.ram}</p>
+                      <p className="font-bold">{computer.ram}GB</p>
                     </div>
                   </div>
 
@@ -313,24 +280,28 @@ export function ComputerDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Storage</p>
-                      <p className="font-bold">{computer.storage}</p>
+                      <p className="font-bold">{computer.storage}GB</p>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {/* Features */}
+              {/* Notes */}
               <Card className="p-6 border-border">
-                <h2 className="text-2xl font-bold mb-4">Tính Năng Nổi Bật</h2>
+                <h2 className="text-2xl font-bold mb-4">Thông Tin Thêm</h2>
                 <ul className="space-y-3">
-                  {computer.features.map((feature: string, index: number) => (
-                    <li key={index} className="flex items-center gap-3">
-                      <div className="bg-accent/20 p-1 rounded-full">
-                        <Check className="w-4 h-4 text-accent" />
-                      </div>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
+                  <li className="flex items-center gap-3">
+                    <div className="bg-accent/20 p-1 rounded-full">
+                      <Check className="w-4 h-4 text-accent" />
+                    </div>
+                    <span>Hệ điều hành: {computer.operatingSystem || "N/A"}</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="bg-accent/20 p-1 rounded-full">
+                      <Check className="w-4 h-4 text-accent" />
+                    </div>
+                    <span>Địa điểm: {computer.location || "N/A"}</span>
+                  </li>
                 </ul>
               </Card>
             </div>
@@ -344,32 +315,58 @@ export function ComputerDetailPage() {
                 <div className="space-y-4">
                   {/* Duration Selection */}
                   <div className="space-y-2">
-                    <Label>Thời gian thuê</Label>
-                    <Select value={rentalDuration} onValueChange={setRentalDuration}>
+                    <Label>Gói thuê</Label>
+                    <Select value={rentalUnit} onValueChange={(v) => setRentalUnit(v as RentalUnit)}>
                       <SelectTrigger className="bg-input-background border-border h-12">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hourly">
+                        <SelectItem value="hour">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
                             Theo giờ
                           </div>
                         </SelectItem>
-                        <SelectItem value="daily">
+                        <SelectItem value="week">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            Theo ngày
+                            Theo tuần
                           </div>
                         </SelectItem>
-                        <SelectItem value="monthly">
+                        <SelectItem value="month">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
                             Theo tháng
                           </div>
                         </SelectItem>
+                        <SelectItem value="year">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Theo năm
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Số lượng</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                      className="bg-input-background border-border h-12"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {rentalUnit === "hour"
+                        ? "Số giờ thuê"
+                        : rentalUnit === "week"
+                        ? "Số tuần thuê"
+                        : rentalUnit === "month"
+                        ? "Số tháng thuê"
+                        : "Số năm thuê"}
+                    </p>
                   </div>
 
                   {/* Price Display */}
@@ -377,19 +374,26 @@ export function ComputerDetailPage() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-muted-foreground">Giá thuê</span>
                       <span className="text-sm text-muted-foreground">
-                        {rentalDuration === "hourly"
+                        {rentalUnit === "hour"
                           ? "/ giờ"
-                          : rentalDuration === "daily"
-                          ? "/ ngày"
-                          : "/ tháng"}
+                          : rentalUnit === "week"
+                          ? "/ tuần"
+                          : rentalUnit === "month"
+                          ? "/ tháng"
+                          : "/ năm"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <DollarSign className="w-6 h-6 text-primary" />
                       <span className="text-3xl font-bold text-primary">
-                        {calculatePrice().toLocaleString("vi-VN")}đ
+                        {estimatedPrice().toLocaleString("vi-VN")}đ
                       </span>
                     </div>
+                    {rentalUnit !== "hour" && !currentPlan && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Gói thuê này chưa có sẵn cho cấu hình này.
+                      </p>
+                    )}
                   </div>
 
                   {/* Pricing Info */}
@@ -397,30 +401,27 @@ export function ComputerDetailPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Giá theo giờ:</span>
                       <span className="font-medium">
-                        {computer.hourlyPrice.toLocaleString("vi-VN")}đ
+                        {Number(computer.hourlyPrice).toLocaleString("vi-VN")}đ
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Giá theo ngày:</span>
-                      <span className="font-medium">
-                        {computer.dailyPrice.toLocaleString("vi-VN")}đ
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Giá theo tháng:</span>
-                      <span className="font-medium">
-                        {computer.monthlyPrice.toLocaleString("vi-VN")}đ
-                      </span>
-                    </div>
+                    {computer.plans?.map((p) => (
+                      <div key={p.id} className="flex justify-between">
+                        <span className="text-muted-foreground">{p.planName}:</span>
+                        <span className="font-medium">{Number(p.price).toLocaleString("vi-VN")}đ</span>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Rent Button */}
                   <Button
                     onClick={handleRent}
-                    disabled={computer.status === "rented"}
+                    disabled={
+                      isRenting ||
+                      (rentalUnit !== "hour" && !currentPlan)
+                    }
                     className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
                   >
-                    {computer.status === "available" ? "Thuê Ngay" : "Không Khả Dụng"}
+                    {isRenting ? "Đang xử lý..." : "Thuê Ngay"}
                   </Button>
 
                   {/* Info */}
