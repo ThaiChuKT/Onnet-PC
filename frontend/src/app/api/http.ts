@@ -2,7 +2,7 @@ import axios, { AxiosError } from "axios";
 import { clearAccessToken, getAccessToken } from "./authStorage";
 import { ApiError, type ApiResponse } from "./types";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const baseURL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8080/api/v1";
 
 export const http = axios.create({
   baseURL,
