@@ -9,9 +9,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate("/login", { replace: true, state: { from: location.pathname } });
+      const from = `${location.pathname}${location.search}`;
+      navigate("/login", { replace: true, state: { from } });
     }
-  }, [isAuthenticated, isLoading, location.pathname, navigate]);
+  }, [isAuthenticated, isLoading, location.pathname, location.search, navigate]);
 
   if (isLoading) return null;
   if (!isAuthenticated) return null;

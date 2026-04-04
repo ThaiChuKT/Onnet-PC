@@ -1,8 +1,27 @@
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Calendar, Clock, Cpu, DollarSign } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { apiGet } from "../../api/http";
+import { Button } from "../ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import {
+  Calendar,
+  Clock,
+  Cpu,
+  DollarSign,
+  Loader2,
+  Wallet,
+  CreditCard,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
+import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
 
 type BookingHistoryItemResponse = {
@@ -18,6 +37,12 @@ type BookingHistoryItemResponse = {
   createdAt: string;
 };
 
+type BookingPaymentResponse = {
+  bookingId: number;
+  status: string;
+  walletBalance: number;
+};
+
 type PageResponse<T> = {
   content: T[];
   totalElements: number;
@@ -27,7 +52,10 @@ type PageResponse<T> = {
 };
 
 const statusConfig = {
-  pending: { label: "Chờ xử lý", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50" },
+  pending: {
+    label: "Chờ thanh toán",
+    className: "bg-amber-500/20 text-amber-400 border-amber-500/50",
+  },
   active: { label: "Đang hoạt động", className: "bg-accent/20 text-accent border-accent/50" },
   paid: { label: "Đã thanh toán", className: "bg-blue-500/20 text-blue-500 border-blue-500/50" },
   completed: { label: "Hoàn thành", className: "bg-secondary/20 text-secondary border-secondary/50" },
@@ -38,32 +66,45 @@ export function RentalHistory() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [payingBookingId, setPayingBookingId] = useState<number | null>(null);
+  const [confirmBooking, setConfirmBooking] = useState<BookingHistoryItemResponse | null>(null);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [page, wallet] = await Promise.all([
+        apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", { page: 0, size: 50 }),
+        apiGet<{ walletId: number; balance: number }>("/wallet").catch(() => null),
+      ]);
+      setItems(page.content ?? []);
+      if (wallet) setWalletBalance(Number(wallet.balance));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Không thể tải lịch sử thuê";
+      setLoadError(msg);
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        const page = await apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", { page: 0, size: 20 });
-        if (!cancelled) setItems(page.content ?? []);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Không thể tải lịch sử thuê";
-        if (!cancelled) {
-          setLoadError(msg);
-          toast.error(msg);
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
+      if (!cancelled) await loadData();
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadData]);
 
   const completedCount = useMemo(
     () => items.filter((i) => (i.status ?? "").toLowerCase() === "completed").length,
+    [items],
+  );
+  const pendingCount = useMemo(
+    () => items.filter((i) => (i.status ?? "").toLowerCase() === "pending").length,
     [items],
   );
   const totalSpent = useMemo(
@@ -74,19 +115,80 @@ export function RentalHistory() {
     [items],
   );
 
+  const handleConfirmPay = async () => {
+    if (!confirmBooking || payingBookingId !== null) return;
+    const id = confirmBooking.bookingId;
+    setPayingBookingId(id);
+    try {
+      const res = await apiPost<BookingPaymentResponse>(
+        `/bookings/${id}/pay-wallet`,
+      );
+      setWalletBalance(Number(res.walletBalance));
+      setItems((prev) =>
+        prev.map((b) =>
+          b.bookingId === id ? { ...b, status: res.status ?? "paid" } : b,
+        ),
+      );
+      toast.success("Thanh toán đơn hàng bằng ví thành công");
+      setConfirmBooking(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể thanh toán");
+    } finally {
+      setPayingBookingId(null);
+    }
+  };
+
+  const price = confirmBooking ? Number(confirmBooking.totalPrice ?? 0) : 0;
+  const balanceAfter =
+    walletBalance !== null ? walletBalance - price : null;
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">
           Lịch Sử
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            {" "}Thuê Máy
+            {" "}
+            Thuê Máy
           </span>
         </h1>
         <p className="text-muted-foreground">
-          Xem lại tất cả các lần thuê máy tính của bạn
+          Xem đơn hàng và thanh toán bằng ví cho các đơn đang chờ
         </p>
       </div>
+
+      {pendingCount > 0 && !isLoading && !loadError && (
+        <Card className="p-6 border-border mb-6 bg-gradient-to-br from-primary/10 via-card to-accent/5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary/20 p-3 rounded-lg shrink-0">
+                <Wallet className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold mb-1">Thanh toán đơn hàng</h2>
+                <p className="text-sm text-muted-foreground">
+                  Bạn có{" "}
+                  <span className="text-foreground font-semibold">{pendingCount}</span> đơn
+                  chờ thanh toán. Số tiền sẽ được trừ từ ví.{" "}
+                  <Link
+                    to="/account/top-up"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Nạp thêm
+                  </Link>{" "}
+                  nếu cần.
+                </p>
+              </div>
+            </div>
+            <div className="sm:text-right shrink-0">
+              <p className="text-xs text-muted-foreground mb-1">Số dư ví hiện tại</p>
+              <p className="text-2xl font-bold text-primary">
+                {walletBalance === null ? "—" : `${walletBalance.toLocaleString("vi-VN")}đ`}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4 mb-6">
@@ -131,6 +233,64 @@ export function RentalHistory() {
         </Card>
       </div>
 
+      <AlertDialog open={!!confirmBooking} onOpenChange={(open) => !open && setConfirmBooking(null)}>
+        <AlertDialogContent className="border-border bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-primary" />
+              Xác nhận thanh toán
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                <p>
+                  Bạn sắp thanh toán đơn <strong>#{confirmBooking?.bookingId}</strong> —{" "}
+                  <strong>{confirmBooking?.specName}</strong>.
+                </p>
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Số tiền</span>
+                    <span className="font-bold text-primary">
+                      {price.toLocaleString("vi-VN")}đ
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Số dư hiện tại</span>
+                    <span className="font-medium">
+                      {walletBalance === null ? "—" : `${walletBalance.toLocaleString("vi-VN")}đ`}
+                    </span>
+                  </div>
+                  {balanceAfter !== null && (
+                    <div className="flex justify-between pt-2 border-t border-border">
+                      <span className="text-muted-foreground">Số dư sau thanh toán</span>
+                      <span className="font-bold text-foreground">
+                        {balanceAfter.toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Hủy</AlertDialogCancel>
+            <Button
+              onClick={handleConfirmPay}
+              disabled={payingBookingId !== null}
+              className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+            >
+              {payingBookingId !== null ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                "Thanh toán"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* History List */}
       <div className="space-y-4">
         {isLoading && (
@@ -154,62 +314,103 @@ export function RentalHistory() {
             key in statusConfig
               ? statusConfig[key as keyof typeof statusConfig]
               : {
-            label: rental.status ?? "N/A",
-            className: "bg-muted text-muted-foreground border-border",
-          };
+                  label: rental.status ?? "N/A",
+                  className: "bg-muted text-muted-foreground border-border",
+                };
           const start = rental.startTime ? new Date(rental.startTime) : null;
           const end = rental.endTime ? new Date(rental.endTime) : null;
           const duration =
             start && end ? `${Math.max(0, Math.round((end.getTime() - start.getTime()) / 36e5))} giờ` : "—";
 
+          const isPending = key === "pending";
+          const total = Number(rental.totalPrice ?? 0);
+          const insufficient =
+            isPending &&
+            total > 0 &&
+            walletBalance !== null &&
+            walletBalance < total;
+          const canOpenPay =
+            isPending && total > 0 && !insufficient;
+
           return (
-          <Card
-            key={rental.bookingId}
-            className="p-6 border-border hover:border-primary/50 transition-all"
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold">{rental.specName}</h3>
-                  <Badge className={cfg.className}>
-                    {cfg.label}
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <Cpu className="w-4 h-4 text-primary" />
-                  <span>PC: {rental.pcId ?? "—"}</span>
+            <Card
+              key={rental.bookingId}
+              className="p-6 border-border hover:border-primary/50 transition-all"
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <h3 className="text-xl font-bold">{rental.specName}</h3>
+                    <Badge className={cfg.className}>{cfg.label}</Badge>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <Cpu className="w-4 h-4 text-primary" />
+                    <span>PC: {rental.pcId ?? "—"}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Ngày thuê:</span>
+                      <span className="font-medium">
+                        {start ? start.toLocaleDateString("vi-VN") : "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Thời gian:</span>
+                      <span className="font-medium">{duration}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Ngày thuê:</span>
-                    <span className="font-medium">
-                      {start ? start.toLocaleDateString("vi-VN") : "—"}
-                    </span>
+                <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-end gap-3 lg:min-w-[200px]">
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="text-2xl font-bold text-primary">
+                      {total.toLocaleString("vi-VN")}đ
+                    </div>
+                    <div className="text-xs text-muted-foreground">Mã: {rental.bookingId}</div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Thời gian:</span>
-                    <span className="font-medium">{duration}</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex flex-col md:items-end gap-2">
-                <div className="text-2xl font-bold text-primary">
-                  {Number(rental.totalPrice ?? 0).toLocaleString("vi-VN")}đ
+                  {isPending && (
+                    <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
+                      {canOpenPay ? (
+                        <Button
+                          onClick={() => setConfirmBooking(rental)}
+                          disabled={payingBookingId !== null}
+                          className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                        >
+                          <Wallet className="w-4 h-4 mr-2" />
+                          Thanh toán bằng ví
+                        </Button>
+                      ) : insufficient ? (
+                        <>
+                          <Button disabled className="w-full opacity-60">
+                            <Wallet className="w-4 h-4 mr-2" />
+                            Không đủ số dư
+                          </Button>
+                          <Link
+                            to="/account/top-up"
+                            className="text-center text-sm text-primary hover:underline"
+                          >
+                            Nạp tiền vào ví
+                          </Link>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground text-right sm:text-left">
+                          Không thể thanh toán đơn này (số tiền không hợp lệ).
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">Mã: {rental.bookingId}</div>
               </div>
-            </div>
-          </Card>
+            </Card>
           );
         })}
       </div>
 
-      {/* Empty State (if needed) */}
       {!isLoading && !loadError && items.length === 0 && (
         <Card className="p-12 border-border text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">

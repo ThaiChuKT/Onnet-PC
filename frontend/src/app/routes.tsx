@@ -16,6 +16,7 @@ import { RevenueStats } from "./components/dashboard/RevenueStats";
 import { OrderManagement } from "./components/dashboard/OrderManagement";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { AdminRoute } from "./auth/AdminRoute";
+import { WalletCheckoutPage } from "./pages/WalletCheckoutPage";
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +38,14 @@ export const router = createBrowserRouter([
   {
     path: "/ai-chat",
     Component: AIChatPage,
+  },
+  {
+    path: "/wallet",
+    element: (
+      <ProtectedRoute>
+        <WalletCheckoutPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/account",
