@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
 
-const quickAmounts = [50000, 100000, 200000, 500000, 1000000, 2000000];
+const quickAmounts = [5, 10, 20, 50, 100, 200];
 
 export function TopUp() {
   const [amount, setAmount] = useState("");
@@ -78,8 +78,7 @@ export function TopUp() {
     }
   };
 
-  const exchangeRate = 25000; // 1 USD = 25,000 VND
-  const amountInUSD = amount ? (parseInt(amount) / exchangeRate).toFixed(2) : "0.00";
+  const amountInUSD = amount ? Number(amount).toFixed(2) : "0.00";
 
   return (
     <div className="space-y-6">
@@ -125,7 +124,7 @@ export function TopUp() {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="amount">Nhập số tiền (VNĐ)</Label>
+                <Label htmlFor="amount">Nhập số tiền (USD)</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -135,7 +134,7 @@ export function TopUp() {
                   className="text-2xl font-bold bg-input-background border-border h-14"
                 />
                 <p className="text-sm text-muted-foreground">
-                  ≈ ${amountInUSD} USD
+                  Sẽ thanh toán: ${amountInUSD} USD
                 </p>
               </div>
 
@@ -152,7 +151,7 @@ export function TopUp() {
                         amount === String(value) ? "border-primary bg-primary/10" : ""
                       }`}
                     >
-                      {(value / 1000).toFixed(0)}K
+                      ${value}
                     </Button>
                   ))}
                 </div>
@@ -168,7 +167,7 @@ export function TopUp() {
               <span className="text-muted-foreground">Số dư hiện tại</span>
             </div>
             <p className="text-3xl font-bold text-primary">
-              {balance === null ? "—" : `${balance.toLocaleString("vi-VN")}đ`}
+              {balance === null ? "—" : `$${balance.toLocaleString("en-US")}`}
             </p>
 
         </Card>
@@ -195,10 +194,6 @@ export function TopUp() {
           <li className="flex gap-2">
             <span className="text-primary">•</span>
             <span>Thời gian xử lý: 5-15 phút sau khi thanh toán thành công</span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-primary">•</span>
-            <span>Tỷ giá quy đổi: 1 USD = 25,000 VNĐ</span>
           </li>
           <li className="flex gap-2">
             <span className="text-primary">•</span>
