@@ -2,8 +2,7 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Badge } from "../ui/badge";
-import { Wallet, CreditCard, QrCode, DollarSign, Check } from "lucide-react";
+import { Wallet, CreditCard, DollarSign, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
@@ -12,11 +11,15 @@ const quickAmounts = [50000, 100000, 200000, 500000, 1000000, 2000000];
 
 export function TopUp() {
   const [amount, setAmount] = useState("");
-  const [paypalEmail, setPaypalEmail] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState<"email" | "qr" | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+
+
+
+
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +41,7 @@ export function TopUp() {
   };
 
   const handleTopUp = async () => {
-    if (!amount || !selectedMethod) return;
-    if (selectedMethod === "email" && !paypalEmail) return;
+    if (!amount) return;
     if (isSubmitting) return;
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -69,8 +71,6 @@ export function TopUp() {
       setShowSuccess(true);
       window.setTimeout(() => setShowSuccess(false), 2500);
       setAmount("");
-      setPaypalEmail("");
-      setSelectedMethod(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Không thể nạp tiền");
     } finally {
@@ -113,11 +113,9 @@ export function TopUp() {
         </Card>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Left Column - Amount Input */}
-        <div className="space-y-6">
-          {/* Amount Input */}
-          <Card className="p-6 border-border">
+      <div className="space-y-6">
+        {/* Amount Input */}
+        <Card className="p-6 border-border">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-primary/20 p-2 rounded-lg">
                 <DollarSign className="w-5 h-5 text-primary" />
@@ -160,10 +158,11 @@ export function TopUp() {
                 </div>
               </div>
             </div>
-          </Card>
 
-          {/* Current Balance */}
-          <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
+        </Card>
+
+        {/* Current Balance */}
+        <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
             <div className="flex items-center gap-3 mb-2">
               <Wallet className="w-5 h-5 text-primary" />
               <span className="text-muted-foreground">Số dư hiện tại</span>
@@ -171,123 +170,19 @@ export function TopUp() {
             <p className="text-3xl font-bold text-primary">
               {balance === null ? "—" : `${balance.toLocaleString("vi-VN")}đ`}
             </p>
-          </Card>
-        </div>
 
-        {/* Right Column - Payment Method */}
-        <div className="space-y-6">
-          {/* PayPal Email */}
-          <Card className="p-6 border-border">
-            <button
-              onClick={() => setSelectedMethod("email")}
-              className="w-full text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-secondary/20 p-2 rounded-lg">
-                    <CreditCard className="w-5 h-5 text-secondary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">PayPal Email</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Thanh toán qua email PayPal
-                    </p>
-                  </div>
-                </div>
-                {selectedMethod === "email" && (
-                  <Badge className="bg-primary/20 text-primary border-primary/50">
-                    Đã chọn
-                  </Badge>
-                )}
-              </div>
-            </button>
-
-            {selectedMethod === "email" && (
-              <div className="space-y-4 mt-4 pt-4 border-t border-border">
-                <div className="space-y-2">
-                  <Label htmlFor="paypal-email">Email PayPal</Label>
-                  <Input
-                    id="paypal-email"
-                    type="email"
-                    value={paypalEmail}
-                    onChange={(e) => setPaypalEmail(e.target.value)}
-                    placeholder="your-email@paypal.com"
-                    className="bg-input-background border-border"
-                  />
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Gửi đến:</strong> payments@rentpc.com
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    <strong>Số tiền:</strong> ${amountInUSD} USD
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    <strong>Ghi chú:</strong> Nạp tiền - [Email của bạn]
-                  </p>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* PayPal QR Code */}
-          <Card className="p-6 border-border">
-            <button
-              onClick={() => setSelectedMethod("qr")}
-              className="w-full text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-accent/20 p-2 rounded-lg">
-                    <QrCode className="w-5 h-5 text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">Quét Mã QR</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Quét mã QR để thanh toán
-                    </p>
-                  </div>
-                </div>
-                {selectedMethod === "qr" && (
-                  <Badge className="bg-primary/20 text-primary border-primary/50">
-                    Đã chọn
-                  </Badge>
-                )}
-              </div>
-            </button>
-
-            {selectedMethod === "qr" && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="bg-white p-6 rounded-lg flex items-center justify-center">
-                  {/* Mock QR Code */}
-                  <div className="w-48 h-48 bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center rounded-lg">
-                    <QrCode className="w-32 h-32 text-white" />
-                  </div>
-                </div>
-                <p className="text-sm text-center text-muted-foreground mt-4">
-                  Quét mã QR bằng ứng dụng PayPal để thanh toán
-                </p>
-                <div className="p-3 bg-muted rounded-lg mt-4">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Số tiền: <strong>${amountInUSD} USD</strong>
-                  </p>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* Action Button */}
-          <Button
-            onClick={handleTopUp}
-            disabled={!amount || !selectedMethod || (selectedMethod === "email" && !paypalEmail)}
-            className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
-          >
-            <Wallet className="w-5 h-5 mr-2" />
-            {isSubmitting ? "Đang xử lý..." : "Xác Nhận Nạp Tiền"}
-          </Button>
-        </div>
+        </Card>
+        
+        {/* Action Button */}
+        <Button
+          onClick={handleTopUp}
+          disabled={!amount || isSubmitting}
+          className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
+        >
+          <CreditCard className="w-5 h-5 mr-2" />
+          {isSubmitting ? "Đang xử lý..." : "Thanh Toán Qua PayPal"}
+        </Button>
       </div>
-
       {/* Info Card */}
       <Card className="p-6 border-border bg-muted/30">
         <h4 className="font-bold mb-3 flex items-center gap-2">
@@ -311,7 +206,7 @@ export function TopUp() {
           </li>
           <li className="flex gap-2">
             <span className="text-primary">•</span>
-            <span>Vui lòng ghi đúng thông tin email trong phần ghi chú khi chuyển khoản</span>
+            <span>Vui lòng liên hệ support nếu có bất kỳ vấn đề gì</span>
           </li>
           <li className="flex gap-2">
             <span className="text-primary">•</span>
