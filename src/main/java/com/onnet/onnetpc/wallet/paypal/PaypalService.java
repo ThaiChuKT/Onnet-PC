@@ -21,6 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
@@ -36,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaypalService {
 
 	private static final Logger logger = LoggerFactory.getLogger(PaypalService.class);
+	private static final Duration PAYPAL_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+	private static final Duration PAYPAL_REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
 	private final PaypalConfig paypalConfig;
 	private final ObjectMapper objectMapper = new ObjectMapper();
@@ -57,7 +60,9 @@ public class PaypalService {
 		this.walletRepository = walletRepository;
 		this.walletTransactionRepository = walletTransactionRepository;
 		this.paypalPaymentRepository = paypalPaymentRepository;
-		this.httpClient = HttpClient.newHttpClient();
+		this.httpClient = HttpClient.newBuilder()
+			.connectTimeout(PAYPAL_CONNECT_TIMEOUT)
+			.build();
 	}
 
 	@Transactional
@@ -202,7 +207,7 @@ public class PaypalService {
 		String accessToken = fetchAccessToken();
 
 		for (PaypalPayment payment : paypalPaymentRepository
-			.findTop50ByWalletIdAndPaymentStatusOrderByCreatedAtDesc(wallet.getId(), PaypalPaymentStatus.pending)) {
+			.findTop10ByWalletIdAndPaymentStatusOrderByCreatedAtDesc(wallet.getId(), PaypalPaymentStatus.pending)) {
 			String orderId = payment.getTransactionId();
 			if (orderId == null || orderId.isBlank()) {
 				continue;
@@ -472,6 +477,7 @@ public class PaypalService {
 
 		HttpRequest request = HttpRequest.newBuilder()
 			.uri(URI.create(paypalConfig.getBaseUrl() + "/v1/oauth2/token"))
+			.timeout(PAYPAL_REQUEST_TIMEOUT)
 			.header("Authorization", "Basic " + encodedCredentials)
 			.header("Content-Type", "application/x-www-form-urlencoded")
 			.POST(HttpRequest.BodyPublishers.ofString(body))
@@ -505,6 +511,7 @@ public class PaypalService {
 	) {
 		HttpRequest request = HttpRequest.newBuilder()
 			.uri(URI.create(url))
+			.timeout(PAYPAL_REQUEST_TIMEOUT)
 			.header("Authorization", "Bearer " + accessToken)
 			.header("Prefer", "return=representation")
 			.header("Content-Type", "application/json")
@@ -527,6 +534,7 @@ public class PaypalService {
 	private JsonNode sendJsonGet(String url, String accessToken, HttpStatus failureStatus, String failureMessage) {
 		HttpRequest request = HttpRequest.newBuilder()
 			.uri(URI.create(url))
+			.timeout(PAYPAL_REQUEST_TIMEOUT)
 			.header("Authorization", "Bearer " + accessToken)
 			.header("Content-Type", "application/json")
 			.GET()

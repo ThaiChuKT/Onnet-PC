@@ -42,7 +42,6 @@ public class WalletService {
 
     @Transactional
     public WalletSummaryResponse getWalletSummary(String email) {
-        paypalService.reconcilePendingPayments(email);
         Wallet wallet = findWalletByEmail(email);
         BigDecimal balance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
         return new WalletSummaryResponse(wallet.getId(), balance);
