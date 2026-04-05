@@ -15,6 +15,8 @@ import {
   Clock,
   Cpu,
   DollarSign,
+  Play,
+  Square,
   Loader2,
   Wallet,
   CreditCard,
@@ -43,6 +45,41 @@ type BookingPaymentResponse = {
   walletBalance: number;
 };
 
+type ActiveSessionResponse = {
+  sessionId: number;
+  bookingId: number;
+  pcId: number;
+  pcLocation: string;
+  startedAt: string;
+  expectedEndTime: string;
+  remainingSeconds: number;
+  warning15Minutes: boolean;
+  status: string;
+  message: string;
+};
+
+type StartSessionResponse = {
+  sessionId: number;
+  bookingId: number;
+  pcId: number;
+  pcLocation: string;
+  startedAt: string;
+  expectedEndTime: string;
+  remainingSeconds: number;
+  connectionInfo: string;
+  status: string;
+  message: string;
+};
+
+type EndSessionResponse = {
+  sessionId: number;
+  bookingId: number;
+  endedAt: string;
+  noRefundApplied: boolean;
+  status: string;
+  message: string;
+};
+
 type PageResponse<T> = {
   content: T[];
   totalElements: number;
@@ -68,18 +105,23 @@ export function RentalHistory() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [payingBookingId, setPayingBookingId] = useState<number | null>(null);
+  const [startingBookingId, setStartingBookingId] = useState<number | null>(null);
+  const [endingBookingId, setEndingBookingId] = useState<number | null>(null);
+  const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
   const [confirmBooking, setConfirmBooking] = useState<BookingHistoryItemResponse | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [page, wallet] = await Promise.all([
+      const [page, wallet, activeSession] = await Promise.all([
         apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", { page: 0, size: 50 }),
         apiGet<{ walletId: number; balance: number }>("/wallet").catch(() => null),
+        apiGet<ActiveSessionResponse>("/sessions/current").catch(() => null),
       ]);
       setItems(page.content ?? []);
       if (wallet) setWalletBalance(Number(wallet.balance));
+      setActiveBookingId(activeSession?.bookingId ?? null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Không thể tải lịch sử thuê";
       setLoadError(msg);
@@ -135,6 +177,56 @@ export function RentalHistory() {
       toast.error(e instanceof Error ? e.message : "Không thể thanh toán");
     } finally {
       setPayingBookingId(null);
+    }
+  };
+
+  const handleStartSession = async (bookingId: number) => {
+    if (startingBookingId !== null || endingBookingId !== null) return;
+    setStartingBookingId(bookingId);
+    try {
+      const res = await apiPost<StartSessionResponse>(`/bookings/${bookingId}/start-session`);
+      setActiveBookingId(res.bookingId ?? bookingId);
+      setItems((prev) =>
+        prev.map((b) =>
+          b.bookingId === bookingId
+            ? {
+                ...b,
+                status: "active",
+                pcId: res.pcId ?? b.pcId,
+              }
+            : b,
+        ),
+      );
+      toast.success(res.message || "Bắt đầu session thành công");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể bắt đầu session");
+    } finally {
+      setStartingBookingId(null);
+    }
+  };
+
+  const handleEndSession = async (bookingId: number) => {
+    if (startingBookingId !== null || endingBookingId !== null) return;
+    setEndingBookingId(bookingId);
+    try {
+      const res = await apiPost<EndSessionResponse>("/sessions/current/end");
+      setActiveBookingId(null);
+      setItems((prev) =>
+        prev.map((b) =>
+          b.bookingId === (res.bookingId ?? bookingId)
+            ? {
+                ...b,
+                status: "completed",
+              }
+            : b,
+        ),
+      );
+      toast.success(res.message || "Kết thúc session thành công");
+      await loadData();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể kết thúc session");
+    } finally {
+      setEndingBookingId(null);
     }
   };
 
@@ -323,6 +415,8 @@ export function RentalHistory() {
             start && end ? `${Math.max(0, Math.round((end.getTime() - start.getTime()) / 36e5))} giờ` : "—";
 
           const isPending = key === "pending";
+          const isActive = key === "active" || activeBookingId === rental.bookingId;
+          const isPaid = key === "paid" && !isActive;
           const total = Number(rental.totalPrice ?? 0);
           const insufficient =
             isPending &&
@@ -331,6 +425,11 @@ export function RentalHistory() {
             walletBalance < total;
           const canOpenPay =
             isPending && total > 0 && !insufficient;
+          const canStart = isPaid && activeBookingId === null;
+          const isBusy =
+            payingBookingId === rental.bookingId ||
+            startingBookingId === rental.bookingId ||
+            endingBookingId === rental.bookingId;
 
           return (
             <Card
@@ -378,11 +477,20 @@ export function RentalHistory() {
                       {canOpenPay ? (
                         <Button
                           onClick={() => setConfirmBooking(rental)}
-                          disabled={payingBookingId !== null}
+                          disabled={payingBookingId !== null || startingBookingId !== null || endingBookingId !== null}
                           className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                         >
-                          <Wallet className="w-4 h-4 mr-2" />
-                          Thanh toán bằng ví
+                          {payingBookingId === rental.bookingId ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Đang xử lý...
+                            </>
+                          ) : (
+                            <>
+                              <Wallet className="w-4 h-4 mr-2" />
+                              Thanh toán bằng ví
+                            </>
+                          )}
                         </Button>
                       ) : insufficient ? (
                         <>
@@ -402,6 +510,55 @@ export function RentalHistory() {
                           Không thể thanh toán đơn này (số tiền không hợp lệ).
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {isPaid && (
+                    <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
+                      <Button
+                        onClick={() => handleStartSession(rental.bookingId)}
+                        disabled={!canStart || isBusy}
+                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-500/90 hover:to-cyan-500/90"
+                      >
+                        {startingBookingId === rental.bookingId ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Đang vào session...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 mr-2" />
+                            Start Session
+                          </>
+                        )}
+                      </Button>
+                      {!canStart && activeBookingId !== null && activeBookingId !== rental.bookingId && (
+                        <p className="text-xs text-muted-foreground text-right sm:text-left">
+                          Bạn đang có session khác đang hoạt động.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {isActive && (
+                    <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
+                      <Button
+                        onClick={() => handleEndSession(rental.bookingId)}
+                        disabled={isBusy}
+                        className="w-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-500/90 hover:to-orange-500/90"
+                      >
+                        {endingBookingId === rental.bookingId ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Đang kết thúc...
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-4 h-4 mr-2" />
+                            End Session
+                          </>
+                        )}
+                      </Button>
                     </div>
                   )}
                 </div>
