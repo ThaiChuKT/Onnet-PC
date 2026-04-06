@@ -15,6 +15,9 @@ import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.booking.service.BookingEmailService;
 import com.onnet.onnetpc.common.exception.ApiException;
+import com.onnet.onnetpc.memberships.MembershipTier;
+import com.onnet.onnetpc.memberships.MembershipTierRepository;
+import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.pcs.PcStatus;
@@ -24,9 +27,12 @@ import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.pcs.repository.PcSpecRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.users.User;
+import com.onnet.onnetpc.users.UserRole;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import com.onnet.onnetpc.subscription.SubscriptionPlan;
 import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
+import com.onnet.onnetpc.session.SessionQueue;
+import com.onnet.onnetpc.session.SessionQueueRepository;
 import com.onnet.onnetpc.wallet.Wallet;
 import com.onnet.onnetpc.wallet.WalletTransaction;
 import com.onnet.onnetpc.wallet.WalletTransactionType;
@@ -51,10 +57,13 @@ public class BookingService {
     private final PcRepository pcRepository;
     private final PcSpecRepository pcSpecRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final MembershipTierRepository membershipTierRepository;
+    private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final ReviewRepository reviewRepository;
     private final BookingEmailService bookingEmailService;
+    private final SessionQueueRepository sessionQueueRepository;
 
     public BookingService(
         BookingRepository bookingRepository,
@@ -62,26 +71,54 @@ public class BookingService {
         PcRepository pcRepository,
         PcSpecRepository pcSpecRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
+        MembershipTierRepository membershipTierRepository,
+        MembershipTierSpecMappingRepository tierSpecMappingRepository,
         WalletRepository walletRepository,
         WalletTransactionRepository walletTransactionRepository,
         ReviewRepository reviewRepository,
-        BookingEmailService bookingEmailService
+        BookingEmailService bookingEmailService,
+        SessionQueueRepository sessionQueueRepository
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
         this.pcSpecRepository = pcSpecRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
+        this.membershipTierRepository = membershipTierRepository;
+        this.tierSpecMappingRepository = tierSpecMappingRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.reviewRepository = reviewRepository;
         this.bookingEmailService = bookingEmailService;
+        this.sessionQueueRepository = sessionQueueRepository;
     }
 
     @Transactional
     public RentMachineResponse rentMachine(String email, RentMachineRequest request) {
         User user = findUserByEmail(email);
-        PricingResult pricing = resolvePricing(request.specId(), request.rentalUnit(), request.quantity());
+        String tierName = request.getTierName() == null ? "" : request.getTierName().trim();
+
+        if (user.getRole() != UserRole.admin && tierName.isBlank()) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Subscription tier is required. Please select Basic, Pro, or Ultra package."
+            );
+        }
+
+        String rentalUnit = request.getRentalUnit() == null ? "" : request.getRentalUnit().trim().toLowerCase(Locale.ROOT);
+        if ("hour".equals(rentalUnit) && user.getRole() != UserRole.admin) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Individual hourly renting is no longer available for users. Please choose a subscription package."
+            );
+        }
+
+        PricingResult pricing = resolvePricing(
+            request.getSpecId(),
+            request.getTierName(),
+            request.getRentalUnit(),
+            request.getQuantity()
+        );
 
         Wallet wallet = walletRepository.findByUserId(user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
@@ -124,6 +161,10 @@ public class BookingService {
     @Transactional
     public BookingResponse createHourlyBooking(String email, CreateBookingRequest request) {
         User user = findUserByEmail(email);
+        if (user.getRole() != UserRole.admin) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Hourly booking is restricted to admin/internal use");
+        }
+
         Pc pc = pcRepository.findById(request.pcId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine not found"));
 
@@ -309,9 +350,8 @@ public class BookingService {
         );
     }
 
-    private PricingResult resolvePricing(Long specId, String rentalUnit, Integer quantity) {
-        PcSpec spec = pcSpecRepository.findById(specId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
+    private PricingResult resolvePricing(Long specId, String tierName, String rentalUnit, Integer quantity) {
+        PcSpec spec = resolveSpecForPricing(specId, tierName);
 
         String unit = rentalUnit == null ? "" : rentalUnit.trim().toLowerCase(Locale.ROOT);
         if (unit.isBlank()) {
@@ -346,7 +386,7 @@ public class BookingService {
         };
 
         SubscriptionPlan plan = subscriptionPlanRepository
-            .findBySpecIdAndActiveTrueOrderByDurationDaysAsc(specId)
+            .findBySpecIdAndActiveTrueOrderByDurationDaysAsc(spec.getId())
             .stream()
             .filter(item -> item.getDurationDays() != null && item.getDurationDays() == durationDays)
             .findFirst()
@@ -359,6 +399,26 @@ public class BookingService {
             Duration.ofDays((long) durationDays * quantity),
             plan.getPrice().multiply(BigDecimal.valueOf(quantity))
         );
+    }
+
+    private PcSpec resolveSpecForPricing(Long specId, String tierName) {
+        if (tierName != null && !tierName.isBlank()) {
+            MembershipTier tier = membershipTierRepository.findByTierNameIgnoreCaseAndActiveTrue(tierName.trim())
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Invalid subscription tier"));
+
+            Long tierSpecId = tierSpecMappingRepository.findPrimarySpecIdByTierId(tier.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "No machine group configured for this tier"));
+
+            return pcSpecRepository.findById(tierSpecId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
+        }
+
+        if (specId == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "specId or tierName is required");
+        }
+
+        return pcSpecRepository.findById(specId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
     }
 
     private Booking buildBooking(
@@ -401,10 +461,16 @@ public class BookingService {
             remainingMinutes = Duration.between(Instant.now(), booking.getEndTime()).toMinutes();
         }
 
+        SessionQueue waitingQueue = sessionQueueRepository
+            .findByBookingIdAndStatusIgnoreCase(booking.getId(), "waiting")
+            .orElse(null);
+
         return new BookingHistoryItemResponse(
             booking.getId(),
             booking.getPc() == null ? null : booking.getPc().getId(),
             booking.getSpec() == null ? null : booking.getSpec().getSpecName(),
+            waitingQueue != null,
+            waitingQueue == null ? null : waitingQueue.getQueuePosition(),
             booking.getTotalHours(),
             booking.getStartTime(),
             booking.getEndTime(),

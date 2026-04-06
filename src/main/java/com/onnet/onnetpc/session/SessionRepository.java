@@ -20,6 +20,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 		""")
 		List<Session> findActiveByUserId(@Param("userId") Long userId);
 
+		@Query("""
+				select s.id
+				from Session s
+				where s.pc.id = :pcId
+					and lower(s.status) = 'active'
+		""")
+		List<Long> findActiveSessionIdsByPcId(@Param("pcId") Long pcId);
+
 		@Query(
 				value = """
 						SELECT *

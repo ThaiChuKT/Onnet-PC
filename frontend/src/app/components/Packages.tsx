@@ -1,17 +1,22 @@
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Check, Cpu, Gamepad2, Zap, Clock } from "lucide-react";
+import { Check, Cpu, Gamepad2, Zap, Clock, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useState } from "react";
+import { useNavigate } from "react-router";
+import { useAuth } from "../auth/AuthProvider";
+import { apiPost } from "../api/http";
+import { toast } from "sonner";
 
 const packages = [
   {
+    tierName: "Basic",
     name: "Basic Gaming",
     icon: Gamepad2,
     pricing: {
-      hourly: { price: "15.000đ", period: "/ giờ" },
-      daily: { price: "150.000đ", period: "/ ngày" },
-      monthly: { price: "3.500.000đ", period: "/ tháng" },
+      week: { price: "150.000đ", period: "/ tuần" },
+      month: { price: "3.500.000đ", period: "/ tháng" },
+      year: { price: "35.000.000đ", period: "/ năm" },
     },
     image:
       "https://images.unsplash.com/photo-1760708825878-9e7ecf31565a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnYW1pbmclMjBkZXNrdG9wJTIwY29tcHV0ZXIlMjB0b3dlcnxlbnwxfHx8fDE3NzM2NzY1ODh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -26,12 +31,13 @@ const packages = [
     popular: false,
   },
   {
+    tierName: "Pro",
     name: "Pro Gaming",
     icon: Zap,
     pricing: {
-      hourly: { price: "30.000đ", period: "/ giờ" },
-      daily: { price: "300.000đ", period: "/ ngày" },
-      monthly: { price: "7.000.000đ", period: "/ tháng" },
+      week: { price: "300.000đ", period: "/ tuần" },
+      month: { price: "7.000.000đ", period: "/ tháng" },
+      year: { price: "70.000.000đ", period: "/ năm" },
     },
     image:
       "https://images.unsplash.com/photo-1738347826086-cadfac03cd45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoaWdoJTIwZW5kJTIwZ2FtaW5nJTIwY29tcHV0ZXJ8ZW58MXx8fHwxNzczNjc2NTg3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -46,12 +52,13 @@ const packages = [
     popular: true,
   },
   {
+    tierName: "Ultra",
     name: "Ultra Gaming",
     icon: Cpu,
     pricing: {
-      hourly: { price: "50.000đ", period: "/ giờ" },
-      daily: { price: "500.000đ", period: "/ ngày" },
-      monthly: { price: "12.000.000đ", period: "/ tháng" },
+      week: { price: "500.000đ", period: "/ tuần" },
+      month: { price: "12.000.000đ", period: "/ tháng" },
+      year: { price: "120.000.000đ", period: "/ năm" },
     },
     image:
       "https://images.unsplash.com/photo-1636914011676-039d36b73765?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYyUyMGdhbWluZyUyMHJvb20lMjBzZXR1cHxlbnwxfHx8fDE3NzM2NzY1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -68,9 +75,35 @@ const packages = [
 ];
 
 export function Packages() {
-  const [selectedPeriod, setSelectedPeriod] = useState<
-    "hourly" | "daily" | "monthly"
-  >("daily");
+  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
+  const [isSubmittingTier, setIsSubmittingTier] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleBookTier = async (tierName: string) => {
+    if (isSubmittingTier !== null) return;
+
+    if (!isAuthenticated) {
+      toast.message("Vui lòng đăng nhập để thuê gói subscription");
+      navigate("/login", { replace: false, state: { from: "/" } });
+      return;
+    }
+
+    setIsSubmittingTier(tierName);
+    try {
+      await apiPost("/bookings/rent", {
+        tierName,
+        rentalUnit: selectedPeriod,
+        quantity: 1,
+      });
+      toast.success("Đã tạo đơn thuê gói. Vui lòng thanh toán và Start Session trong lịch sử thuê.");
+      navigate("/account/rental-history");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể tạo đơn thuê gói");
+    } finally {
+      setIsSubmittingTier(null);
+    }
+  };
 
   return (
     <section
@@ -93,37 +126,37 @@ export function Packages() {
           {/* Period Selector */}
           <div className="inline-flex items-center gap-2 bg-card border border-border rounded-lg p-1">
             <button
-              onClick={() => setSelectedPeriod("hourly")}
+              onClick={() => setSelectedPeriod("week")}
               className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
-                selectedPeriod === "hourly"
+                selectedPeriod === "week"
                   ? "bg-gradient-to-r from-primary to-accent text-white"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Clock className="w-4 h-4" />
-              Theo Giờ
+              Theo Tuần
             </button>
             <button
-              onClick={() => setSelectedPeriod("daily")}
+              onClick={() => setSelectedPeriod("month")}
               className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
-                selectedPeriod === "daily"
-                  ? "bg-gradient-to-r from-primary to-accent text-white"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              Theo Ngày
-            </button>
-            <button
-              onClick={() => setSelectedPeriod("monthly")}
-              className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
-                selectedPeriod === "monthly"
+                selectedPeriod === "month"
                   ? "bg-gradient-to-r from-primary to-accent text-white"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Clock className="w-4 h-4" />
               Theo Tháng
+            </button>
+            <button
+              onClick={() => setSelectedPeriod("year")}
+              className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
+                selectedPeriod === "year"
+                  ? "bg-gradient-to-r from-primary to-accent text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Theo Năm
               <span className="ml-1 text-xs bg-accent/20 px-2 py-0.5 rounded-full">
                 Tiết kiệm
               </span>
@@ -177,9 +210,9 @@ export function Packages() {
                         {currentPricing.period}
                       </span>
                     </div>
-                    {selectedPeriod === "monthly" && (
+                    {selectedPeriod === "year" && (
                       <p className="text-xs text-accent mt-1">
-                        Tiết kiệm đến 20% so với thuê theo ngày
+                        Tiết kiệm đến 20% so với thuê theo tháng
                       </p>
                     )}
                   </div>
@@ -196,13 +229,22 @@ export function Packages() {
                   </ul>
 
                   <Button
+                    onClick={() => handleBookTier(pkg.tierName)}
+                    disabled={isSubmittingTier !== null}
                     className={`w-full ${
                       pkg.popular
                         ? "bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                         : "bg-card border border-primary text-foreground hover:bg-primary/10"
                     }`}
                   >
-                    Đặt Ngay
+                    {isSubmittingTier === pkg.tierName ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Đang xử lý...
+                      </>
+                    ) : (
+                      "Đặt Gói Ngay"
+                    )}
                   </Button>
                 </div>
               </Card>

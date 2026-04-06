@@ -108,6 +108,27 @@ CREATE TABLE `membership_tiers` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `membership_tiers`
+--
+
+INSERT INTO `membership_tiers` (`id`, `tier_name`, `tier_level`, `monthly_fee`, `discount_percentage`, `storage_limit_gb`, `free_hours_per_month`, `rollover_hours_limit`, `advance_booking_days`, `queue_priority`, `can_access_exclusive_specs`, `support_level`, `is_active`, `created_at`) VALUES
+(1, 'Basic', 1, 19.00, 0.00, NULL, 0, 0, 0, 30, 0, 'standard', 1, '2026-03-27 13:00:00'),
+(2, 'Pro', 2, 39.00, 5.00, NULL, 0, 0, 0, 20, 0, 'priority', 1, '2026-03-27 13:00:00'),
+(3, 'Ultra', 3, 69.00, 10.00, NULL, 0, 0, 0, 10, 1, 'vip', 1, '2026-03-27 13:00:00');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `membership_tier_spec_mappings`
+--
+
+CREATE TABLE `membership_tier_spec_mappings` (
+  `id` bigint(20) NOT NULL,
+  `tier_id` bigint(20) NOT NULL,
+  `spec_id` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- --------------------------------------------------------
 
 --
@@ -203,6 +224,22 @@ INSERT INTO `pc_specs` (`id`, `spec_name`, `cpu`, `gpu`, `ram`, `storage`, `os`,
 (9, 'Titan AI', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 128, 4096, 'Ubuntu 22.04', 10.50, 'ML experiments and container workflows', 1, 1, '2026-03-27 13:01:51'),
 (10, 'Zephyr Dev', 'AMD Ryzen 5 7600', 'NVIDIA RTX 3070', 32, 1024, 'Ubuntu 22.04', 4.20, 'Programming, docker, and test automation', 0, 1, '2026-03-27 13:01:51');
 
+--
+-- Dumping data for table `membership_tier_spec_mappings`
+--
+
+INSERT INTO `membership_tier_spec_mappings` (`id`, `tier_id`, `spec_id`) VALUES
+(1, 1, 1),
+(2, 1, 2),
+(3, 1, 3),
+(4, 1, 4),
+(5, 1, 10),
+(6, 2, 5),
+(7, 2, 6),
+(8, 2, 7),
+(9, 3, 8),
+(10, 3, 9);
+
 -- --------------------------------------------------------
 
 --
@@ -270,6 +307,7 @@ CREATE TABLE `session_queue` (
   `booking_id` bigint(20) NOT NULL,
   `user_id` bigint(20) NOT NULL,
   `spec_id` bigint(20) NOT NULL,
+  `tier_id` bigint(20) DEFAULT NULL,
   `queue_position` int(11) NOT NULL,
   `status` varchar(50) DEFAULT 'waiting',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -473,6 +511,15 @@ ALTER TABLE `membership_tiers`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `membership_tier_spec_mappings`
+--
+ALTER TABLE `membership_tier_spec_mappings`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_membership_tier_spec` (`tier_id`,`spec_id`),
+  ADD UNIQUE KEY `uq_membership_spec_single_tier` (`spec_id`),
+  ADD KEY `idx_membership_tier_spec_tier` (`tier_id`);
+
+--
 -- Indexes for table `payments`
 --
 ALTER TABLE `payments`
@@ -524,7 +571,9 @@ ALTER TABLE `session_queue`
   ADD PRIMARY KEY (`id`),
   ADD KEY `booking_id` (`booking_id`),
   ADD KEY `user_id` (`user_id`),
-  ADD KEY `spec_id` (`spec_id`);
+  ADD KEY `spec_id` (`spec_id`),
+  ADD KEY `tier_id` (`tier_id`),
+  ADD KEY `idx_session_queue_tier_status_position` (`tier_id`,`status`,`queue_position`);
 
 --
 -- Indexes for table `subscription_plans`
@@ -600,7 +649,13 @@ ALTER TABLE `email_verification_tokens`
 -- AUTO_INCREMENT for table `membership_tiers`
 --
 ALTER TABLE `membership_tiers`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `membership_tier_spec_mappings`
+--
+ALTER TABLE `membership_tier_spec_mappings`
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `payments`
@@ -745,7 +800,15 @@ ALTER TABLE `session_files`
 ALTER TABLE `session_queue`
   ADD CONSTRAINT `session_queue_ibfk_1` FOREIGN KEY (`booking_id`) REFERENCES `bookings` (`id`),
   ADD CONSTRAINT `session_queue_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  ADD CONSTRAINT `session_queue_ibfk_3` FOREIGN KEY (`spec_id`) REFERENCES `pc_specs` (`id`);
+  ADD CONSTRAINT `session_queue_ibfk_3` FOREIGN KEY (`spec_id`) REFERENCES `pc_specs` (`id`),
+  ADD CONSTRAINT `session_queue_ibfk_4` FOREIGN KEY (`tier_id`) REFERENCES `membership_tiers` (`id`);
+
+--
+-- Constraints for table `membership_tier_spec_mappings`
+--
+ALTER TABLE `membership_tier_spec_mappings`
+  ADD CONSTRAINT `membership_tier_spec_mappings_ibfk_1` FOREIGN KEY (`tier_id`) REFERENCES `membership_tiers` (`id`),
+  ADD CONSTRAINT `membership_tier_spec_mappings_ibfk_2` FOREIGN KEY (`spec_id`) REFERENCES `pc_specs` (`id`);
 
 --
 -- Constraints for table `subscription_plans`

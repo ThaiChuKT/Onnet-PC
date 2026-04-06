@@ -1,6 +1,7 @@
 package com.onnet.onnetpc.session;
 
 import com.onnet.onnetpc.booking.entity.Booking;
+import com.onnet.onnetpc.memberships.MembershipTier;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.users.User;
 import jakarta.persistence.Column;
@@ -37,6 +38,10 @@ public class SessionQueue {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spec_id", nullable = false)
     private PcSpec spec;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tier_id")
+    private MembershipTier tier;
 
     @Column(name = "queue_position", nullable = false)
     private Integer queuePosition;

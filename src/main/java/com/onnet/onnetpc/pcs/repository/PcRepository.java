@@ -3,6 +3,7 @@ package com.onnet.onnetpc.pcs.repository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcStatus;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -62,6 +63,21 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         value = """
             SELECT p.*
             FROM pcs p
+            WHERE p.spec_id IN (:specIds)
+              AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+              AND LOWER(p.status) = 'available'
+            ORDER BY COALESCE(p.last_used_at, '1970-01-01 00:00:00') ASC, p.id ASC
+            LIMIT 1
+            FOR UPDATE
+            """,
+        nativeQuery = true
+    )
+    Optional<Pc> findNextAvailableBySpecIdsForUpdate(@Param("specIds") List<Long> specIds);
+
+    @Query(
+        value = """
+            SELECT p.*
+            FROM pcs p
             WHERE p.spec_id = :specId
                             AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
                             AND LOWER(p.status) = 'in_use'
@@ -78,6 +94,27 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         nativeQuery = true
     )
     Optional<Pc> findNextStaleReservedBySpecIdForUpdate(@Param("specId") Long specId);
+
+        @Query(
+                value = """
+                        SELECT p.*
+                        FROM pcs p
+                        WHERE p.spec_id IN (:specIds)
+                            AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+                            AND LOWER(p.status) = 'in_use'
+                            AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM sessions s
+                                    WHERE s.pc_id = p.id
+                                        AND LOWER(s.status) = 'active'
+                            )
+                        ORDER BY COALESCE(p.last_used_at, '1970-01-01 00:00:00') ASC, p.id ASC
+                        LIMIT 1
+                        FOR UPDATE
+                        """,
+                nativeQuery = true
+        )
+        Optional<Pc> findNextStaleReservedBySpecIdsForUpdate(@Param("specIds") List<Long> specIds);
 
     @Query(
         value = """

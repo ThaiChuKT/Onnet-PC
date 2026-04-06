@@ -2,12 +2,18 @@ package com.onnet.onnetpc.session.service;
 
 import com.onnet.onnetpc.booking.entity.Booking;
 import com.onnet.onnetpc.booking.enums.BookingStatus;
+import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
+import com.onnet.onnetpc.memberships.MembershipTier;
+import com.onnet.onnetpc.memberships.MembershipTierRepository;
+import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcStatus;
 import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.session.Session;
+import com.onnet.onnetpc.session.SessionQueue;
+import com.onnet.onnetpc.session.SessionQueueRepository;
 import com.onnet.onnetpc.session.SessionRepository;
 import com.onnet.onnetpc.session.dto.ActiveSessionResponse;
 import com.onnet.onnetpc.session.dto.EndSessionResponse;
@@ -16,6 +22,7 @@ import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,17 +35,26 @@ public class SessionLifecycleService {
     private final BookingRepository bookingRepository;
     private final PcRepository pcRepository;
     private final SessionRepository sessionRepository;
+    private final SessionQueueRepository sessionQueueRepository;
+    private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
+    private final MembershipTierRepository membershipTierRepository;
 
     public SessionLifecycleService(
         UserRepository userRepository,
         BookingRepository bookingRepository,
         PcRepository pcRepository,
-        SessionRepository sessionRepository
+        SessionRepository sessionRepository,
+        SessionQueueRepository sessionQueueRepository,
+        MembershipTierSpecMappingRepository tierSpecMappingRepository,
+        MembershipTierRepository membershipTierRepository
     ) {
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
         this.pcRepository = pcRepository;
         this.sessionRepository = sessionRepository;
+        this.sessionQueueRepository = sessionQueueRepository;
+        this.tierSpecMappingRepository = tierSpecMappingRepository;
+        this.membershipTierRepository = membershipTierRepository;
     }
 
     @Transactional
@@ -73,6 +89,13 @@ public class SessionLifecycleService {
         }
 
         Pc pc = resolvePcForSessionStart(booking);
+        if (pc == null) {
+            int queuePosition = enqueueForTierWaiting(booking, user);
+            throw new ApiException(
+                HttpStatus.CONFLICT,
+                "No available machine right now. Added to queue at position #" + queuePosition
+            );
+        }
         if (pc.getStatus() == PcStatus.maintenance) {
             throw new ApiException(HttpStatus.CONFLICT, "Machine is under maintenance");
         }
@@ -85,6 +108,14 @@ public class SessionLifecycleService {
         booking.setPc(pc);
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
+
+        SessionQueue waitingQueue = sessionQueueRepository
+            .findByBookingIdAndStatusIgnoreCase(booking.getId(), "waiting")
+            .orElse(null);
+        if (waitingQueue != null) {
+            waitingQueue.setStatus("assigned");
+            sessionQueueRepository.save(waitingQueue);
+        }
 
         Session session = new Session();
         session.setBooking(booking);
@@ -153,6 +184,7 @@ public class SessionLifecycleService {
         }
         pc.setUpdatedAt(now);
         pcRepository.save(pc);
+        promoteQueuedBookingForSpec(pc.getSpec().getId());
 
         return new EndSessionResponse(
             session.getId(),
@@ -206,10 +238,40 @@ public class SessionLifecycleService {
             }
             pc.setUpdatedAt(now);
             pcRepository.save(pc);
+            promoteQueuedBookingForSpec(pc.getSpec().getId());
         }
     }
 
     private Pc resolvePcForSessionStart(Booking booking) {
+        if (booking.getPc() != null) {
+            Pc lockedAssignedPc = pcRepository.findByIdForUpdate(booking.getPc().getId()).orElse(null);
+            if (lockedAssignedPc != null
+                && lockedAssignedPc.getStatus() != PcStatus.maintenance
+                && (lockedAssignedPc.getStatus() == PcStatus.available || isStaleReserved(lockedAssignedPc))) {
+                return lockedAssignedPc;
+            }
+            booking.setPc(null);
+            booking.setUpdatedAt(Instant.now());
+            bookingRepository.save(booking);
+        }
+
+        if (booking.getBookingType() == BookingType.subscription) {
+            Long tierId = resolveTierIdByBookingSpec(booking);
+            if (tierId != null) {
+                List<Long> specIds = tierSpecMappingRepository.findAccessibleSpecIdsForRequestedTier(tierId);
+                if (!specIds.isEmpty()) {
+                    Pc availablePc = pcRepository.findNextAvailableBySpecIdsForUpdate(specIds).orElse(null);
+                    if (availablePc != null) {
+                        return availablePc;
+                    }
+                    Pc stalePc = pcRepository.findNextStaleReservedBySpecIdsForUpdate(specIds).orElse(null);
+                    if (stalePc != null) {
+                        return stalePc;
+                    }
+                }
+            }
+        }
+
         Pc availablePc = pcRepository.findNextAvailableBySpecIdForUpdate(booking.getSpec().getId()).orElse(null);
         if (availablePc == null) {
             // Backward compatibility for databases where deleted_at was auto-populated unexpectedly.
@@ -228,7 +290,130 @@ public class SessionLifecycleService {
             return staleReserved;
         }
 
-        throw new ApiException(HttpStatus.CONFLICT, "No available machine to start session");
+        return null;
+    }
+
+    private boolean isStaleReserved(Pc pc) {
+        return pc.getStatus() == PcStatus.in_use
+            && sessionRepository.findActiveSessionIdsByPcId(pc.getId()).isEmpty();
+    }
+
+    private Long resolveTierIdByBookingSpec(Booking booking) {
+        if (booking.getSpec() == null || booking.getSpec().getId() == null) {
+            return null;
+        }
+        return tierSpecMappingRepository.findTierIdBySpecId(booking.getSpec().getId()).orElse(null);
+    }
+
+    private int enqueueForTierWaiting(Booking booking, User user) {
+        SessionQueue existingWaiting = sessionQueueRepository
+            .findByBookingIdAndStatusIgnoreCase(booking.getId(), "waiting")
+            .orElse(null);
+        if (existingWaiting != null) {
+            return existingWaiting.getQueuePosition() == null ? 1 : existingWaiting.getQueuePosition();
+        }
+
+        Long tierId = resolveTierIdByBookingSpec(booking);
+        if (tierId == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "No available machine in selected package pool");
+        }
+
+        Integer maxPosition = sessionQueueRepository.findMaxWaitingPositionForUpdate(tierId);
+        int queuePosition = (maxPosition == null ? 0 : maxPosition) + 1;
+
+        MembershipTier tier = membershipTierRepository.findById(tierId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Membership tier not found"));
+
+        SessionQueue queue = new SessionQueue();
+        queue.setBooking(booking);
+        queue.setUser(user);
+        queue.setSpec(booking.getSpec());
+        queue.setTier(tier);
+        queue.setQueuePosition(queuePosition);
+        queue.setStatus("waiting");
+        sessionQueueRepository.save(queue);
+
+        return queuePosition;
+    }
+
+    private void promoteQueuedBookingForSpec(Long specId) {
+        if (specId == null) {
+            return;
+        }
+
+        SessionQueue queued = sessionQueueRepository.findNextWaitingEligibleForSpecForUpdate(specId).orElse(null);
+        if (queued == null || queued.getBooking() == null) {
+            return;
+        }
+
+        Booking queuedBooking = bookingRepository.findByIdAndStatusForUpdate(
+            queued.getBooking().getId(),
+            BookingStatus.paid.name()
+        ).orElse(null);
+        if (queuedBooking == null) {
+            queued.setStatus("skipped");
+            sessionQueueRepository.save(queued);
+            return;
+        }
+
+        List<Long> candidateSpecIds = new ArrayList<>();
+        if (queued.getTier() != null && queued.getTier().getId() != null) {
+            candidateSpecIds.addAll(tierSpecMappingRepository.findAccessibleSpecIdsForRequestedTier(queued.getTier().getId()));
+        }
+        if (candidateSpecIds.isEmpty() && queuedBooking.getSpec() != null && queuedBooking.getSpec().getId() != null) {
+            candidateSpecIds.add(queuedBooking.getSpec().getId());
+        }
+
+        Pc available = candidateSpecIds.isEmpty()
+            ? null
+            : pcRepository.findNextAvailableBySpecIdsForUpdate(candidateSpecIds).orElse(null);
+        if (available == null && !candidateSpecIds.isEmpty()) {
+            available = pcRepository.findNextStaleReservedBySpecIdsForUpdate(candidateSpecIds).orElse(null);
+        }
+        if (available == null) {
+            return;
+        }
+
+        if (available.getStatus() == PcStatus.maintenance) {
+            return;
+        }
+
+        available.setStatus(PcStatus.in_use);
+        available.setUpdatedAt(Instant.now());
+        pcRepository.save(available);
+
+        queuedBooking.setPc(available);
+        queuedBooking.setUpdatedAt(Instant.now());
+        bookingRepository.save(queuedBooking);
+
+        queued.setStatus("assigned");
+        sessionQueueRepository.save(queued);
+
+        normalizeWaitingPositions(queued.getTier());
+    }
+
+    private void normalizeWaitingPositions(MembershipTier tier) {
+        if (tier == null || tier.getId() == null) {
+            return;
+        }
+
+        List<SessionQueue> waitingRows = sessionQueueRepository.findAll().stream()
+            .filter(item -> "waiting".equalsIgnoreCase(item.getStatus()))
+            .filter(item -> item.getTier() != null && tier.getId().equals(item.getTier().getId()))
+            .sorted((a, b) -> Integer.compare(
+                a.getQueuePosition() == null ? Integer.MAX_VALUE : a.getQueuePosition(),
+                b.getQueuePosition() == null ? Integer.MAX_VALUE : b.getQueuePosition()
+            ))
+            .toList();
+
+        int position = 1;
+        for (SessionQueue row : waitingRows) {
+            if (row.getQueuePosition() == null || row.getQueuePosition() != position) {
+                row.setQueuePosition(position);
+                sessionQueueRepository.save(row);
+            }
+            position++;
+        }
     }
 
     private StartSessionResponse toStartResponse(Session session, String message) {

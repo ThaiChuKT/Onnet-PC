@@ -30,6 +30,8 @@ type BookingHistoryItemResponse = {
   bookingId: number;
   pcId: number | null;
   specName: string;
+  queued: boolean;
+  queuePosition: number | null;
   totalHours: number | null;
   startTime: string;
   endTime: string;
@@ -95,6 +97,7 @@ const statusConfig = {
   },
   active: { label: "Đang hoạt động", className: "bg-accent/20 text-accent border-accent/50" },
   paid: { label: "Đã thanh toán", className: "bg-blue-500/20 text-blue-500 border-blue-500/50" },
+  waiting: { label: "Đang chờ máy", className: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
   completed: { label: "Hoàn thành", className: "bg-secondary/20 text-secondary border-secondary/50" },
   cancelled: { label: "Đã hủy", className: "bg-muted text-muted-foreground border-border" },
 };
@@ -402,8 +405,11 @@ export function RentalHistory() {
 
         {items.map((rental) => {
           const key = (rental.status ?? "").toLowerCase();
+          const isQueued = !!rental.queued;
           const cfg =
-            key in statusConfig
+            isQueued
+              ? statusConfig.waiting
+              : key in statusConfig
               ? statusConfig[key as keyof typeof statusConfig]
               : {
                   label: rental.status ?? "N/A",
@@ -425,7 +431,7 @@ export function RentalHistory() {
             walletBalance < total;
           const canOpenPay =
             isPending && total > 0 && !insufficient;
-          const canStart = isPaid && activeBookingId === null;
+          const canStart = isPaid && !isQueued && activeBookingId === null;
           const isBusy =
             payingBookingId === rental.bookingId ||
             startingBookingId === rental.bookingId ||
@@ -447,6 +453,13 @@ export function RentalHistory() {
                     <Cpu className="w-4 h-4 text-primary" />
                     <span>PC: {rental.pcId ?? "—"}</span>
                   </div>
+
+                  {isQueued && (
+                    <p className="text-sm text-orange-400 mb-2">
+                      Đang chờ cấp máy từ pool gói subscription
+                      {rental.queuePosition ? ` - vị trí #${rental.queuePosition}` : ""}.
+                    </p>
+                  )}
 
                   <div className="flex flex-wrap gap-4 text-sm">
                     <div className="flex items-center gap-1.5">
@@ -535,6 +548,11 @@ export function RentalHistory() {
                       {!canStart && activeBookingId !== null && activeBookingId !== rental.bookingId && (
                         <p className="text-xs text-muted-foreground text-right sm:text-left">
                           Bạn đang có session khác đang hoạt động.
+                        </p>
+                      )}
+                      {!canStart && isQueued && (
+                        <p className="text-xs text-orange-400 text-right sm:text-left">
+                          Đơn đang trong hàng chờ. Hệ thống sẽ tự gán máy khi có slot trống.
                         </p>
                       )}
                     </div>
