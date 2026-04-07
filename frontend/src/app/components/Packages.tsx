@@ -8,6 +8,22 @@ import { useAuth } from "../auth/AuthProvider";
 import { apiPost } from "../api/http";
 import { toast } from "sonner";
 
+type RentMachineResponse = {
+  bookingId: number;
+  queued: boolean;
+  queuePosition: number | null;
+  sessionId: number | null;
+  pcId: number | null;
+  pcLocation: string | null;
+  specName: string;
+  startTime: string;
+  expectedEndTime: string;
+  totalPrice: number;
+  walletBalance: number;
+  status: string;
+  message: string;
+};
+
 const packages = [
   {
     tierName: "Basic",
@@ -91,12 +107,12 @@ export function Packages() {
 
     setIsSubmittingTier(tierName);
     try {
-      await apiPost("/bookings/rent", {
+      const res = await apiPost<RentMachineResponse>("/bookings/rent", {
         tierName,
         rentalUnit: selectedPeriod,
         quantity: 1,
       });
-      toast.success("Order created. Pay in My bookings, then start your session.");
+      toast.success(res.message || "Order created. Pay in My bookings, then start your session.");
       navigate("/account/rental-history");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create subscription order");

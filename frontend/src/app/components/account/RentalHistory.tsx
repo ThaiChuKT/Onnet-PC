@@ -34,6 +34,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { apiGet, apiPost } from "../../api/http";
+import { useAuth } from "../../auth/AuthProvider";
 import { toast } from "sonner";
 
 type BookingHistoryItemResponse = {
@@ -64,6 +65,8 @@ type BookingPaymentResponse = {
   bookingId: number;
   status: string;
   walletBalance: number;
+  message?: string;
+  mergedIntoBookingId?: number | null;
 };
 
 type ActiveSessionResponse = {
@@ -149,8 +152,11 @@ const statusConfig = {
 const POLL_MS = 15_000;
 
 export function RentalHistory() {
+  const { isAdmin } = useAuth();
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [now, setNow] = useState(() => Date.now());
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid" | "active" | "completed">("all");
+  const [showCancelled, setShowCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -257,6 +263,18 @@ export function RentalHistory() {
     [items],
   );
 
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      const status = (item.status ?? "").toLowerCase();
+      if ((!isAdmin || !showCancelled) && status === "cancelled") return false;
+      if (statusFilter === "all") return true;
+      if (statusFilter === "active") {
+        return status === "active" || activeBookingId === item.bookingId;
+      }
+      return status === statusFilter;
+    });
+  }, [items, isAdmin, showCancelled, statusFilter, activeBookingId]);
+
   const formatCountdown = (endIso: string | null) => {
     if (!endIso) return null;
     const remainingMs = new Date(endIso).getTime() - now;
@@ -294,7 +312,7 @@ export function RentalHistory() {
           b.bookingId === id ? { ...b, status: res.status ?? "paid" } : b,
         ),
       );
-      toast.success("Payment completed from your wallet");
+      toast.success(res.message || "Payment completed from your wallet");
       setConfirmBooking(null);
       await loadData("silent");
     } catch (e) {
@@ -525,6 +543,37 @@ export function RentalHistory() {
           </div>
         </Card>
       </div>
+
+      <Card className="p-4 border-border mb-4 bg-card/40">
+        <div className="flex flex-wrap items-center gap-2">
+          {["all", "pending", "paid", "active", "completed"].map((key) => {
+            const active = statusFilter === key;
+            return (
+              <Button
+                key={key}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter(key as "all" | "pending" | "paid" | "active" | "completed")}
+                className={active ? "bg-primary text-primary-foreground" : "border-border"}
+              >
+                {key === "all" ? "All" : key[0].toUpperCase() + key.slice(1)}
+              </Button>
+            );
+          })}
+          {isAdmin && (
+            <Button
+              type="button"
+              variant={showCancelled ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowCancelled((prev) => !prev)}
+              className={showCancelled ? "bg-muted-foreground text-background" : "border-border"}
+            >
+              {showCancelled ? "Hide cancelled" : "Show cancelled"}
+            </Button>
+          )}
+        </div>
+      </Card>
 
       <AlertDialog
         open={!!confirmBooking}
@@ -795,7 +844,7 @@ export function RentalHistory() {
           </Card>
         )}
 
-        {items.map((rental) => {
+        {visibleItems.map((rental) => {
           const key = (rental.status ?? "").toLowerCase();
           const isQueued = !!rental.queued;
           const cfg = isQueued
@@ -1043,7 +1092,7 @@ export function RentalHistory() {
         })}
       </div>
 
-      {!isLoading && !loadError && items.length === 0 && (
+      {!isLoading && !loadError && visibleItems.length === 0 && (
         <Card className="p-12 border-border text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
             <Calendar className="w-8 h-8 text-muted-foreground" />

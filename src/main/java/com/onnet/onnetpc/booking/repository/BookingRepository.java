@@ -54,6 +54,55 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         )
         Optional<Booking> findByIdAndStatusForUpdate(@Param("bookingId") Long bookingId, @Param("status") String status);
 
+        @Query(
+                value = """
+                        SELECT *
+                        FROM bookings
+                        WHERE user_id = :userId
+                          AND spec_id = :specId
+                          AND booking_type = :bookingType
+                          AND status = 'pending'
+                        ORDER BY end_time DESC, id DESC
+                        LIMIT 1
+                        FOR UPDATE
+                        """,
+                nativeQuery = true
+        )
+        Optional<Booking> findMergeablePendingSubscriptionForUpdate(
+                @Param("userId") Long userId,
+                @Param("specId") Long specId,
+                @Param("bookingType") String bookingType
+        );
+
+        @Query(
+                value = """
+                        SELECT *
+                        FROM bookings
+                        WHERE user_id = :userId
+                          AND spec_id = :specId
+                          AND booking_type = :bookingType
+                          AND status = 'paid'
+                          AND id <> :excludeBookingId
+                        ORDER BY end_time DESC, id DESC
+                        LIMIT 1
+                        FOR UPDATE
+                        """,
+                nativeQuery = true
+        )
+        Optional<Booking> findPaidSubscriptionForMergeForUpdate(
+                @Param("userId") Long userId,
+                @Param("specId") Long specId,
+                @Param("bookingType") String bookingType,
+                @Param("excludeBookingId") Long excludeBookingId
+        );
+
+        boolean existsByUserIdAndSpecIdAndBookingTypeAndStatus(
+                Long userId,
+                Long specId,
+                com.onnet.onnetpc.booking.enums.BookingType bookingType,
+                BookingStatus status
+        );
+
         @Query("""
                 select b.id
                 from Booking b

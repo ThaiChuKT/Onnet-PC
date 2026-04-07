@@ -128,6 +128,57 @@ public class BookingService {
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
 
         BigDecimal currentBalance = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+        boolean hasPaidSubscription = false;
+
+        if (pricing.bookingType() == BookingType.subscription) {
+            Booking existing = bookingRepository
+                .findMergeablePendingSubscriptionForUpdate(user.getId(), pricing.spec().getId(), BookingType.subscription.name())
+                .orElse(null);
+
+            if (existing != null) {
+                Instant now = Instant.now();
+                Instant anchor = existing.getEndTime() != null && existing.getEndTime().isAfter(now)
+                    ? existing.getEndTime()
+                    : now;
+                Instant mergedEnd = anchor.plus(pricing.duration());
+
+                BigDecimal currentTotal = existing.getTotalPrice() == null ? BigDecimal.ZERO : existing.getTotalPrice();
+                BigDecimal mergedTotal = currentTotal.add(pricing.totalPrice());
+
+                existing.setEndTime(mergedEnd);
+                existing.setTotalPrice(mergedTotal);
+                existing.setUpdatedAt(now);
+                Booking merged = bookingRepository.save(existing);
+
+                long remainingHours = Math.max(Duration.between(now, mergedEnd).toHours(), 0);
+
+                return new RentMachineResponse(
+                    merged.getId(),
+                    false,
+                    null,
+                    null,
+                    merged.getPc() == null ? null : merged.getPc().getId(),
+                    null,
+                    pricing.spec().getSpecName(),
+                    merged.getStartTime(),
+                    merged.getEndTime(),
+                    merged.getTotalPrice(),
+                    currentBalance,
+                    merged.getStatus().name(),
+                    "You already have a pending " + pricing.spec().getSpecName()
+                        + " order. Added this rental to that same unpaid order."
+                        + " Complete one wallet payment to activate all merged time"
+                        + " (about " + remainingHours + " total hours after payment)."
+                );
+            }
+
+            hasPaidSubscription = bookingRepository.existsByUserIdAndSpecIdAndBookingTypeAndStatus(
+                user.getId(),
+                pricing.spec().getId(),
+                BookingType.subscription,
+                BookingStatus.paid
+            );
+        }
 
         Instant startTime = Instant.now();
         Instant endTime = startTime.plus(pricing.duration());
@@ -158,7 +209,10 @@ public class BookingService {
             pricing.totalPrice(),
             currentBalance,
             savedBooking.getStatus().name(),
-            "Booking created as pending. Please pay from wallet to start session."
+            hasPaidSubscription
+                ? "You already have an active paid " + pricing.spec().getSpecName()
+                    + " subscription. A new pending extension order was created; pay with wallet to add more time."
+                : "Booking created as pending. Please pay from wallet to start session."
         );
     }
 
@@ -289,13 +343,63 @@ public class BookingService {
         tx.setNote("Booking payment");
         walletTransactionRepository.save(tx);
 
+        Instant now = Instant.now();
+        if (booking.getBookingType() == BookingType.subscription && booking.getSpec() != null) {
+            Booking paidTarget = bookingRepository
+                .findPaidSubscriptionForMergeForUpdate(
+                    user.getId(),
+                    booking.getSpec().getId(),
+                    BookingType.subscription.name(),
+                    booking.getId()
+                )
+                .orElse(null);
+
+            if (paidTarget != null) {
+                Duration extensionDuration = (booking.getStartTime() != null && booking.getEndTime() != null)
+                    ? Duration.between(booking.getStartTime(), booking.getEndTime())
+                    : Duration.ZERO;
+                if (extensionDuration.isNegative() || extensionDuration.isZero()) {
+                    extensionDuration = Duration.ofDays(7);
+                }
+
+                Instant anchor = paidTarget.getEndTime() != null && paidTarget.getEndTime().isAfter(now)
+                    ? paidTarget.getEndTime()
+                    : now;
+                paidTarget.setEndTime(anchor.plus(extensionDuration));
+                BigDecimal paidTargetTotal = paidTarget.getTotalPrice() == null ? BigDecimal.ZERO : paidTarget.getTotalPrice();
+                paidTarget.setTotalPrice(paidTargetTotal.add(booking.getTotalPrice()));
+                paidTarget.setUpdatedAt(now);
+                bookingRepository.save(paidTarget);
+
+                booking.setStatus(BookingStatus.cancelled);
+                booking.setUpdatedAt(now);
+                bookingRepository.save(booking);
+
+                bookingEmailService.sendPaymentConfirmation(user.getEmail(), paidTarget);
+
+                return new BookingPaymentResponse(
+                    booking.getId(),
+                    booking.getStatus().name(),
+                    newBalance,
+                    "Payment received. Time has been added to your existing active package.",
+                    paidTarget.getId()
+                );
+            }
+        }
+
         booking.setStatus(BookingStatus.paid);
-        booking.setUpdatedAt(Instant.now());
+        booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
         bookingEmailService.sendPaymentConfirmation(user.getEmail(), booking);
 
-        return new BookingPaymentResponse(booking.getId(), booking.getStatus().name(), newBalance);
+        return new BookingPaymentResponse(
+            booking.getId(),
+            booking.getStatus().name(),
+            newBalance,
+            "Payment successful. Your package is now active.",
+            null
+        );
     }
 
     @Transactional(readOnly = true)
