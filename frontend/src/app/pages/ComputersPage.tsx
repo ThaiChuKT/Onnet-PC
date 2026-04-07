@@ -80,7 +80,7 @@ export function ComputersPage() {
         });
         if (!cancelled) setComputers(page.content ?? []);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Không thể tải danh sách máy";
+        const msg = e instanceof Error ? e.message : "Could not load machine list";
         if (!cancelled) {
           setLoadError(msg);
           toast.error(msg);
@@ -140,14 +140,14 @@ export function ComputersPage() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold mb-2">
-              Máy
+              PCs
               <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 {" "}
-                Cho Thuê
+                catalog
               </span>
             </h1>
             <p className="text-muted-foreground">
-              Tìm và thuê máy tính phù hợp với nhu cầu của bạn
+              Browse inventory (admin). Customers subscribe from the home page.
             </p>
           </div>
 
@@ -158,7 +158,7 @@ export function ComputersPage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold flex items-center gap-2">
                     <Filter className="w-5 h-5 text-primary" />
-                    Bộ Lọc
+                    Filters
                   </h3>
                   <Button
                     variant="ghost"
@@ -166,14 +166,14 @@ export function ComputersPage() {
                     onClick={handleResetFilters}
                     className="text-xs"
                   >
-                    Đặt lại
+                    Reset
                   </Button>
                 </div>
 
                 <div className="space-y-4">
                   {/* Category */}
                   <div className="space-y-2">
-                    <Label>Phân Loại</Label>
+                    <Label>Category</Label>
                     <Select
                       value={categoryFilter}
                       onValueChange={setCategoryFilter}
@@ -182,7 +182,7 @@ export function ComputersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
                         <SelectItem value="Basic">Basic</SelectItem>
                         <SelectItem value="Pro">Pro</SelectItem>
                         <SelectItem value="Ultra">Ultra</SelectItem>
@@ -192,7 +192,7 @@ export function ComputersPage() {
 
                   {/* Status */}
                   <div className="space-y-2">
-                    <Label>Trạng Thái</Label>
+                    <Label>Status</Label>
                     <Select
                       value={statusFilter}
                       onValueChange={setStatusFilter}
@@ -201,9 +201,9 @@ export function ComputersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tất cả</SelectItem>
-                        <SelectItem value="available">Máy trống</SelectItem>
-                        <SelectItem value="rented">Đang thuê</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="rented">Rented</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -219,7 +219,7 @@ export function ComputersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
                         {cpuOptions.map((cpu) => (
                           <SelectItem key={cpu} value={cpu}>
                             {cpu}
@@ -240,7 +240,7 @@ export function ComputersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
                         {gpuOptions.map((gpu) => (
                           <SelectItem key={gpu} value={gpu}>
                             {gpu}
@@ -261,7 +261,7 @@ export function ComputersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
                         {ramOptions.map((ram) => (
                           <SelectItem key={ram} value={ram}>
                             {ram}
@@ -278,7 +278,7 @@ export function ComputersPage() {
                   className="w-full mt-6 bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90"
                 >
                   <MessageSquare className="w-4 h-4 mr-2" />
-                  Chat AI Tư Vấn
+                  AI chat
                 </Button>
               </Card>
             </aside>
@@ -289,7 +289,7 @@ export function ComputersPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  placeholder="Tìm kiếm theo tên, CPU, GPU..."
+                  placeholder="Search by name, CPU, GPU…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 h-12 bg-input-background border-border"
@@ -299,11 +299,11 @@ export function ComputersPage() {
               {/* Results Count */}
               <div className="flex items-center justify-between">
                 <p className="text-muted-foreground">
-                  Tìm thấy{" "}
+                  Found{" "}
                   <span className="font-bold text-primary">
                     {filteredComputers.length}
                   </span>{" "}
-                  máy
+                  machines
                 </p>
               </div>
 
@@ -312,8 +312,8 @@ export function ComputersPage() {
                 {isLoading && (
                   <Card className="p-12 border-border text-center md:col-span-2">
                     <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-bold mb-2">Đang tải danh sách...</h3>
-                    <p className="text-muted-foreground">Vui lòng chờ trong giây lát</p>
+                    <h3 className="text-xl font-bold mb-2">Loading catalog…</h3>
+                    <p className="text-muted-foreground">Please wait</p>
                   </Card>
                 )}
 
@@ -321,7 +321,7 @@ export function ComputersPage() {
                   loadError && (
                     <Card className="p-12 border-border text-center md:col-span-2">
                       <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-xl font-bold mb-2">Không thể tải danh sách</h3>
+                      <h3 className="text-xl font-bold mb-2">Could not load catalog</h3>
                       <p className="text-muted-foreground">{loadError}</p>
                     </Card>
                   )}
@@ -348,7 +348,7 @@ export function ComputersPage() {
                               : "bg-muted text-muted-foreground border-border"
                           }
                         >
-                          {computer.status.toLowerCase() === "available" ? "Có sẵn" : computer.status}
+                          {computer.status.toLowerCase() === "available" ? "Available" : computer.status}
                         </Badge>
                       </div>
 
@@ -388,9 +388,9 @@ export function ComputersPage() {
                       <div className="pt-3 border-t border-border">
                         <div className="grid grid-cols-1 gap-2 text-sm">
                           <div>
-                            <p className="text-muted-foreground text-xs">Giá theo giờ</p>
+                            <p className="text-muted-foreground text-xs">Hourly rate</p>
                             <p className="font-bold text-primary">
-                              {Number(computer.hourlyPrice).toLocaleString("vi-VN")}đ
+                              {Number(computer.hourlyPrice).toLocaleString("en-US")} ₫
                             </p>
                           </div>
                         </div>
@@ -404,7 +404,7 @@ export function ComputersPage() {
                           navigate(`/computers/${computer.pcId}`);
                         }}
                       >
-                        Xem Chi Tiết
+                        View details
                       </Button>
                     </div>
                   </Card>
@@ -415,13 +415,13 @@ export function ComputersPage() {
                 <Card className="p-12 border-border text-center">
                   <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-xl font-bold mb-2">
-                    Không tìm thấy máy nào
+                    No machines match
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác
+                    Try different filters or search terms
                   </p>
                   <Button onClick={handleResetFilters} variant="outline">
-                    Đặt lại bộ lọc
+                    Reset bộ lọc
                   </Button>
                 </Card>
               )}

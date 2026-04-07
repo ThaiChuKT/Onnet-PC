@@ -10,6 +10,10 @@ import { Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { toast } from "sonner";
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -29,31 +33,76 @@ export function LoginPage() {
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (isLogin) {
+      if (!formData.email.trim()) {
+        toast.error("Please enter your email address.");
+        return;
+      }
+      if (!isValidEmail(formData.email)) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+      if (!formData.password) {
+        toast.error("Please enter your password.");
+        return;
+      }
+    } else {
+      if (!formData.fullName.trim()) {
+        toast.error("Please enter your full name.");
+        return;
+      }
+      if (!formData.phone.trim()) {
+        toast.error("Please enter your phone number.");
+        return;
+      }
+      if (!formData.email.trim()) {
+        toast.error("Please enter your email address.");
+        return;
+      }
+      if (!isValidEmail(formData.email)) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+      if (formData.password.length < 8) {
+        toast.error("Password must be at least 8 characters.");
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        toast.error("Passwords do not match.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       if (isLogin) {
-        await login({ email: formData.email, password: formData.password });
-        const state = location.state as { from?: string } | null;
-        const redirectTo = state?.from ?? "/";
-        toast.success("Đăng nhập thành công");
-        navigate(redirectTo, { replace: true });
-      } else {
-        if (formData.password !== formData.confirmPassword) {
-          toast.error("Mật khẩu không khớp!");
-          return;
+        try {
+          await login({ email: formData.email.trim(), password: formData.password });
+          const state = location.state as { from?: string } | null;
+          const redirectTo = state?.from ?? "/";
+          toast.success("Signed in successfully");
+          navigate(redirectTo, { replace: true });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Something went wrong";
+          if (message.toLowerCase().includes("not verified")) {
+            toast.error("Your email is not verified yet.");
+            navigate(`/verify-email?email=${encodeURIComponent(formData.email.trim())}`);
+            return;
+          }
+          throw err;
         }
-        await register({
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
+      } else {
+        const registerRes = await register({
+          fullName: formData.fullName.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
           password: formData.password,
         });
-        toast.success("Đăng ký thành công. Vui lòng đăng nhập.");
-        setIsLogin(true);
-        setFormData((prev) => ({ ...prev, password: "", confirmPassword: "" }));
+        toast.success(registerRes.message || "Verification code sent to your email.");
+        navigate(`/verify-email?email=${encodeURIComponent(registerRes.email)}`);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setIsSubmitting(false);
     }
@@ -62,30 +111,28 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      
+
       <main className="flex-1 pt-20 pb-12 bg-gradient-to-br from-black via-background to-black">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-md mx-auto">
             <Card className="p-8 border-border bg-card/80 backdrop-blur">
-              {/* Logo/Title */}
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold mb-2">
-                  {isLogin ? "Đăng Nhập" : "Đăng Ký"}
+                  {isLogin ? "Sign in" : "Create account"}
                   <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                    {" "}Tài Khoản
+                    {" "}
+                    RentPC Pro
                   </span>
                 </h1>
                 <p className="text-muted-foreground">
-                  {isLogin
-                    ? "Chào mừng bạn quay lại!"
-                    : "Tạo tài khoản để bắt đầu thuê máy"}
+                  {isLogin ? "Welcome back." : "Start renting gaming PCs in minutes."}
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form noValidate onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Họ và Tên</Label>
+                    <Label htmlFor="fullName">Full name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -95,9 +142,9 @@ export function LoginPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, fullName: e.target.value })
                         }
-                        placeholder="Nhập họ và tên"
+                        placeholder="Your name"
                         className="pl-10 bg-input-background border-border"
-                        required
+                        autoComplete="name"
                       />
                     </div>
                   </div>
@@ -105,7 +152,7 @@ export function LoginPage() {
 
                 {!isLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Số Điện Thoại</Label>
+                    <Label htmlFor="phone">Phone</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -113,9 +160,9 @@ export function LoginPage() {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="Nhập số điện thoại"
+                        placeholder="Phone number"
                         className="pl-10 bg-input-background border-border"
-                        required
+                        autoComplete="tel"
                       />
                     </div>
                   </div>
@@ -132,15 +179,15 @@ export function LoginPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      placeholder="example@email.com"
+                      placeholder="you@example.com"
                       className="pl-10 bg-input-background border-border"
-                      required
+                      autoComplete="email"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Mật Khẩu</Label>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -152,7 +199,7 @@ export function LoginPage() {
                       }
                       placeholder="••••••••"
                       className="pl-10 pr-10 bg-input-background border-border"
-                      required
+                      autoComplete={isLogin ? "current-password" : "new-password"}
                     />
                     <button
                       type="button"
@@ -170,7 +217,7 @@ export function LoginPage() {
 
                 {!isLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
+                    <Label htmlFor="confirmPassword">Confirm password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -185,7 +232,7 @@ export function LoginPage() {
                         }
                         placeholder="••••••••"
                         className="pl-10 bg-input-background border-border"
-                        required
+                        autoComplete="new-password"
                       />
                     </div>
                   </div>
@@ -196,51 +243,45 @@ export function LoginPage() {
                   disabled={isSubmitting}
                   className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                 >
-                  {isSubmitting ? "Đang xử lý..." : isLogin ? "Đăng Nhập" : "Đăng Ký"}
+                  {isSubmitting ? "Please wait…" : isLogin ? "Sign in" : "Create account"}
                 </Button>
               </form>
 
               <div className="mt-6 text-center">
                 <button
+                  type="button"
                   onClick={() => setIsLogin(!isLogin)}
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
                   {isLogin ? (
                     <>
-                      Chưa có tài khoản?{" "}
-                      <span className="text-primary font-medium">Đăng ký ngay</span>
+                      No account yet?{" "}
+                      <span className="text-primary font-medium">Register</span>
                     </>
                   ) : (
                     <>
-                      Đã có tài khoản?{" "}
-                      <span className="text-primary font-medium">Đăng nhập</span>
+                      Already have an account?{" "}
+                      <span className="text-primary font-medium">Sign in</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* Features */}
               {!isLogin && (
                 <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Khi đăng ký, bạn sẽ được:
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-2">With an account you can:</p>
                   <ul className="space-y-1 text-sm text-muted-foreground">
                     <li className="flex gap-2">
                       <span className="text-accent">✓</span>
-                      <span>Quản lý tài khoản và lịch sử thuê máy</span>
+                      <span>Manage bookings and wallet</span>
                     </li>
                     <li className="flex gap-2">
                       <span className="text-accent">✓</span>
-                      <span>Sử dụng ví điện tử để thanh toán nhanh</span>
+                      <span>Subscribe to Basic / Pro / Ultra tiers</span>
                     </li>
                     <li className="flex gap-2">
                       <span className="text-accent">✓</span>
-                      <span>Chat với AI để được tư vấn cấu hình</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="text-accent">✓</span>
-                      <span>Nhận ưu đãi và khuyến mãi đặc biệt</span>
+                      <span>Use AI chat for hardware advice</span>
                     </li>
                   </ul>
                 </div>
@@ -249,7 +290,7 @@ export function LoginPage() {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

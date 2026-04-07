@@ -6,6 +6,7 @@ import { ComputerDetailPage } from "./pages/ComputerDetailPage";
 import { AIChatPage } from "./pages/AIChatPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EmailVerificationPage } from "./pages/EmailVerificationPage";
 import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
@@ -28,12 +29,24 @@ export const router = createBrowserRouter([
     Component: LoginPage,
   },
   {
+    path: "/verify-email",
+    Component: EmailVerificationPage,
+  },
+  {
     path: "/computers",
-    Component: ComputersPage,
+    element: (
+      <AdminRoute>
+        <ComputersPage />
+      </AdminRoute>
+    ),
   },
   {
     path: "/computers/:id",
-    Component: ComputerDetailPage,
+    element: (
+      <AdminRoute>
+        <ComputerDetailPage />
+      </AdminRoute>
+    ),
   },
   {
     path: "/ai-chat",

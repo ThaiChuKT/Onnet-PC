@@ -6,22 +6,22 @@ import { Monitor, Users, TrendingUp, ShoppingCart } from "lucide-react";
 const menuItems = [
   {
     path: "/dashboard/computers",
-    label: "Danh Sách Máy",
+    label: "Machines",
     icon: Monitor,
   },
   {
     path: "/dashboard/orders",
-    label: "Quản Lý Đơn Hàng",
+    label: "Orders",
     icon: ShoppingCart,
   },
   {
     path: "/dashboard/accounts",
-    label: "Danh Sách Tài Khoản",
+    label: "Accounts",
     icon: Users,
   },
   {
     path: "/dashboard/revenue",
-    label: "Thống Kê Doanh Thu",
+    label: "Revenue",
     icon: TrendingUp,
   },
 ];
@@ -38,13 +38,13 @@ export function DashboardPage() {
           {/* Dashboard Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold mb-2">
-              Dashboard
+              Admin
               <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                {" "}Quản Trị
+                {" "}dashboard
               </span>
             </h1>
             <p className="text-muted-foreground">
-              Quản lý máy tính, đơn hàng, tài khoản và theo dõi doanh thu
+              Manage machines, bookings, users, and revenue
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export function DashboardPage() {
             {/* Sidebar */}
             <aside className="lg:sticky lg:top-24 h-fit">
               <div className="bg-card border border-border rounded-lg p-4">
-                <h2 className="text-lg font-bold mb-4 px-2">Menu Quản Trị</h2>
+                <h2 className="text-lg font-bold mb-4 px-2">Menu</h2>
                 <nav className="space-y-1">
                   {menuItems.map((item) => {
                     const isActive = location.pathname === item.path || (location.pathname === "/dashboard" && item.path === "/dashboard/computers");

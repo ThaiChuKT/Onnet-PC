@@ -6,22 +6,22 @@ import { User, Lock, History, Wallet } from "lucide-react";
 const menuItems = [
   {
     path: "/account",
-    label: "Thông Tin Tài Khoản",
+    label: "Profile",
     icon: User,
   },
   {
     path: "/account/change-password",
-    label: "Đổi Mật Khẩu",
+    label: "Password",
     icon: Lock,
   },
   {
     path: "/account/top-up",
-    label: "Nạp Tiền",
+    label: "Top up",
     icon: Wallet,
   },
   {
     path: "/account/rental-history",
-    label: "Lịch Sử Thuê",
+    label: "My bookings",
     icon: History,
   },
 ];
@@ -32,14 +32,13 @@ export function AccountPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      
+
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4 py-8">
           <div className="grid lg:grid-cols-[280px_1fr] gap-8">
-            {/* Sidebar */}
             <aside className="lg:sticky lg:top-24 h-fit">
               <div className="bg-card border border-border rounded-lg p-4">
-                <h2 className="text-lg font-bold mb-4 px-2">Quản Lý Tài Khoản</h2>
+                <h2 className="text-lg font-bold mb-4 px-2">Account</h2>
                 <nav className="space-y-1">
                   {menuItems.map((item) => {
                     const isActive = location.pathname === item.path;
@@ -62,14 +61,13 @@ export function AccountPage() {
               </div>
             </aside>
 
-            {/* Main Content */}
             <div className="min-h-[600px]">
               <Outlet />
             </div>
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

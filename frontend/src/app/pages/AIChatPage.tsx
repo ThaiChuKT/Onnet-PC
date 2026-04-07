@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../auth/AuthProvider";
 import {
   Send,
   Bot,
@@ -23,142 +24,50 @@ interface Message {
   suggestions?: string[];
 }
 
+const SUGGEST_VIEW_PLANS = "View plans";
+
 const initialMessage: Message = {
   id: "1",
   role: "assistant",
   content:
-    "Xin chào! Tôi là AI assistant của RentPC Pro. Tôi có thể giúp bạn:\n\n• Tư vấn cấu hình máy phù hợp với nhu cầu\n• So sánh các gói dịch vụ\n• Giải đáp thắc mắc về giá cả\n• Gợi ý máy tốt nhất cho từng mức giá\n\nBạn muốn thuê máy để làm gì?",
+    "Hi! I’m the RentPC Pro assistant. I can help with:\n\n• Picking a tier for gaming, streaming, or work\n• Comparing Basic / Pro / Ultra\n• Pricing questions (see home page for current VND rates)\n• What to expect from pool-assigned hardware\n\nWhat do you want to use the PC for?",
   timestamp: new Date(),
-  suggestions: [
-    "Chơi game AAA",
-    "Streaming",
-    "Làm việc văn phòng",
-    "Render video/3D",
-  ],
+  suggestions: ["AAA gaming", "Streaming", "Office work", "Video / 3D render"],
 };
 
-// Mock AI responses
 const aiResponses: { [key: string]: string } = {
-  "chơi game": `Để chơi game, tôi gợi ý các cấu hình sau:
+  "chơi game": `For gaming, our subscription tiers map to these typical builds:
 
-**Basic Gaming (20k/giờ)**
-• CPU: Intel i5-12400F
-• GPU: GTX 1660 Super
-• RAM: 16GB DDR4
-→ Phù hợp: Game eSports (CSGO, Valorant, LOL) ở 144+ FPS
+**Basic** — esports & lighter titles (1080p high FPS)
+**Pro** — AAA at high/ultra 1440p
+**Ultra** — 4K, heavy RT, VR
 
-**Pro Gaming (35k/giờ)**
-• CPU: Intel i7-13700K
-• GPU: RTX 4060 Ti
-• RAM: 32GB DDR5
-→ Phù hợp: Game AAA (Cyberpunk, GTA 5) ở Ultra 100+ FPS
+Exact hardware is assigned from the pool when you start a session. Tell me which games you play and I’ll narrow the tier.`,
 
-**Ultra Gaming (50k/giờ)**
-• CPU: Intel i9-13900K
-• GPU: RTX 4080
-• RAM: 64GB DDR5
-→ Phù hợp: Game 4K, VR, Ray Tracing tối đa
+  streaming: `For streaming, **Pro** is the usual sweet spot (NVENC, strong CPU). **Ultra** if you want 4K stream + heavy game simultaneously.
 
-Bạn thường chơi game gì?`,
+Ask in My bookings after paying — Start session assigns a machine from the pool.`,
 
-  streaming: `Để streaming chất lượng cao, tôi đề xuất:
+  "làm việc": `For office and productivity, **Basic** covers browser, Office, video calls. Choose **Pro** if you run heavy multitasking, CAD, or large Photoshop files.`,
 
-**Pro Gaming (35k/giờ)** ⭐ Khuyên dùng
-• CPU: Intel i7-13700K (12 cores xử lý tốt)
-• GPU: RTX 4060 Ti (NVENC encoder)
-• RAM: 32GB DDR5
-• Có thể: Stream 1080p60fps + chơi game mượt
+  render: `For Premiere, Blender, or 3D, pick **Ultra** for maximum GPU/CPU/RAM headroom. Long jobs are cheaper on monthly/yearly plans — check the Plans section on the home page.`,
 
-**Ultra Gaming (50k/giờ)** 🔥 Chuyên nghiệp
-• CPU: Intel i9-13900K (24 cores)
-• GPU: RTX 4080
-• RAM: 64GB DDR5
-• Có thể: Stream 4K + record + chơi game ultra
+  giá: `Published prices are on the home page (weekly / monthly / yearly). They’re shown in ₫ and updated there.
 
-Cả hai đều có NVENC encoder giúp stream không ảnh hưởng FPS!
+Rough orientation (verify on **Plans**):
+• Basic — entry tier
+• Pro — mid / streaming / AAA
+• Ultra — top performance
 
-Bạn stream game gì và platform nào?`,
+Wallet top-up uses PayPal in USD on the Top up page.`,
 
-  "làm việc": `Cho công việc văn phòng, tôi gợi ý:
+  default: `I can help with:
 
-**Basic Gaming (20k/giờ)** ✅ Tối ưu
-• CPU: Intel i5-12400F
-• RAM: 16GB DDR4
-• Storage: 500GB NVMe SSD
-→ Phù hợp: Office, Google Workspace, Zoom, nhẹ nhàng
+🎮 **Tiers** — Basic vs Pro vs Ultra for your workload
+💰 **Pricing** — point you to the Plans section for live numbers
+🖥️ **Flow** — subscribe → pay in My bookings → Start session
 
-**Pro Gaming (35k/giờ)** - Nếu cần mạnh hơn
-• CPU: Intel i7-13700K
-• RAM: 32GB DDR5
-• Storage: 1TB NVMe SSD
-→ Phù hợp: Đa nhiệm nặng, AutoCAD, Photoshop
-
-Công việc của bạn có cần phần mềm đặc biệt không?`,
-
-  render: `Để render video/3D chuyên nghiệp:
-
-**Ultra Gaming (50k/giờ)** 🎬 Bắt buộc
-• CPU: Intel i9-13900K (24 cores)
-• GPU: RTX 4080 (CUDA cores)
-• RAM: 64GB DDR5
-• Storage: 2TB NVMe SSD
-
-**Ưu điểm:**
-✓ Render Premiere/After Effects nhanh 3-5x
-✓ GPU rendering cho Blender, Cinema 4D
-✓ RAM 64GB xử lý project lớn
-✓ CUDA/OptiX acceleration
-
-**Giá tham khảo:**
-• 1 giờ: 50,000đ
-• 1 ngày: 350,000đ
-• 1 tháng: 7,000,000đ (tiết kiệm nhất!)
-
-Bạn dùng phần mềm nào (Premiere, Blender, ...)?`,
-
-  giá: `**Bảng giá dịch vụ:**
-
-💰 **Basic Gaming**
-• Giờ: 20,000đ
-• Ngày: 150,000đ (tiết kiệm 330k so với giờ!)
-• Tháng: 2,500,000đ (tiết kiệm 12M so với giờ!)
-
-💎 **Pro Gaming**
-• Giờ: 35,000đ
-• Ngày: 250,000đ
-• Tháng: 4,500,000đ
-
-🔥 **Ultra Gaming**
-• Giờ: 50,000đ
-• Ngày: 350,000đ
-• Tháng: 7,000,000đ
-
-**Mẹo tiết kiệm:**
-📌 Thuê theo tháng giảm đến 90%!
-📌 Nạp ví PayPal nhanh chóng
-📌 Không phí ẩn, không ràng buộc
-
-Bạn dự định thuê trong bao lâu?`,
-
-  default: `Tôi có thể giúp bạn về:
-
-🎮 **Tư vấn cấu hình**
-• Chơi game: Basic/Pro/Ultra
-• Streaming & Recording
-• Làm việc & học tập
-• Render video & 3D
-
-💰 **Tư vấn giá cả**
-• So sánh gói theo giờ/ngày/tháng
-• Tính toán chi phí phù hợp
-• Mẹo tiết kiệm
-
-📊 **So sánh máy**
-• So sánh hiệu năng
-• Chọn máy theo budget
-• Xem máy nào đang trống
-
-Bạn cần tư vấn gì cụ thể?`,
+What should we tackle first?`,
 };
 
 export function AIChatPage() {
@@ -167,6 +76,18 @@ export function AIChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+
+  const goToPlansOrCatalog = () => {
+    if (isAdmin) {
+      navigate("/computers");
+    } else {
+      navigate("/");
+      window.setTimeout(() => {
+        window.location.hash = "packages";
+      }, 0);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -193,7 +114,8 @@ export function AIChatPage() {
     } else if (
       lowerMessage.includes("làm việc") ||
       lowerMessage.includes("văn phòng") ||
-      lowerMessage.includes("office")
+      lowerMessage.includes("office") ||
+      lowerMessage.includes("work")
     ) {
       return aiResponses["làm việc"];
     } else if (
@@ -206,7 +128,10 @@ export function AIChatPage() {
     } else if (
       lowerMessage.includes("giá") ||
       lowerMessage.includes("bao nhiêu") ||
-      lowerMessage.includes("tiền")
+      lowerMessage.includes("tiền") ||
+      lowerMessage.includes("price") ||
+      lowerMessage.includes("cost") ||
+      lowerMessage.includes("how much")
     ) {
       return aiResponses["giá"];
     } else {
@@ -239,7 +164,7 @@ export function AIChatPage() {
         timestamp: new Date(),
         suggestions:
           Math.random() > 0.5
-            ? ["Xem máy phù hợp", "So sánh giá", "Câu hỏi khác"]
+            ? [SUGGEST_VIEW_PLANS, "Compare pricing", "Another question"]
             : undefined,
       };
 
@@ -249,8 +174,8 @@ export function AIChatPage() {
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    if (suggestion === "Xem máy phù hợp") {
-      navigate("/computers");
+    if (suggestion === SUGGEST_VIEW_PLANS) {
+      goToPlansOrCatalog();
     } else {
       handleSend(suggestion);
     }
@@ -272,12 +197,12 @@ export function AIChatPage() {
                 AI
                 <span className="bg-gradient-to-r from-secondary via-accent to-primary bg-clip-text text-transparent">
                   {" "}
-                  Chat Tư Vấn
+                  assistant
                 </span>
               </h1>
             </div>
             <p className="text-muted-foreground">
-              Hỏi AI để được tư vấn cấu hình và giá phù hợp nhất
+              Ask about tiers, pricing, and how renting works
             </p>
           </div>
 
@@ -341,7 +266,7 @@ export function AIChatPage() {
                     )}
 
                     <p className="text-xs text-muted-foreground mt-1">
-                      {message.timestamp.toLocaleTimeString("vi-VN", {
+                      {message.timestamp.toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -382,7 +307,7 @@ export function AIChatPage() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Nhập câu hỏi của bạn..."
+                  placeholder="Type your question…"
                   className="bg-input-background border-border"
                 />
                 <Button
@@ -400,16 +325,16 @@ export function AIChatPage() {
           <div className="grid md:grid-cols-3 gap-4 mt-6">
             <Card
               className="p-4 border-border hover:border-primary/50 cursor-pointer transition-all"
-              onClick={() => navigate("/computers")}
+              onClick={() => goToPlansOrCatalog()}
             >
               <div className="flex items-center gap-3">
                 <div className="bg-primary/20 p-2 rounded-lg">
                   <Monitor className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-bold">Xem Máy</p>
+                  <p className="font-bold">{isAdmin ? "PC catalog" : "View plans"}</p>
                   <p className="text-sm text-muted-foreground">
-                    Danh sách đầy đủ
+                    {isAdmin ? "Admin inventory" : "Subscription tiers on home"}
                   </p>
                 </div>
               </div>
@@ -417,16 +342,16 @@ export function AIChatPage() {
 
             <Card
               className="p-4 border-border hover:border-primary/50 cursor-pointer transition-all"
-              onClick={() => handleSend("So sánh giá các gói")}
+              onClick={() => handleSend("Compare pricing of subscription tiers")}
             >
               <div className="flex items-center gap-3">
                 <div className="bg-accent/20 p-2 rounded-lg">
                   <TrendingUp className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <p className="font-bold">So Sánh Giá</p>
+                  <p className="font-bold">Compare pricing</p>
                   <p className="text-sm text-muted-foreground">
-                    Chọn gói tốt nhất
+                    Basic / Pro / Ultra
                   </p>
                 </div>
               </div>
@@ -434,16 +359,16 @@ export function AIChatPage() {
 
             <Card
               className="p-4 border-border hover:border-primary/50 cursor-pointer transition-all"
-              onClick={() => handleSend("Máy nào mạnh nhất?")}
+              onClick={() => handleSend("Which tier is the most powerful?")}
             >
               <div className="flex items-center gap-3">
                 <div className="bg-secondary/20 p-2 rounded-lg">
                   <Zap className="w-5 h-5 text-secondary" />
                 </div>
                 <div>
-                  <p className="font-bold">Hiệu Năng Cao</p>
+                  <p className="font-bold">Top performance</p>
                   <p className="text-sm text-muted-foreground">
-                    Xem máy mạnh nhất
+                    Ultra tier overview
                   </p>
                 </div>
               </div>

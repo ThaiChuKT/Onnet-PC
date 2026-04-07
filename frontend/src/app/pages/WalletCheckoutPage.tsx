@@ -39,12 +39,12 @@ function initialView(searchParams: URLSearchParams): ViewState {
       return {
         kind: "error",
         message:
-          "Không tìm thấy mã đơn hàng PayPal. Vui lòng thử lại từ trang nạp tiền hoặc liên hệ hỗ trợ.",
+          "Missing PayPal order id. Return from Top up after approving payment, or contact support.",
       };
     }
     return { kind: "capturing" };
   }
-  return { kind: "error", message: "Tham số thanh toán không hợp lệ." };
+  return { kind: "error", message: "Invalid payment parameters." };
 }
 
 export function WalletCheckoutPage() {
@@ -65,14 +65,14 @@ export function WalletCheckoutPage() {
         );
         if (!cancelled) {
           setView({ kind: "success", data });
-          toast.success(data.message || "Thanh toán đã được xác nhận");
+          toast.success(data.message || "Payment confirmed");
         }
       } catch (e) {
         if (!cancelled) {
           const msg =
             e instanceof Error
               ? e.message
-              : "Không thể xác nhận thanh toán. Vui lòng thử lại sau.";
+              : "Could not confirm payment. Try again later.";
           setView({ kind: "error", message: msg });
           toast.error(msg);
         }
@@ -85,10 +85,10 @@ export function WalletCheckoutPage() {
 
   const title = (
     <h1 className="text-3xl font-bold mb-2">
-      Hoàn tất
+      Wallet
       <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
         {" "}
-        thanh toán
+        checkout
       </span>
     </h1>
   );
@@ -106,7 +106,7 @@ export function WalletCheckoutPage() {
               </div>
               {title}
               <p className="text-muted-foreground">
-                Đang xác nhận giao dịch với PayPal và cập nhật số dư ví...
+                Confirming PayPal with our server and updating your wallet…
               </p>
             </Card>
           )}
@@ -119,20 +119,20 @@ export function WalletCheckoutPage() {
                 </div>
                 {title}
                 <p className="text-muted-foreground">
-                  {view.data.message || "Nạp tiền vào ví thành công."}
+                  {view.data.message || "Top-up completed."}
                 </p>
               </div>
 
               <div className="p-6 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-border mb-6">
                 <div className="flex items-center gap-3 mb-2">
                   <Wallet className="w-5 h-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Số dư ví hiện tại</span>
+                  <span className="text-sm text-muted-foreground">Current balance</span>
                 </div>
                 <p className="text-3xl font-bold text-primary">
-                  {Number(view.data.balance).toLocaleString("vi-VN")}đ
+                  {Number(view.data.balance).toLocaleString("en-US")} ₫
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Mã đơn: {view.data.orderId}
+                  Order id: {view.data.orderId}
                 </p>
               </div>
 
@@ -143,12 +143,12 @@ export function WalletCheckoutPage() {
                 >
                   <Link to="/account/top-up">
                     <CreditCard className="w-4 h-4 mr-2" />
-                    Nạp thêm
+                    Top up again
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="flex-1 h-12 border-border">
                   <Link to="/account">
-                    Tài khoản
+                    Account
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
                 </Button>
@@ -163,14 +163,13 @@ export function WalletCheckoutPage() {
               </div>
               {title}
               <p className="text-muted-foreground mb-8">
-                Bạn đã hủy thanh toán PayPal. Chưa có khoản tiền nào được trừ. Bạn có thể
-                thử lại bất cứ lúc nào từ trang nạp tiền.
+                You cancelled PayPal. No money was charged. You can try again from Top up.
               </p>
               <Button
                 asChild
                 className="h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
-                <Link to="/account/top-up">Quay lại nạp tiền</Link>
+                <Link to="/account/top-up">Back to top up</Link>
               </Button>
             </Card>
           )}
@@ -186,10 +185,10 @@ export function WalletCheckoutPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button asChild variant="outline" className="border-border">
-                  <Link to="/account/top-up">Thử lại nạp tiền</Link>
+                  <Link to="/account/top-up">Try top up again</Link>
                 </Button>
                 <Button asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
-                  <Link to="/account">Về tài khoản</Link>
+                  <Link to="/account">Account</Link>
                 </Button>
               </div>
             </Card>
@@ -204,9 +203,8 @@ export function WalletCheckoutPage() {
                 <div>
                   {title}
                   <p className="text-muted-foreground">
-                    Đây là trang xử lý sau khi bạn thanh toán PayPal khi nạp tiền. Nếu bạn vừa
-                    hoàn tất trên PayPal, hãy đảm bảo bạn mở đúng liên kết trả về từ PayPal
-                    (có chứa tham số trạng thái).
+                    This page completes after PayPal top-up. If you just paid, open the return link
+                    from PayPal (it includes status parameters).
                   </p>
                 </div>
               </div>
@@ -216,7 +214,7 @@ export function WalletCheckoutPage() {
               >
                 <Link to="/account/top-up">
                   <Wallet className="w-4 h-4 mr-2" />
-                  Đi tới nạp tiền
+                  Go to top up
                 </Link>
               </Button>
             </Card>

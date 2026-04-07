@@ -14,19 +14,19 @@ const packages = [
     name: "Basic Gaming",
     icon: Gamepad2,
     pricing: {
-      week: { price: "150.000đ", period: "/ tuần" },
-      month: { price: "3.500.000đ", period: "/ tháng" },
-      year: { price: "35.000.000đ", period: "/ năm" },
+      week: { price: "149,000 ₫", period: "/ week" },
+      month: { price: "3,499,000 ₫", period: "/ month" },
+      year: { price: "34,900,000 ₫", period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1760708825878-9e7ecf31565a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnYW1pbmclMjBkZXNrdG9wJTIwY29tcHV0ZXIlMjB0b3dlcnxlbnwxfHx8fDE3NzM2NzY1ODh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     features: [
       "Intel Core i5 / Ryzen 5",
       "GTX 1660 Super",
-      "16GB RAM DDR4",
-      "SSD 512GB NVMe",
-      'Monitor 24" 144Hz',
-      "Bàn phím + chuột gaming",
+      "16GB DDR4 RAM",
+      "512GB NVMe SSD",
+      '24" 144Hz monitor',
+      "Keyboard & mouse included",
     ],
     popular: false,
   },
@@ -35,19 +35,19 @@ const packages = [
     name: "Pro Gaming",
     icon: Zap,
     pricing: {
-      week: { price: "300.000đ", period: "/ tuần" },
-      month: { price: "7.000.000đ", period: "/ tháng" },
-      year: { price: "70.000.000đ", period: "/ năm" },
+      week: { price: "299,000 ₫", period: "/ week" },
+      month: { price: "6,999,000 ₫", period: "/ month" },
+      year: { price: "69,900,000 ₫", period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1738347826086-cadfac03cd45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoaWdoJTIwZW5kJTIwZ2FtaW5nJTIwY29tcHV0ZXJ8ZW58MXx8fHwxNzczNjc2NTg3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     features: [
       "Intel Core i7 / Ryzen 7",
       "RTX 4060 Ti 8GB",
-      "32GB RAM DDR5",
-      "SSD 1TB NVMe Gen4",
-      'Monitor 27" 240Hz',
-      "Full bộ gaming gear cao cấp",
+      "32GB DDR5 RAM",
+      "1TB NVMe Gen4 SSD",
+      '27" 240Hz monitor',
+      "Full premium gaming kit",
     ],
     popular: true,
   },
@@ -56,19 +56,19 @@ const packages = [
     name: "Ultra Gaming",
     icon: Cpu,
     pricing: {
-      week: { price: "500.000đ", period: "/ tuần" },
-      month: { price: "12.000.000đ", period: "/ tháng" },
-      year: { price: "120.000.000đ", period: "/ năm" },
+      week: { price: "499,000 ₫", period: "/ week" },
+      month: { price: "11,999,000 ₫", period: "/ month" },
+      year: { price: "119,900,000 ₫", period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1636914011676-039d36b73765?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYyUyMGdhbWluZyUyMHJvb20lMjBzZXR1cHxlbnwxfHx8fDE3NzM2NzY1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     features: [
       "Intel Core i9 / Ryzen 9",
       "RTX 4080 16GB",
-      "64GB RAM DDR5",
-      "SSD 2TB NVMe Gen4",
-      'Monitor 32" 4K 144Hz',
-      "Premium gaming setup",
+      "64GB DDR5 RAM",
+      "2TB NVMe Gen4 SSD",
+      '32" 4K 144Hz monitor',
+      "Premium streaming-ready setup",
     ],
     popular: false,
   },
@@ -84,7 +84,7 @@ export function Packages() {
     if (isSubmittingTier !== null) return;
 
     if (!isAuthenticated) {
-      toast.message("Vui lòng đăng nhập để thuê gói subscription");
+      toast.message("Sign in to subscribe to a tier");
       navigate("/login", { replace: false, state: { from: "/" } });
       return;
     }
@@ -96,10 +96,10 @@ export function Packages() {
         rentalUnit: selectedPeriod,
         quantity: 1,
       });
-      toast.success("Đã tạo đơn thuê gói. Vui lòng thanh toán và Start Session trong lịch sử thuê.");
+      toast.success("Order created. Pay in My bookings, then start your session.");
       navigate("/account/rental-history");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể tạo đơn thuê gói");
+      toast.error(e instanceof Error ? e.message : "Could not create subscription order");
     } finally {
       setIsSubmittingTier(null);
     }
@@ -113,19 +113,19 @@ export function Packages() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Gói Cho Thuê
+            Subscription
             <span className="block bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              Phù Hợp Mọi Nhu Cầu
+              tiers
             </span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-            Chọn cấu hình phù hợp với nhu cầu gaming của bạn. Tất cả đều được
-            bảo dưỡng định kỳ và đảm bảo hiệu suất tối đa.
+            Pick a tier and billing period. Hardware is maintained on a schedule so performance stays
+            predictable.
           </p>
 
-          {/* Period Selector */}
-          <div className="inline-flex items-center gap-2 bg-card border border-border rounded-lg p-1">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-card border border-border rounded-lg p-1">
             <button
+              type="button"
               onClick={() => setSelectedPeriod("week")}
               className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
                 selectedPeriod === "week"
@@ -134,9 +134,10 @@ export function Packages() {
               }`}
             >
               <Clock className="w-4 h-4" />
-              Theo Tuần
+              Weekly
             </button>
             <button
+              type="button"
               onClick={() => setSelectedPeriod("month")}
               className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
                 selectedPeriod === "month"
@@ -145,9 +146,10 @@ export function Packages() {
               }`}
             >
               <Clock className="w-4 h-4" />
-              Theo Tháng
+              Monthly
             </button>
             <button
+              type="button"
               onClick={() => setSelectedPeriod("year")}
               className={`flex items-center gap-2 px-6 py-2 rounded-md transition-all ${
                 selectedPeriod === "year"
@@ -156,9 +158,9 @@ export function Packages() {
               }`}
             >
               <Clock className="w-4 h-4" />
-              Theo Năm
+              Yearly
               <span className="ml-1 text-xs bg-accent/20 px-2 py-0.5 rounded-full">
-                Tiết kiệm
+                Best value
               </span>
             </button>
           </div>
@@ -179,7 +181,7 @@ export function Packages() {
               >
                 {pkg.popular && (
                   <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-primary to-accent text-white text-xs font-bold px-3 py-1 rounded-full">
-                    PHỔ BIẾN NHẤT
+                    MOST POPULAR
                   </div>
                 )}
 
@@ -202,7 +204,7 @@ export function Packages() {
 
                 <div className="p-6">
                   <div className="mb-6">
-                    <div className="flex items-baseline gap-1">
+                    <div className="flex items-baseline gap-1 flex-wrap">
                       <span className="text-4xl font-bold text-primary">
                         {currentPricing.price}
                       </span>
@@ -212,7 +214,7 @@ export function Packages() {
                     </div>
                     {selectedPeriod === "year" && (
                       <p className="text-xs text-accent mt-1">
-                        Tiết kiệm đến 20% so với thuê theo tháng
+                        Save up to ~20% vs paying month-to-month
                       </p>
                     )}
                   </div>
@@ -240,10 +242,10 @@ export function Packages() {
                     {isSubmittingTier === pkg.tierName ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Đang xử lý...
+                        Processing…
                       </>
                     ) : (
-                      "Đặt Gói Ngay"
+                      "Subscribe now"
                     )}
                   </Button>
                 </div>
@@ -252,7 +254,6 @@ export function Packages() {
           })}
         </div>
 
-        {/* Additional Info */}
         <div className="mt-12 text-center">
           <div className="inline-flex flex-col sm:flex-row items-center gap-4 bg-card/50 backdrop-blur border border-border rounded-lg px-6 py-4">
             <div className="flex items-center gap-2">
@@ -260,16 +261,16 @@ export function Packages() {
                 <Zap className="w-5 h-5 text-primary" />
               </div>
               <div className="text-left">
-                <div className="text-sm font-bold">Giá thuê linh hoạt</div>
+                <div className="text-sm font-bold">Flexible rental pricing</div>
                 <div className="text-xs text-muted-foreground">
-                  Tùy chọn theo nhu cầu của bạn
+                  Switch period anytime before checkout
                 </div>
               </div>
             </div>
             <div className="hidden sm:block w-px h-12 bg-border"></div>
             <div className="text-sm text-muted-foreground">
-              Đặt cọc: <span className="text-primary font-bold">500.000đ</span>{" "}
-              - Hoàn lại khi trả máy
+              Security deposit: <span className="text-primary font-bold">500,000 ₫</span> — refunded
+              when hardware is returned
             </div>
           </div>
         </div>

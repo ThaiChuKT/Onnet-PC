@@ -34,10 +34,10 @@ export function ChangePassword() {
           confirmPassword: formData.confirmPassword,
         },
       );
-      toast.success("Đổi mật khẩu thành công");
+      toast.success("Password updated");
       setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể đổi mật khẩu");
+      toast.error(e instanceof Error ? e.message : "Could not change password");
     } finally {
       setIsSubmitting(false);
     }
@@ -47,13 +47,13 @@ export function ChangePassword() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">
-          Đổi
+          Change
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            {" "}Mật Khẩu
+            {" "}password
           </span>
         </h1>
         <p className="text-muted-foreground">
-          Cập nhật mật khẩu để bảo vệ tài khoản của bạn
+          Use a strong password you don’t reuse elsewhere
         </p>
       </div>
 

@@ -65,6 +65,11 @@ public class BookingController {
         return ApiResponse.success(bookingService.payWithWallet(authentication.getName(), bookingId));
     }
 
+    @PostMapping("/{bookingId}/cancel")
+    public ApiResponse<BookingResponse> cancelBooking(Authentication authentication, @PathVariable Long bookingId) {
+        return ApiResponse.success(bookingService.cancelBooking(authentication.getName(), bookingId));
+    }
+
     @PostMapping("/{bookingId}/start-session")
     public ApiResponse<StartSessionResponse> startSession(Authentication authentication, @PathVariable Long bookingId) {
         return ApiResponse.success(sessionLifecycleService.startSession(authentication.getName(), bookingId));

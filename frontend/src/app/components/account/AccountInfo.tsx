@@ -37,10 +37,10 @@ export function AccountInfo() {
         { fullName: formData.fullName, phone: formData.phone, avatar: null },
       );
       await refreshMe();
-      toast.success("Cập nhật thông tin thành công");
+      toast.success("Profile updated");
       setIsEditing(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể cập nhật thông tin");
+      toast.error(e instanceof Error ? e.message : "Could not update profile");
     } finally {
       setIsSaving(false);
     }
@@ -51,13 +51,13 @@ export function AccountInfo() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">
-            Thông Tin
+            Profile
             <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              {" "}Tài Khoản
+              {" "}settings
             </span>
           </h1>
           <p className="text-muted-foreground">
-            Quản lý thông tin cá nhân và bảo mật tài khoản của bạn
+            Manage your personal details and account security
           </p>
         </div>
         {!isEditing && (
@@ -67,7 +67,7 @@ export function AccountInfo() {
             className="border-primary text-foreground hover:bg-primary/10"
           >
             <Edit2 className="w-4 h-4 mr-2" />
-            Chỉnh Sửa
+            Edit
           </Button>
         )}
       </div>

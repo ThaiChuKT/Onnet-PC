@@ -13,13 +13,14 @@ import {
 import {
   Calendar,
   Clock,
-  Cpu,
   DollarSign,
   Play,
   Square,
   Loader2,
   Wallet,
   CreditCard,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -82,6 +83,11 @@ type EndSessionResponse = {
   message: string;
 };
 
+type BookingResponseDto = {
+  bookingId: number;
+  status: string;
+};
+
 type PageResponse<T> = {
   content: T[];
   totalElements: number;
@@ -92,15 +98,32 @@ type PageResponse<T> = {
 
 const statusConfig = {
   pending: {
-    label: "Chờ thanh toán",
+    label: "Awaiting payment",
     className: "bg-amber-500/20 text-amber-400 border-amber-500/50",
   },
-  active: { label: "Đang hoạt động", className: "bg-accent/20 text-accent border-accent/50" },
-  paid: { label: "Đã thanh toán", className: "bg-blue-500/20 text-blue-500 border-blue-500/50" },
-  waiting: { label: "Đang chờ máy", className: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
-  completed: { label: "Hoàn thành", className: "bg-secondary/20 text-secondary border-secondary/50" },
-  cancelled: { label: "Đã hủy", className: "bg-muted text-muted-foreground border-border" },
+  active: {
+    label: "Active",
+    className: "bg-accent/20 text-accent border-accent/50",
+  },
+  paid: {
+    label: "Paid",
+    className: "bg-blue-500/20 text-blue-500 border-blue-500/50",
+  },
+  waiting: {
+    label: "Waiting for machine",
+    className: "bg-orange-500/20 text-orange-400 border-orange-500/50",
+  },
+  completed: {
+    label: "Expired",
+    className: "bg-secondary/20 text-secondary border-secondary/50",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-muted text-muted-foreground border-border",
+  },
 };
+
+const POLL_MS = 15_000;
 
 export function RentalHistory() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
@@ -108,54 +131,93 @@ export function RentalHistory() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [payingBookingId, setPayingBookingId] = useState<number | null>(null);
-  const [startingBookingId, setStartingBookingId] = useState<number | null>(null);
+  const [startingBookingId, setStartingBookingId] = useState<number | null>(
+    null,
+  );
   const [endingBookingId, setEndingBookingId] = useState<number | null>(null);
   const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
-  const [confirmBooking, setConfirmBooking] = useState<BookingHistoryItemResponse | null>(null);
+  const [confirmBooking, setConfirmBooking] =
+    useState<BookingHistoryItemResponse | null>(null);
+  const [cancelBookingTarget, setCancelBookingTarget] =
+    useState<BookingHistoryItemResponse | null>(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState<number | null>(
+    null,
+  );
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
+  const loadData = useCallback(async (mode: "full" | "silent" = "full") => {
+    if (mode === "full") {
+      setIsLoading(true);
+      setLoadError(null);
+    }
     try {
       const [page, wallet, activeSession] = await Promise.all([
-        apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", { page: 0, size: 50 }),
-        apiGet<{ walletId: number; balance: number }>("/wallet").catch(() => null),
+        apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", {
+          page: 0,
+          size: 50,
+        }),
+        apiGet<{ walletId: number; balance: number }>("/wallet").catch(
+          () => null,
+        ),
         apiGet<ActiveSessionResponse>("/sessions/current").catch(() => null),
       ]);
       setItems(page.content ?? []);
       if (wallet) setWalletBalance(Number(wallet.balance));
       setActiveBookingId(activeSession?.bookingId ?? null);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Không thể tải lịch sử thuê";
-      setLoadError(msg);
-      toast.error(msg);
+      const msg = e instanceof Error ? e.message : "Could not load bookings";
+      if (mode === "full") {
+        setLoadError(msg);
+        toast.error(msg);
+      }
     } finally {
-      setIsLoading(false);
+      if (mode === "full") setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!cancelled) await loadData();
+      if (!cancelled) await loadData("full");
     })();
     return () => {
       cancelled = true;
     };
   }, [loadData]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      loadData("silent");
+    }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [loadData]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") loadData("silent");
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loadData]);
+
   const completedCount = useMemo(
-    () => items.filter((i) => (i.status ?? "").toLowerCase() === "completed").length,
+    () =>
+      items.filter((i) => (i.status ?? "").toLowerCase() === "completed")
+        .length,
     [items],
   );
   const pendingCount = useMemo(
-    () => items.filter((i) => (i.status ?? "").toLowerCase() === "pending").length,
+    () =>
+      items.filter((i) => (i.status ?? "").toLowerCase() === "pending").length,
     [items],
   );
   const totalSpent = useMemo(
     () =>
       items
-        .filter((i) => ["active", "paid", "completed"].includes((i.status ?? "").toLowerCase()))
+        .filter((i) =>
+          ["active", "paid", "completed"].includes(
+            (i.status ?? "").toLowerCase(),
+          ),
+        )
         .reduce((sum, i) => sum + Number(i.totalPrice ?? 0), 0),
     [items],
   );
@@ -174,10 +236,11 @@ export function RentalHistory() {
           b.bookingId === id ? { ...b, status: res.status ?? "paid" } : b,
         ),
       );
-      toast.success("Thanh toán đơn hàng bằng ví thành công");
+      toast.success("Payment completed from your wallet");
       setConfirmBooking(null);
+      await loadData("silent");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể thanh toán");
+      toast.error(e instanceof Error ? e.message : "Payment failed");
     } finally {
       setPayingBookingId(null);
     }
@@ -187,7 +250,9 @@ export function RentalHistory() {
     if (startingBookingId !== null || endingBookingId !== null) return;
     setStartingBookingId(bookingId);
     try {
-      const res = await apiPost<StartSessionResponse>(`/bookings/${bookingId}/start-session`);
+      const res = await apiPost<StartSessionResponse>(
+        `/bookings/${bookingId}/start-session`,
+      );
       setActiveBookingId(res.bookingId ?? bookingId);
       setItems((prev) =>
         prev.map((b) =>
@@ -200,9 +265,10 @@ export function RentalHistory() {
             : b,
         ),
       );
-      toast.success(res.message || "Bắt đầu session thành công");
+      toast.success(res.message || "Session started");
+      await loadData("silent");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể bắt đầu session");
+      toast.error(e instanceof Error ? e.message : "Could not start session");
     } finally {
       setStartingBookingId(null);
     }
@@ -224,31 +290,53 @@ export function RentalHistory() {
             : b,
         ),
       );
-      toast.success(res.message || "Kết thúc session thành công");
-      await loadData();
+      toast.success(res.message || "Session ended");
+      await loadData("silent");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể kết thúc session");
+      toast.error(e instanceof Error ? e.message : "Could not end session");
     } finally {
       setEndingBookingId(null);
     }
   };
 
+  const handleConfirmCancelRental = async () => {
+    if (!cancelBookingTarget || cancellingBookingId !== null) return;
+    const id = cancelBookingTarget.bookingId;
+    setCancellingBookingId(id);
+    try {
+      await apiPost<BookingResponseDto>(`/bookings/${id}/cancel`);
+      toast.success("Rental cancelled. You have not been charged.");
+      setCancelBookingTarget(null);
+      setItems((prev) =>
+        prev.map((b) =>
+          b.bookingId === id ? { ...b, status: "cancelled" } : b,
+        ),
+      );
+      await loadData("silent");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not cancel rental");
+    } finally {
+      setCancellingBookingId(null);
+    }
+  };
+
   const price = confirmBooking ? Number(confirmBooking.totalPrice ?? 0) : 0;
-  const balanceAfter =
-    walletBalance !== null ? walletBalance - price : null;
+  const balanceAfter = walletBalance !== null ? walletBalance - price : null;
+  const payRemaining = confirmBooking?.remainingMinutes;
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">
-          Lịch Sử
+          My
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             {" "}
-            Thuê Máy
+            bookings
           </span>
         </h1>
         <p className="text-muted-foreground">
-          Xem đơn hàng và thanh toán bằng ví cho các đơn đang chờ
+          Pay pending orders from your wallet, start sessions, and track rental
+          periods
         </p>
       </div>
 
@@ -260,32 +348,38 @@ export function RentalHistory() {
                 <Wallet className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-bold mb-1">Thanh toán đơn hàng</h2>
+                <h2 className="text-lg font-bold mb-1">Payment required</h2>
                 <p className="text-sm text-muted-foreground">
-                  Bạn có{" "}
-                  <span className="text-foreground font-semibold">{pendingCount}</span> đơn
-                  chờ thanh toán. Số tiền sẽ được trừ từ ví.{" "}
+                  You have{" "}
+                  <span className="text-foreground font-semibold">
+                    {pendingCount}
+                  </span>{" "}
+                  order(s) waiting for payment. Funds are taken from your
+                  wallet.{" "}
                   <Link
                     to="/account/top-up"
                     className="text-primary hover:underline font-medium"
                   >
-                    Nạp thêm
+                    Top up
                   </Link>{" "}
-                  nếu cần.
+                  if needed.
                 </p>
               </div>
             </div>
             <div className="sm:text-right shrink-0">
-              <p className="text-xs text-muted-foreground mb-1">Số dư ví hiện tại</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                Wallet balance
+              </p>
               <p className="text-2xl font-bold text-primary">
-                {walletBalance === null ? "—" : `${walletBalance.toLocaleString("vi-VN")}đ`}
+                {walletBalance === null
+                  ? "—"
+                  : `${walletBalance.toLocaleString("en-US")} ₫`}
               </p>
             </div>
           </div>
         </Card>
       )}
 
-      {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4 mb-6">
         <Card className="p-4 border-border bg-card/50">
           <div className="flex items-center gap-3">
@@ -293,7 +387,7 @@ export function RentalHistory() {
               <Calendar className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tổng đơn hàng</p>
+              <p className="text-sm text-muted-foreground">Total orders</p>
               <p className="text-2xl font-bold">{items.length}</p>
             </div>
           </div>
@@ -305,9 +399,9 @@ export function RentalHistory() {
               <DollarSign className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tổng chi tiêu</p>
+              <p className="text-sm text-muted-foreground">Total spent</p>
               <p className="text-2xl font-bold text-accent">
-                {totalSpent.toLocaleString("vi-VN")}đ
+                {totalSpent.toLocaleString("en-US")} ₫
               </p>
             </div>
           </div>
@@ -319,7 +413,7 @@ export function RentalHistory() {
               <Clock className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Hoàn thành</p>
+              <p className="text-sm text-muted-foreground">Expired</p>
               <p className="text-2xl font-bold text-secondary">
                 {completedCount}
               </p>
@@ -328,37 +422,68 @@ export function RentalHistory() {
         </Card>
       </div>
 
-      <AlertDialog open={!!confirmBooking} onOpenChange={(open) => !open && setConfirmBooking(null)}>
-        <AlertDialogContent className="border-border bg-card">
+      <AlertDialog
+        open={!!confirmBooking}
+        onOpenChange={(open) => !open && setConfirmBooking(null)}
+      >
+        <AlertDialogContent className="border-border bg-card max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-primary" />
-              Xác nhận thanh toán
+              Confirm wallet payment
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-left">
+                <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-destructive mt-0.5" />
+                  <div>
+                    <strong>Non-refundable:</strong> After this payment is
+                    completed, amounts are not refunded to your wallet except
+                    where required by policy or support.
+                  </div>
+                </div>
+                {payRemaining != null && payRemaining > 0 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    If you do not pay in time, this order may be cancelled
+                    automatically. Approximately <strong>{payRemaining}</strong>{" "}
+                    minute(s) remaining before automatic cancellation.
+                  </p>
+                )}
+                {(payRemaining == null || payRemaining <= 0) && (
+                  <p className="text-sm text-muted-foreground">
+                    Complete payment soon to keep your reservation. You can
+                    cancel this dialog without being charged.
+                  </p>
+                )}
                 <p>
-                  Bạn sắp thanh toán đơn <strong>#{confirmBooking?.bookingId}</strong> —{" "}
+                  You are paying order{" "}
+                  <strong>#{confirmBooking?.bookingId}</strong> —{" "}
                   <strong>{confirmBooking?.specName}</strong>.
                 </p>
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Số tiền</span>
+                    <span className="text-muted-foreground">Amount</span>
                     <span className="font-bold text-primary">
-                      {price.toLocaleString("vi-VN")}đ
+                      {price.toLocaleString("en-US")} ₫
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Số dư hiện tại</span>
+                    <span className="text-muted-foreground">
+                      Current balance
+                    </span>
                     <span className="font-medium">
-                      {walletBalance === null ? "—" : `${walletBalance.toLocaleString("vi-VN")}đ`}
+                      {walletBalance === null
+                        ? "—"
+                        : `${walletBalance.toLocaleString("en-US")} ₫`}
                     </span>
                   </div>
                   {balanceAfter !== null && (
                     <div className="flex justify-between pt-2 border-t border-border">
-                      <span className="text-muted-foreground">Số dư sau thanh toán</span>
+                      <span className="text-muted-foreground">
+                        Balance after payment
+                      </span>
                       <span className="font-bold text-foreground">
-                        {balanceAfter.toLocaleString("vi-VN")}đ
+                        {balanceAfter.toLocaleString("en-US")} ₫
                       </span>
                     </div>
                   )}
@@ -366,8 +491,10 @@ export function RentalHistory() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-border">Hủy</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="border-border">
+              Cancel (no charge)
+            </AlertDialogCancel>
             <Button
               onClick={handleConfirmPay}
               disabled={payingBookingId !== null}
@@ -376,40 +503,86 @@ export function RentalHistory() {
               {payingBookingId !== null ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Đang xử lý...
+                  Processing…
                 </>
               ) : (
-                "Thanh toán"
+                "Pay with wallet"
               )}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* History List */}
+      <AlertDialog
+        open={!!cancelBookingTarget}
+        onOpenChange={(open) => !open && setCancelBookingTarget(null)}
+      >
+        <AlertDialogContent className="border-border bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Cancel this rental?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left text-sm">
+                <p>
+                  Order <strong>#{cancelBookingTarget?.bookingId}</strong> —{" "}
+                  <strong>{cancelBookingTarget?.specName}</strong> will be
+                  cancelled. You will not be charged for unpaid orders.
+                </p>
+                <p className="text-muted-foreground">
+                  If you change your mind, you can create a new booking from the
+                  home page.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="border-border">
+              Keep order
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancelRental}
+              disabled={cancellingBookingId !== null}
+            >
+              {cancellingBookingId !== null ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Cancelling…
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4" />
+                  Cancel rental
+                </>
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="space-y-4">
         {isLoading && (
           <Card className="p-12 border-border text-center">
             <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">Đang tải lịch sử thuê...</p>
+            <p className="text-muted-foreground">Loading bookings…</p>
           </Card>
         )}
 
-        {!isLoading &&
-          loadError && (
-            <Card className="p-12 border-border text-center">
-              <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">{loadError}</p>
-            </Card>
-          )}
+        {!isLoading && loadError && (
+          <Card className="p-12 border-border text-center">
+            <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">{loadError}</p>
+          </Card>
+        )}
 
         {items.map((rental) => {
           const key = (rental.status ?? "").toLowerCase();
           const isQueued = !!rental.queued;
-          const cfg =
-            isQueued
-              ? statusConfig.waiting
-              : key in statusConfig
+          const cfg = isQueued
+            ? statusConfig.waiting
+            : key in statusConfig
               ? statusConfig[key as keyof typeof statusConfig]
               : {
                   label: rental.status ?? "N/A",
@@ -418,10 +591,13 @@ export function RentalHistory() {
           const start = rental.startTime ? new Date(rental.startTime) : null;
           const end = rental.endTime ? new Date(rental.endTime) : null;
           const duration =
-            start && end ? `${Math.max(0, Math.round((end.getTime() - start.getTime()) / 36e5))} giờ` : "—";
+            start && end
+              ? `${Math.max(0, Math.round((end.getTime() - start.getTime()) / 36e5))} h`
+              : "—";
 
           const isPending = key === "pending";
-          const isActive = key === "active" || activeBookingId === rental.bookingId;
+          const isActive =
+            key === "active" || activeBookingId === rental.bookingId;
           const isPaid = key === "paid" && !isActive;
           const total = Number(rental.totalPrice ?? 0);
           const insufficient =
@@ -429,13 +605,13 @@ export function RentalHistory() {
             total > 0 &&
             walletBalance !== null &&
             walletBalance < total;
-          const canOpenPay =
-            isPending && total > 0 && !insufficient;
+          const canOpenPay = isPending && total > 0 && !insufficient;
           const canStart = isPaid && !isQueued && activeBookingId === null;
           const isBusy =
             payingBookingId === rental.bookingId ||
             startingBookingId === rental.bookingId ||
-            endingBookingId === rental.bookingId;
+            endingBookingId === rental.bookingId ||
+            cancellingBookingId === rental.bookingId;
 
           return (
             <Card
@@ -449,29 +625,33 @@ export function RentalHistory() {
                     <Badge className={cfg.className}>{cfg.label}</Badge>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <Cpu className="w-4 h-4 text-primary" />
-                    <span>PC: {rental.pcId ?? "—"}</span>
-                  </div>
-
                   {isQueued && (
                     <p className="text-sm text-orange-400 mb-2">
-                      Đang chờ cấp máy từ pool gói subscription
-                      {rental.queuePosition ? ` - vị trí #${rental.queuePosition}` : ""}.
+                      Waiting for a machine from the subscription pool
+                      {rental.queuePosition
+                        ? ` — queue position #${rental.queuePosition}`
+                        : ""}
+                      .
                     </p>
                   )}
 
                   <div className="flex flex-wrap gap-4 text-sm">
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Ngày thuê:</span>
+                      <span className="text-muted-foreground">Start:</span>
                       <span className="font-medium">
-                        {start ? start.toLocaleDateString("vi-VN") : "—"}
+                        {start ? start.toLocaleString("en-US") : "—"}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Thời gian:</span>
+                      <span className="text-muted-foreground">End:</span>
+                      <span className="font-medium">
+                        {end ? end.toLocaleString("en-US") : "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                      <span className="text-muted-foreground">Duration:</span>
                       <span className="font-medium">{duration}</span>
                     </div>
                   </div>
@@ -480,9 +660,8 @@ export function RentalHistory() {
                 <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-end gap-3 lg:min-w-[200px]">
                   <div className="flex flex-col items-end gap-1">
                     <div className="text-2xl font-bold text-primary">
-                      {total.toLocaleString("vi-VN")}đ
+                      {total.toLocaleString("en-US")} ₫
                     </div>
-                    <div className="text-xs text-muted-foreground">Mã: {rental.bookingId}</div>
                   </div>
 
                   {isPending && (
@@ -490,18 +669,22 @@ export function RentalHistory() {
                       {canOpenPay ? (
                         <Button
                           onClick={() => setConfirmBooking(rental)}
-                          disabled={payingBookingId !== null || startingBookingId !== null || endingBookingId !== null}
+                          disabled={
+                            payingBookingId !== null ||
+                            startingBookingId !== null ||
+                            endingBookingId !== null
+                          }
                           className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                         >
                           {payingBookingId === rental.bookingId ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Đang xử lý...
+                              Processing…
                             </>
                           ) : (
                             <>
                               <Wallet className="w-4 h-4 mr-2" />
-                              Thanh toán bằng ví
+                              Pay with wallet
                             </>
                           )}
                         </Button>
@@ -509,20 +692,35 @@ export function RentalHistory() {
                         <>
                           <Button disabled className="w-full opacity-60">
                             <Wallet className="w-4 h-4 mr-2" />
-                            Không đủ số dư
+                            Insufficient balance
                           </Button>
                           <Link
                             to="/account/top-up"
                             className="text-center text-sm text-primary hover:underline"
                           >
-                            Nạp tiền vào ví
+                            Top up wallet
                           </Link>
                         </>
                       ) : (
                         <p className="text-xs text-muted-foreground text-right sm:text-left">
-                          Không thể thanh toán đơn này (số tiền không hợp lệ).
+                          This order cannot be paid (invalid amount).
                         </p>
                       )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setCancelBookingTarget(rental)}
+                        disabled={
+                          payingBookingId !== null ||
+                          startingBookingId !== null ||
+                          endingBookingId !== null ||
+                          cancellingBookingId !== null
+                        }
+                        className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Cancel rental
+                      </Button>
                     </div>
                   )}
 
@@ -536,23 +734,26 @@ export function RentalHistory() {
                         {startingBookingId === rental.bookingId ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Đang vào session...
+                            Starting…
                           </>
                         ) : (
                           <>
                             <Play className="w-4 h-4 mr-2" />
-                            Start Session
+                            Start session
                           </>
                         )}
                       </Button>
-                      {!canStart && activeBookingId !== null && activeBookingId !== rental.bookingId && (
-                        <p className="text-xs text-muted-foreground text-right sm:text-left">
-                          Bạn đang có session khác đang hoạt động.
-                        </p>
-                      )}
+                      {!canStart &&
+                        activeBookingId !== null &&
+                        activeBookingId !== rental.bookingId && (
+                          <p className="text-xs text-muted-foreground text-right sm:text-left">
+                            Another session is already active.
+                          </p>
+                        )}
                       {!canStart && isQueued && (
                         <p className="text-xs text-orange-400 text-right sm:text-left">
-                          Đơn đang trong hàng chờ. Hệ thống sẽ tự gán máy khi có slot trống.
+                          Order is queued; a machine will be assigned when a
+                          slot is free.
                         </p>
                       )}
                     </div>
@@ -568,12 +769,12 @@ export function RentalHistory() {
                         {endingBookingId === rental.bookingId ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Đang kết thúc...
+                            Ending…
                           </>
                         ) : (
                           <>
                             <Square className="w-4 h-4 mr-2" />
-                            End Session
+                            End session
                           </>
                         )}
                       </Button>
@@ -591,9 +792,9 @@ export function RentalHistory() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
             <Calendar className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-xl font-bold mb-2">Chưa có lịch sử thuê</h3>
+          <h3 className="text-xl font-bold mb-2">No bookings yet</h3>
           <p className="text-muted-foreground">
-            Bạn chưa có đơn hàng nào. Hãy bắt đầu thuê máy tính ngay!
+            Choose a subscription plan on the home page to get started.
           </p>
         </Card>
       )}

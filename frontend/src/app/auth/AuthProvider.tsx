@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPost } from "../api/http";
 import { clearAccessToken, getAccessToken, setAccessToken } from "../api/authStorage";
-import type { AuthResponse, ProfileResponse } from "./types";
+import type { AuthResponse, ProfileResponse, RegisterResponse } from "./types";
 
 type AuthContextValue = {
   token: string | null;
@@ -11,7 +11,8 @@ type AuthContextValue = {
   isAdmin: boolean;
   refreshMe: () => Promise<void>;
   login: (args: { email: string; password: string }) => Promise<void>;
-  register: (args: { fullName: string; email: string; phone: string; password: string }) => Promise<void>;
+  register: (args: { fullName: string; email: string; phone: string; password: string }) => Promise<RegisterResponse>;
+  verifyEmail: (args: { email: string; code: string }) => Promise<void>;
   logout: () => void;
 };
 
@@ -56,14 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async ({ fullName, email, phone, password }: { fullName: string; email: string; phone: string; password: string }) => {
-      await apiPost<{ userId: number; email: string; message: string }, { fullName: string; email: string; phone: string; password: string }>(
+      return apiPost<RegisterResponse, { fullName: string; email: string; phone: string; password: string }>(
         "/auth/register",
         { fullName, email, phone, password },
       );
-      // Registration does not return token; user must login.
     },
     [],
   );
+
+  const verifyEmail = useCallback(async ({ email, code }: { email: string; code: string }) => {
+    await apiPost<string, { email: string; code: string }>("/auth/verify-email", { email, code });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,9 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshMe,
       login,
       register,
+      verifyEmail,
       logout,
     };
-  }, [token, user, isLoading, refreshMe, login, register, logout]);
+  }, [token, user, isLoading, refreshMe, login, register, verifyEmail, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -15,12 +15,6 @@ export function TopUp() {
   const [balance, setBalance] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-
-
-
-
-
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -45,10 +39,10 @@ export function TopUp() {
     if (isSubmitting) return;
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      toast.error("Số tiền không hợp lệ");
+      toast.error("Enter a valid amount");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       const res = await apiPost<
@@ -57,12 +51,12 @@ export function TopUp() {
       >("/wallet/top-up", { amount: parsed });
 
       if (res.approvalUrl) {
-        toast.message(res.message || "Vui lòng hoàn tất thanh toán", {
-          description: "Đang mở trang thanh toán...",
+        toast.message(res.message || "Complete payment in PayPal", {
+          description: "Opening PayPal…",
         });
         window.open(res.approvalUrl, "_blank", "noopener,noreferrer");
       } else {
-        toast.success(res.message || "Nạp tiền thành công");
+        toast.success(res.message || "Top-up successful");
       }
 
       const wallet = await apiGet<{ walletId: number; balance: number }>("/wallet");
@@ -72,7 +66,7 @@ export function TopUp() {
       window.setTimeout(() => setShowSuccess(false), 2500);
       setAmount("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể nạp tiền");
+      toast.error(e instanceof Error ? e.message : "Top-up failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -82,20 +76,19 @@ export function TopUp() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-3xl font-bold mb-2">
-          Nạp Tiền
+          Top up
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            {" "}Vào Ví
+            {" "}
+            wallet
           </span>
         </h2>
         <p className="text-muted-foreground">
-          Nạp tiền vào ví để thanh toán dịch vụ thuê máy
+          Add funds to pay subscription bookings from your balance
         </p>
       </div>
 
-      {/* Success Message */}
       {showSuccess && (
         <Card className="p-4 bg-accent/10 border-accent">
           <div className="flex items-center gap-3">
@@ -103,9 +96,9 @@ export function TopUp() {
               <Check className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h4 className="font-bold text-accent">Nạp tiền thành công!</h4>
+              <h4 className="font-bold text-accent">Top-up recorded</h4>
               <p className="text-sm text-muted-foreground">
-                Số dư ví của bạn đã được cập nhật
+                Your wallet balance has been refreshed
               </p>
             </div>
           </div>
@@ -113,99 +106,90 @@ export function TopUp() {
       )}
 
       <div className="space-y-6">
-        {/* Amount Input */}
         <Card className="p-6 border-border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-primary/20 p-2 rounded-lg">
-                <DollarSign className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold">Số Tiền Nạp</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-primary/20 p-2 rounded-lg">
+              <DollarSign className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold">Amount (USD)</h3>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Enter amount</Label>
+              <Input
+                id="amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                className="text-2xl font-bold bg-input-background border-border h-14"
+              />
+              <p className="text-sm text-muted-foreground">
+                Checkout total: ${amountInUSD} USD
+              </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Nhập số tiền (USD)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  className="text-2xl font-bold bg-input-background border-border h-14"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Sẽ thanh toán: ${amountInUSD} USD
-                </p>
-              </div>
-
-              {/* Quick Amount Buttons */}
-              <div>
-                <Label className="mb-2 block">Chọn nhanh</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {quickAmounts.map((value) => (
-                    <Button
-                      key={value}
-                      variant="outline"
-                      onClick={() => handleQuickAmount(value)}
-                      className={`border-border hover:border-primary ${
-                        amount === String(value) ? "border-primary bg-primary/10" : ""
-                      }`}
-                    >
-                      ${value}
-                    </Button>
-                  ))}
-                </div>
+            <div>
+              <Label className="mb-2 block">Quick picks</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {quickAmounts.map((value) => (
+                  <Button
+                    key={value}
+                    variant="outline"
+                    type="button"
+                    onClick={() => handleQuickAmount(value)}
+                    className={`border-border hover:border-primary ${
+                      amount === String(value) ? "border-primary bg-primary/10" : ""
+                    }`}
+                  >
+                    ${value}
+                  </Button>
+                ))}
               </div>
             </div>
-
+          </div>
         </Card>
 
-        {/* Current Balance */}
         <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
-            <div className="flex items-center gap-3 mb-2">
-              <Wallet className="w-5 h-5 text-primary" />
-              <span className="text-muted-foreground">Số dư hiện tại</span>
-            </div>
-            <p className="text-3xl font-bold text-primary">
-              {balance === null ? "—" : `$${balance.toLocaleString("en-US")}`}
-            </p>
-
+          <div className="flex items-center gap-3 mb-2">
+            <Wallet className="w-5 h-5 text-primary" />
+            <span className="text-muted-foreground">Current balance (display)</span>
+          </div>
+          <p className="text-3xl font-bold text-primary">
+            {balance === null ? "—" : `$${balance.toLocaleString("en-US")}`}
+          </p>
         </Card>
-        
-        {/* Action Button */}
+
         <Button
           onClick={handleTopUp}
           disabled={!amount || isSubmitting}
           className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
         >
           <CreditCard className="w-5 h-5 mr-2" />
-          {isSubmitting ? "Đang xử lý..." : "Thanh Toán Qua PayPal"}
+          {isSubmitting ? "Processing…" : "Pay with PayPal"}
         </Button>
       </div>
-      {/* Info Card */}
+
       <Card className="p-6 border-border bg-muted/30">
         <h4 className="font-bold mb-3 flex items-center gap-2">
           <span className="bg-primary/20 p-1 rounded">
             <CreditCard className="w-4 h-4 text-primary" />
           </span>
-          Lưu ý khi nạp tiền
+          Top-up notes
         </h4>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li className="flex gap-2">
             <span className="text-primary">•</span>
-            <span>Thời gian xử lý: 5-15 phút sau khi thanh toán thành công</span>
+            <span>Settlement usually appears within 5–15 minutes after PayPal approves.</span>
           </li>
           <li className="flex gap-2">
             <span className="text-primary">•</span>
-            <span>Phí giao dịch PayPal áp dụng theo chính sách của PayPal</span>
+            <span>PayPal fees follow PayPal&apos;s own rules.</span>
           </li>
           <li className="flex gap-2">
             <span className="text-primary">•</span>
-            <span>Vui lòng liên hệ support nếu có bất kỳ vấn đề gì</span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-primary">•</span>
-            <span>Liên hệ support nếu không nhận được tiền sau 30 phút</span>
+            <span>Contact support if the balance does not update after 30 minutes.</span>
           </li>
         </ul>
       </Card>

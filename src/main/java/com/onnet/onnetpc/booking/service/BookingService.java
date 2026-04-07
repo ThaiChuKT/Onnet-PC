@@ -302,6 +302,22 @@ public class BookingService {
     }
 
     @Transactional
+    public BookingResponse cancelBooking(String email, Long bookingId) {
+        User user = findUserByEmail(email);
+        Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.pending) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Only unpaid orders can be cancelled");
+        }
+
+        booking.setStatus(BookingStatus.cancelled);
+        booking.setUpdatedAt(Instant.now());
+        bookingRepository.save(booking);
+        return toBookingResponse(booking);
+    }
+
+    @Transactional
     public ReviewSubmitResponse submitReview(String email, Long bookingId, CreateReviewRequest request) {
         User user = findUserByEmail(email);
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, user.getId())

@@ -4,6 +4,12 @@ export type AuthResponse = {
   expiresAt: string;
 };
 
+export type RegisterResponse = {
+  userId: number;
+  email: string;
+  message: string;
+};
+
 export type ProfileResponse = {
   id: number;
   fullName: string;

@@ -40,22 +40,22 @@ const statusConfig: Record<
   { label: string; className: string; icon: typeof Clock }
 > = {
   pending: {
-    label: "Chờ xử lý",
+    label: "Pending",
     className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
     icon: Clock,
   },
   active: {
-    label: "Đang hoạt động",
+    label: "Active",
     className: "bg-accent/20 text-accent border-accent/50",
     icon: CheckCircle,
   },
   completed: {
-    label: "Hoàn thành",
+    label: "Expired",
     className: "bg-blue-500/20 text-blue-500 border-blue-500/50",
     icon: CheckCircle,
   },
   cancelled: {
-    label: "Đã hủy",
+    label: "Cancelled",
     className: "bg-destructive/20 text-destructive border-destructive/50",
     icon: XCircle,
   },
@@ -72,7 +72,7 @@ export function OrderManagement() {
       const page = await apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", { page: 0, size: 50 });
       setOrders(page.content ?? []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể tải danh sách đơn");
+      toast.error(e instanceof Error ? e.message : "Could not load orders");
     } finally {
       setIsLoading(false);
     }
@@ -85,11 +85,11 @@ export function OrderManagement() {
   const handleStatusChange = async (bookingId: number, status: string) => {
     try {
       await apiPatch<AdminBookingItemResponse, { status: string }>(`/admin/bookings/${bookingId}/status`, { status });
-      toast.success("Cập nhật trạng thái thành công");
+      toast.success("Status updated");
       setSelectedOrder(null);
       await loadOrders();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể cập nhật trạng thái");
+      toast.error(e instanceof Error ? e.message : "Could not update status");
     }
   };
 
@@ -113,7 +113,7 @@ export function OrderManagement() {
               <ShoppingCart className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tổng đơn</p>
+              <p className="text-sm text-muted-foreground">Total orders</p>
               <p className="text-2xl font-bold">{stats.total}</p>
             </div>
           </div>
@@ -125,7 +125,7 @@ export function OrderManagement() {
               <Clock className="w-5 h-5 text-yellow-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Chờ xử lý</p>
+              <p className="text-sm text-muted-foreground">Pending</p>
               <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export function OrderManagement() {
               <CheckCircle className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Đang hoạt động</p>
+              <p className="text-sm text-muted-foreground">Active</p>
               <p className="text-2xl font-bold text-accent">{stats.active}</p>
             </div>
           </div>
@@ -149,7 +149,7 @@ export function OrderManagement() {
               <CheckCircle className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Hoàn thành</p>
+              <p className="text-sm text-muted-foreground">Expired</p>
               <p className="text-2xl font-bold text-blue-500">{stats.completed}</p>
             </div>
           </div>
@@ -161,7 +161,7 @@ export function OrderManagement() {
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Doanh thu</p>
+              <p className="text-sm text-muted-foreground">Revenue</p>
               <p className="text-lg font-bold text-primary">
                 {(stats.totalRevenue / 1_000_000).toFixed(1)}M
               </p>
@@ -174,7 +174,7 @@ export function OrderManagement() {
         {isLoading && (
           <Card className="p-12 border-border text-center">
             <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Đang tải danh sách đơn...</p>
+            <p className="text-muted-foreground">Loading orders…</p>
           </Card>
         )}
 
