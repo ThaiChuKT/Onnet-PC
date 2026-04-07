@@ -11,6 +11,14 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import {
   Calendar,
   Clock,
   DollarSign,
@@ -21,6 +29,7 @@ import {
   CreditCard,
   AlertTriangle,
   XCircle,
+  RotateCcw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -29,6 +38,7 @@ import { toast } from "sonner";
 
 type BookingHistoryItemResponse = {
   bookingId: number;
+  specId: number | null;
   pcId: number | null;
   specName: string;
   queued: boolean;
@@ -39,7 +49,15 @@ type BookingHistoryItemResponse = {
   totalPrice: number;
   status: string;
   remainingMinutes: number | null;
+  pendingExpiresAt: string | null;
   createdAt: string;
+};
+
+type SubscriptionPlanPriceResponse = {
+  id: number;
+  planName: string;
+  durationDays: number;
+  price: number;
 };
 
 type BookingPaymentResponse = {
@@ -88,6 +106,11 @@ type BookingResponseDto = {
   status: string;
 };
 
+type RenewTarget = {
+  booking: BookingHistoryItemResponse;
+  plans: SubscriptionPlanPriceResponse[];
+};
+
 type PageResponse<T> = {
   content: T[];
   totalElements: number;
@@ -127,6 +150,7 @@ const POLL_MS = 15_000;
 
 export function RentalHistory() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -143,6 +167,10 @@ export function RentalHistory() {
   const [cancellingBookingId, setCancellingBookingId] = useState<number | null>(
     null,
   );
+  const [renewTarget, setRenewTarget] = useState<RenewTarget | null>(null);
+  const [renewLoading, setRenewLoading] = useState(false);
+  const [renewPlanId, setRenewPlanId] = useState<number | null>(null);
+  const [renewingBookingId, setRenewingBookingId] = useState<number | null>(null);
 
   const loadData = useCallback(async (mode: "full" | "silent" = "full") => {
     if (mode === "full") {
@@ -192,6 +220,13 @@ export function RentalHistory() {
   }, [loadData]);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible") loadData("silent");
     };
@@ -221,6 +256,29 @@ export function RentalHistory() {
         .reduce((sum, i) => sum + Number(i.totalPrice ?? 0), 0),
     [items],
   );
+
+  const formatCountdown = (endIso: string | null) => {
+    if (!endIso) return null;
+    const remainingMs = new Date(endIso).getTime() - now;
+    if (!Number.isFinite(remainingMs)) return null;
+    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins.toString().padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`;
+    }
+    return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+  };
+
+  const formatDurationLabel = (days: number | null | undefined) => {
+    if (!days || days <= 0) return "Package";
+    if (days === 7) return "Weekly";
+    if (days === 30) return "Monthly";
+    if (days === 365) return "Yearly";
+    return `${days} days`;
+  };
 
   const handleConfirmPay = async () => {
     if (!confirmBooking || payingBookingId !== null) return;
@@ -317,6 +375,52 @@ export function RentalHistory() {
       toast.error(e instanceof Error ? e.message : "Could not cancel rental");
     } finally {
       setCancellingBookingId(null);
+    }
+  };
+
+  const handleOpenRenew = async (booking: BookingHistoryItemResponse) => {
+    if (!booking.specId) {
+      toast.error("Missing machine group for renew");
+      return;
+    }
+    setRenewLoading(true);
+    setRenewPlanId(null);
+    try {
+      const plans = await apiGet<SubscriptionPlanPriceResponse[]>(
+        `/pcs/specs/${booking.specId}/plans`,
+      );
+      setRenewTarget({ booking, plans });
+      if (plans.length > 0) {
+        setRenewPlanId(plans[0].id);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load renew plans");
+    } finally {
+      setRenewLoading(false);
+    }
+  };
+
+  const handleConfirmRenew = async () => {
+    if (!renewTarget || !renewPlanId || renewingBookingId !== null) return;
+    const { booking } = renewTarget;
+    setRenewingBookingId(booking.bookingId);
+    try {
+      await apiPost<BookingResponseDto, { specId: number; planId: number; quantity: number }>(
+        "/bookings/subscription",
+        {
+          specId: booking.specId ?? 0,
+          planId: renewPlanId,
+          quantity: 1,
+        },
+      );
+      toast.success("Renewal order created");
+      setRenewTarget(null);
+      setRenewPlanId(null);
+      await loadData("silent");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not renew booking");
+    } finally {
+      setRenewingBookingId(null);
     }
   };
 
@@ -562,6 +666,120 @@ export function RentalHistory() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog
+        open={renewLoading || !!renewTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenewTarget(null);
+            setRenewPlanId(null);
+            setRenewLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="border-border bg-card max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-primary" />
+              Renew package
+            </DialogTitle>
+            <DialogDescription>
+              Select a weekly, monthly, or yearly plan to create a new booking
+              for the same machine group.
+            </DialogDescription>
+          </DialogHeader>
+
+          {renewLoading && !renewTarget ? (
+            <div className="py-10 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading plans…
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                <p className="font-medium mb-1">
+                  {renewTarget?.booking.specName} renewal options
+                </p>
+                <p className="text-muted-foreground">
+                  Order <strong>#{renewTarget?.booking.bookingId}</strong> will be renewed as a new
+                  subscription booking.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                {renewTarget?.plans.map((plan) => {
+                  const selected = renewPlanId === plan.id;
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => setRenewPlanId(plan.id)}
+                      className={`text-left rounded-lg border p-4 transition-all ${
+                        selected
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">{formatDurationLabel(plan.durationDays)}</p>
+                          <p className="text-sm text-muted-foreground">{plan.planName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-primary">
+                            {Number(plan.price ?? 0).toLocaleString("en-US")} ₫
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {plan.durationDays} day(s)
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {renewTarget && renewTarget.plans.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No active subscription plans are configured for this machine group.
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenewTarget(null);
+                setRenewPlanId(null);
+              }}
+              className="border-border"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleConfirmRenew}
+              disabled={
+                renewLoading ||
+                !renewTarget ||
+                !renewPlanId ||
+                renewingBookingId !== null
+              }
+              className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+            >
+              {renewingBookingId !== null ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating renewal…
+                </>
+              ) : (
+                "Confirm renewal"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {isLoading && (
           <Card className="p-12 border-border text-center">
@@ -594,11 +812,15 @@ export function RentalHistory() {
             start && end
               ? `${Math.max(0, Math.round((end.getTime() - start.getTime()) / 36e5))} h`
               : "—";
+          const pendingCountdown = rental.pendingExpiresAt
+            ? formatCountdown(rental.pendingExpiresAt)
+            : null;
 
           const isPending = key === "pending";
           const isActive =
             key === "active" || activeBookingId === rental.bookingId;
           const isPaid = key === "paid" && !isActive;
+          const isCompleted = key === "completed";
           const total = Number(rental.totalPrice ?? 0);
           const insufficient =
             isPending &&
@@ -635,26 +857,35 @@ export function RentalHistory() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Start:</span>
-                      <span className="font-medium">
-                        {start ? start.toLocaleString("en-US") : "—"}
-                      </span>
+                  {isPending && pendingCountdown && (
+                    <p className="text-sm text-amber-500 mb-2">
+                      Auto-cancel in <strong>about {pendingCountdown}</strong> if you
+                      do not pay yet.
+                    </p>
+                  )}
+
+                  {!isPending && (
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Start:</span>
+                        <span className="font-medium">
+                          {start ? start.toLocaleString("en-US") : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">End:</span>
+                        <span className="font-medium">
+                          {end ? end.toLocaleString("en-US") : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                        <span className="text-muted-foreground">Duration:</span>
+                        <span className="font-medium">{duration}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">End:</span>
-                      <span className="font-medium">
-                        {end ? end.toLocaleString("en-US") : "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                      <span className="text-muted-foreground">Duration:</span>
-                      <span className="font-medium">{duration}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-end gap-3 lg:min-w-[200px]">
@@ -756,6 +987,31 @@ export function RentalHistory() {
                           slot is free.
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {isCompleted && (
+                    <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
+                      <Button
+                        onClick={() => handleOpenRenew(rental)}
+                        disabled={renewLoading || renewingBookingId !== null}
+                        className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                      >
+                        {renewLoading && renewTarget?.booking.bookingId === rental.bookingId ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Loading plans…
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Renew package
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-right sm:text-left">
+                        Renew with weekly, monthly, or yearly plans.
+                      </p>
                     </div>
                   )}
 

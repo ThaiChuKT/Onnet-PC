@@ -134,6 +134,14 @@ public class PcService {
         return new SubscriptionPlanPriceResponse(plan.getId(), plan.getPlanName(), plan.getDurationDays(), plan.getPrice());
     }
 
+    @Transactional(readOnly = true)
+    public List<SubscriptionPlanPriceResponse> getSubscriptionPlansBySpecId(Long specId) {
+        return subscriptionPlanRepository.findBySpecIdAndActiveTrueOrderByDurationDaysAsc(specId)
+            .stream()
+            .map(this::toPlanResponse)
+            .toList();
+    }
+
     private ReviewSummaryResponse toReviewResponse(Review review) {
         Integer rating = review.getRating() == null ? null : review.getRating().intValue();
         return new ReviewSummaryResponse(rating, review.getComment(), review.getCreatedAt());

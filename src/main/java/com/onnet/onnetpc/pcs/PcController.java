@@ -3,8 +3,10 @@ package com.onnet.onnetpc.pcs;
 import com.onnet.onnetpc.common.response.ApiResponse;
 import com.onnet.onnetpc.pcs.dto.MachineDetailResponse;
 import com.onnet.onnetpc.pcs.dto.MachineListItemResponse;
+import com.onnet.onnetpc.pcs.dto.SubscriptionPlanPriceResponse;
 import com.onnet.onnetpc.pcs.service.PcService;
 import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,5 +56,10 @@ public class PcController {
     @GetMapping("/{pcId}")
     public ApiResponse<MachineDetailResponse> getMachineDetail(@PathVariable Long pcId) {
         return ApiResponse.success(pcService.getMachineDetail(pcId));
+    }
+
+    @GetMapping("/specs/{specId}/plans")
+    public ApiResponse<List<SubscriptionPlanPriceResponse>> getSubscriptionPlans(@PathVariable Long specId) {
+        return ApiResponse.success(pcService.getSubscriptionPlansBySpecId(specId));
     }
 }

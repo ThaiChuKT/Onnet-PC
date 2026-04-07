@@ -46,6 +46,7 @@ import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +65,7 @@ public class BookingService {
     private final ReviewRepository reviewRepository;
     private final BookingEmailService bookingEmailService;
     private final SessionQueueRepository sessionQueueRepository;
+    private final long pendingTimeoutMinutes;
 
     public BookingService(
         BookingRepository bookingRepository,
@@ -77,7 +79,8 @@ public class BookingService {
         WalletTransactionRepository walletTransactionRepository,
         ReviewRepository reviewRepository,
         BookingEmailService bookingEmailService,
-        SessionQueueRepository sessionQueueRepository
+        SessionQueueRepository sessionQueueRepository,
+        @Value("${app.booking.pending-timeout-minutes:15}") long pendingTimeoutMinutes
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
@@ -91,6 +94,7 @@ public class BookingService {
         this.reviewRepository = reviewRepository;
         this.bookingEmailService = bookingEmailService;
         this.sessionQueueRepository = sessionQueueRepository;
+        this.pendingTimeoutMinutes = pendingTimeoutMinutes;
     }
 
     @Transactional
@@ -473,8 +477,14 @@ public class BookingService {
 
     private BookingHistoryItemResponse toHistoryItem(Booking booking) {
         Long remainingMinutes = null;
+        Instant pendingExpiresAt = null;
         if (booking.getStatus() == BookingStatus.paid && booking.getEndTime() != null && booking.getEndTime().isAfter(Instant.now())) {
             remainingMinutes = Duration.between(Instant.now(), booking.getEndTime()).toMinutes();
+        } else if (booking.getStatus() == BookingStatus.pending && booking.getCreatedAt() != null) {
+            Instant now = Instant.now();
+            Instant createdExpiry = booking.getCreatedAt().plus(Duration.ofMinutes(pendingTimeoutMinutes));
+            Instant nowExpiry = now.plus(Duration.ofMinutes(pendingTimeoutMinutes));
+            pendingExpiresAt = createdExpiry.isAfter(nowExpiry) ? nowExpiry : createdExpiry;
         }
 
         SessionQueue waitingQueue = sessionQueueRepository
@@ -483,6 +493,7 @@ public class BookingService {
 
         return new BookingHistoryItemResponse(
             booking.getId(),
+            booking.getSpec() == null ? null : booking.getSpec().getId(),
             booking.getPc() == null ? null : booking.getPc().getId(),
             booking.getSpec() == null ? null : booking.getSpec().getSpecName(),
             waitingQueue != null,
@@ -493,6 +504,7 @@ public class BookingService {
             booking.getTotalPrice(),
             booking.getStatus() == null ? null : booking.getStatus().name(),
             remainingMinutes,
+            pendingExpiresAt,
             booking.getCreatedAt()
         );
     }

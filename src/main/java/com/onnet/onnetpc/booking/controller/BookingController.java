@@ -55,7 +55,7 @@ public class BookingController {
     @PostMapping("/rent")
     public ApiResponse<RentMachineResponse> rentMachine(
         Authentication authentication,
-        @Valid @RequestBody RentMachineRequest request
+        @RequestBody RentMachineRequest request
     ) {
         return ApiResponse.success(bookingService.rentMachine(authentication.getName(), request));
     }

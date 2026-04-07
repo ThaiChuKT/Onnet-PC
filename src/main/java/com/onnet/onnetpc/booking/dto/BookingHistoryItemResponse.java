@@ -5,6 +5,7 @@ import java.time.Instant;
 
 public record BookingHistoryItemResponse(
     Long bookingId,
+    Long specId,
     Long pcId,
     String specName,
     boolean queued,
@@ -15,6 +16,7 @@ public record BookingHistoryItemResponse(
     BigDecimal totalPrice,
     String status,
     Long remainingMinutes,
+    Instant pendingExpiresAt,
     Instant createdAt
 ) {
 }
