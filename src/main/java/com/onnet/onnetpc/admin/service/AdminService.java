@@ -25,6 +25,7 @@ import com.onnet.onnetpc.pcs.repository.ReviewRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import com.onnet.onnetpc.wallet.WalletTransaction;
+import com.onnet.onnetpc.wallet.WalletTransactionType;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
 import java.time.Instant;
 import java.util.List;
@@ -120,6 +121,14 @@ public class AdminService {
             .stream()
             .map((tx) -> toAdminUserPayment(user, tx))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserPaymentItemResponse> listTopUpPayments(int page, int size) {
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return walletTransactionRepository
+            .findByTypeOrderByCreatedAtDesc(WalletTransactionType.top_up, pageable)
+            .map(this::toAdminUserPayment);
     }
 
     @Transactional(readOnly = true)
@@ -305,6 +314,22 @@ public class AdminService {
             user.getId(),
             user.getEmail(),
             user.getFullName(),
+            tx.getAmount(),
+            tx.getType() == null ? null : tx.getType().name(),
+            tx.getReferenceId(),
+            tx.getNote(),
+            tx.getCreatedAt()
+        );
+    }
+
+    private AdminUserPaymentItemResponse toAdminUserPayment(WalletTransaction tx) {
+        User user = tx.getWallet() == null ? null : tx.getWallet().getUser();
+        return new AdminUserPaymentItemResponse(
+            tx.getId(),
+            tx.getWallet() == null ? null : tx.getWallet().getId(),
+            user == null ? null : user.getId(),
+            user == null ? null : user.getEmail(),
+            user == null ? null : user.getFullName(),
             tx.getAmount(),
             tx.getType() == null ? null : tx.getType().name(),
             tx.getReferenceId(),

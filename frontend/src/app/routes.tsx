@@ -15,6 +15,7 @@ import { ComputerList } from "./components/dashboard/ComputerList";
 import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
 import { OrderManagement } from "./components/dashboard/OrderManagement";
+import { InvoiceManagement } from "./components/dashboard/InvoiceManagement";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { AdminRoute } from "./auth/AdminRoute";
 import { WalletCheckoutPage } from "./pages/WalletCheckoutPage";
@@ -96,7 +97,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: ComputerList,
+        Component: RevenueStats,
       },
       {
         path: "computers",
@@ -105,6 +106,10 @@ export const router = createBrowserRouter([
       {
         path: "orders",
         Component: OrderManagement,
+      },
+      {
+        path: "invoices",
+        Component: InvoiceManagement,
       },
       {
         path: "accounts",

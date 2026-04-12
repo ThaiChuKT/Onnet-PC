@@ -9,8 +9,8 @@ type AuthContextValue = {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  refreshMe: () => Promise<void>;
-  login: (args: { email: string; password: string }) => Promise<void>;
+  refreshMe: () => Promise<ProfileResponse | null>;
+  login: (args: { email: string; password: string }) => Promise<ProfileResponse>;
   register: (args: { fullName: string; email: string; phone: string; password: string }) => Promise<RegisterResponse>;
   verifyEmail: (args: { email: string; code: string }) => Promise<void>;
   logout: () => void;
@@ -39,10 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentToken = getAccessToken();
     if (!currentToken) {
       setUser(null);
-      return;
+      return null;
     }
     const me = await apiGet<ProfileResponse>("/users/me");
     setUser(me);
+    return me;
   }, []);
 
   const login = useCallback(async ({ email, password }: { email: string; password: string }) => {
@@ -52,7 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     setAccessToken(auth.accessToken);
     setToken(auth.accessToken);
-    await refreshMe();
+    const me = await refreshMe();
+    if (!me) {
+      throw new Error("Unable to load profile after login");
+    }
+    return me;
   }, [refreshMe]);
 
   const register = useCallback(

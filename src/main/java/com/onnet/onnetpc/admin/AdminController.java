@@ -63,6 +63,14 @@ public class AdminController {
         return ApiResponse.success(adminService.listUserPayments(userId));
     }
 
+    @GetMapping("/payments/topups")
+    public ApiResponse<Page<AdminUserPaymentItemResponse>> listTopUpPayments(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.success(adminService.listTopUpPayments(page, size));
+    }
+
     @GetMapping("/pcs")
     public ApiResponse<Page<AdminPcItemResponse>> listPcs(
         @RequestParam(required = false) String status,

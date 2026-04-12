@@ -14,6 +14,7 @@ import { Monitor, Plus, Edit, Trash2, Search, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 interface Computer {
   pcId: number;
@@ -55,6 +56,7 @@ type UpdatePcRequest = Partial<CreatePcRequest>;
 export function ComputerList() {
   const [computers, setComputers] = useState<Computer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingComputer, setEditingComputer] = useState<Computer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,18 +90,24 @@ export function ComputerList() {
 
   const filteredComputers = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return computers;
+    const selectedStatus = statusFilter.toLowerCase();
     return computers.filter((pc) => {
-      return (
+      const matchesSearch =
+        !q ||
         String(pc.pcId).includes(q) ||
         pc.specName.toLowerCase().includes(q) ||
         pc.cpu.toLowerCase().includes(q) ||
         pc.gpu.toLowerCase().includes(q) ||
         pc.location.toLowerCase().includes(q) ||
-        pc.status.toLowerCase().includes(q)
-      );
+        pc.status.toLowerCase().includes(q);
+      const normalized = (pc.status ?? "").toLowerCase();
+      const matchesStatus =
+        selectedStatus === "all" ||
+        normalized === selectedStatus ||
+        (selectedStatus === "rented" && normalized !== "available");
+      return matchesSearch && matchesStatus;
     });
-  }, [computers, searchTerm]);
+  }, [computers, searchTerm, statusFilter]);
 
   const handleAdd = async () => {
     try {
@@ -235,12 +243,23 @@ export function ComputerList() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm theo tên, ID, mã kết nối..."
+            placeholder="Tìm kiếm theo tên, ID, CPU, GPU..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
           />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[220px] bg-input-background border-border">
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả trạng thái</SelectItem>
+            <SelectItem value="available">Máy trống</SelectItem>
+            <SelectItem value="rented">Đang cho thuê</SelectItem>
+            <SelectItem value="maintenance">Bảo trì</SelectItem>
+          </SelectContent>
+        </Select>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">

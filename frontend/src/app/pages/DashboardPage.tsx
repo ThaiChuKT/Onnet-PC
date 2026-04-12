@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { Monitor, Users, TrendingUp, ShoppingCart } from "lucide-react";
+import { Monitor, Users, TrendingUp, ShoppingCart, ReceiptText } from "lucide-react";
 
 const menuItems = [
   {
@@ -13,6 +13,11 @@ const menuItems = [
     path: "/dashboard/orders",
     label: "Orders",
     icon: ShoppingCart,
+  },
+  {
+    path: "/dashboard/invoices",
+    label: "Invoices",
+    icon: ReceiptText,
   },
   {
     path: "/dashboard/accounts",
@@ -55,7 +60,9 @@ export function DashboardPage() {
                 <h2 className="text-lg font-bold mb-4 px-2">Menu</h2>
                 <nav className="space-y-1">
                   {menuItems.map((item) => {
-                    const isActive = location.pathname === item.path || (location.pathname === "/dashboard" && item.path === "/dashboard/computers");
+                    const isActive =
+                      location.pathname === item.path ||
+                      (location.pathname === "/dashboard" && item.path === "/dashboard/revenue");
                     return (
                       <Link
                         key={item.path}

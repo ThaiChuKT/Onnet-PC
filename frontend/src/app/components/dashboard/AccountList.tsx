@@ -6,6 +6,7 @@ import { CheckCircle, Search, Shield, Trash2, User, XCircle } from "lucide-react
 import { useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AdminUserItemResponse = {
   id: number;
@@ -28,6 +29,7 @@ type PageResponse<T> = {
 export function AccountList() {
   const [users, setUsers] = useState<AdminUserItemResponse[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
 
   const loadUsers = async (keyword?: string) => {
@@ -51,7 +53,28 @@ export function AccountList() {
     return () => window.clearTimeout(handle);
   }, [searchTerm]);
 
-  const filteredUsers = useMemo(() => users, [users]);
+  const filteredUsers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const selectedStatus = statusFilter.toLowerCase();
+    return users.filter((u) => {
+      const isActive = !!u.active;
+      const role = (u.role ?? "").toLowerCase();
+      const matchesSearch =
+        !q ||
+        String(u.id).includes(q) ||
+        (u.fullName ?? "").toLowerCase().includes(q) ||
+        (u.email ?? "").toLowerCase().includes(q) ||
+        (u.phone ?? "").toLowerCase().includes(q) ||
+        role.includes(q);
+      const matchesStatus =
+        selectedStatus === "all" ||
+        (selectedStatus === "active-user" && isActive) ||
+        (selectedStatus === "inactive-user" && !isActive) ||
+        (selectedStatus === "admin" && role.includes("admin")) ||
+        (selectedStatus === "user" && role.includes("user"));
+      return matchesSearch && matchesStatus;
+    });
+  }, [searchTerm, statusFilter, users]);
 
   const handleToggleActive = async (user: AdminUserItemResponse) => {
     try {
@@ -140,12 +163,24 @@ export function AccountList() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm theo tên, email..."
+            placeholder="Tìm kiếm theo tên, email, phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
           />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[220px] bg-input-background border-border">
+            <SelectValue placeholder="Lọc tài khoản" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả tài khoản</SelectItem>
+            <SelectItem value="active-user">Active</SelectItem>
+            <SelectItem value="inactive-user">Inactive</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="user">User</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-4">
