@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { apiGet } from "../api/http";
+import { formatUsd } from "../lib/formatUsd";
 
 const WALLET_POLL_MS = 15_000;
 
@@ -105,7 +106,7 @@ export function Header() {
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground">Balance</span>
                   <span className="text-sm font-bold text-primary">
-                    {balance === null ? "—" : `${balance.toLocaleString("en-US")} ₫`}
+                    {balance === null ? "—" : formatUsd(balance)}
                   </span>
                 </div>
               </div>

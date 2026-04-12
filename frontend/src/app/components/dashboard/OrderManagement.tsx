@@ -12,6 +12,7 @@ import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, TrendingUp } from "luci
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../../lib/formatUsd";
 
 type AdminBookingItemResponse = {
   bookingId: number;
@@ -216,7 +217,7 @@ export function OrderManagement() {
                     <div>
                       <span className="text-muted-foreground">Giá:</span>{" "}
                       <span className="font-bold text-primary">
-                        {Number(order.totalPrice ?? 0).toLocaleString("vi-VN")}đ
+                        {formatUsd(Number(order.totalPrice ?? 0))}
                       </span>
                     </div>
                     <div>
@@ -280,7 +281,7 @@ export function OrderManagement() {
                             <div className="flex justify-between items-center">
                               <span className="font-bold">Tổng tiền:</span>
                               <span className="text-2xl font-bold text-primary">
-                                {Number(selectedOrder.totalPrice ?? 0).toLocaleString("vi-VN")}đ
+                                {formatUsd(Number(selectedOrder.totalPrice ?? 0))}
                               </span>
                             </div>
                           </div>

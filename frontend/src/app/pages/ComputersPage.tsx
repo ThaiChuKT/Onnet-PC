@@ -27,6 +27,7 @@ import {
 import { useEffect } from "react";
 import { apiGet } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
 
 interface Computer {
   pcId: number;
@@ -390,7 +391,7 @@ export function ComputersPage() {
                           <div>
                             <p className="text-muted-foreground text-xs">Hourly rate</p>
                             <p className="font-bold text-primary">
-                              {Number(computer.hourlyPrice).toLocaleString("en-US")} ₫
+                              {formatUsd(Number(computer.hourlyPrice))}
                             </p>
                           </div>
                         </div>

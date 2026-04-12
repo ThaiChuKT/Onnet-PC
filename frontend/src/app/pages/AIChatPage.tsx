@@ -30,7 +30,7 @@ const initialMessage: Message = {
   id: "1",
   role: "assistant",
   content:
-    "Hi! I’m the RentPC Pro assistant. I can help with:\n\n• Picking a tier for gaming, streaming, or work\n• Comparing Basic / Pro / Ultra\n• Pricing questions (see home page for current VND rates)\n• What to expect from pool-assigned hardware\n\nWhat do you want to use the PC for?",
+    "Hi! I’m the RentPC Pro assistant. I can help with:\n\n• Picking a tier for gaming, streaming, or work\n• Comparing Basic / Pro / Ultra\n• Pricing questions (see home page for current USD rates)\n• What to expect from pool-assigned hardware\n\nWhat do you want to use the PC for?",
   timestamp: new Date(),
   suggestions: ["AAA gaming", "Streaming", "Office work", "Video / 3D render"],
 };
@@ -52,7 +52,7 @@ Ask in My bookings after paying — Start session assigns a machine from the poo
 
   render: `For Premiere, Blender, or 3D, pick **Ultra** for maximum GPU/CPU/RAM headroom. Long jobs are cheaper on monthly/yearly plans — check the Plans section on the home page.`,
 
-  giá: `Published prices are on the home page (weekly / monthly / yearly). They’re shown in ₫ and updated there.
+  giá: `Published prices are on the home page (weekly / monthly / yearly). They’re shown in USD and updated there.
 
 Rough orientation (verify on **Plans**):
 • Basic — entry tier

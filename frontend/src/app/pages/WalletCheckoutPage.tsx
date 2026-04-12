@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { apiPost } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
 
 type PaypalCaptureResponse = {
   orderId: string;
@@ -129,7 +130,7 @@ export function WalletCheckoutPage() {
                   <span className="text-sm text-muted-foreground">Current balance</span>
                 </div>
                 <p className="text-3xl font-bold text-primary">
-                  {Number(view.data.balance).toLocaleString("en-US")} ₫
+                  {formatUsd(Number(view.data.balance))}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Order id: {view.data.orderId}

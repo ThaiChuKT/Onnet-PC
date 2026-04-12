@@ -36,6 +36,7 @@ import { Link } from "react-router";
 import { apiGet, apiPost } from "../../api/http";
 import { useAuth } from "../../auth/AuthProvider";
 import { toast } from "sonner";
+import { formatUsd } from "../../lib/formatUsd";
 
 type BookingHistoryItemResponse = {
   bookingId: number;
@@ -155,7 +156,9 @@ export function RentalHistory() {
   const { isAdmin } = useAuth();
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [now, setNow] = useState(() => Date.now());
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid" | "active" | "completed">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "paid" | "active" | "completed"
+  >("all");
   const [showCancelled, setShowCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -176,7 +179,9 @@ export function RentalHistory() {
   const [renewTarget, setRenewTarget] = useState<RenewTarget | null>(null);
   const [renewLoading, setRenewLoading] = useState(false);
   const [renewPlanId, setRenewPlanId] = useState<number | null>(null);
-  const [renewingBookingId, setRenewingBookingId] = useState<number | null>(null);
+  const [renewingBookingId, setRenewingBookingId] = useState<number | null>(
+    null,
+  );
 
   const loadData = useCallback(async (mode: "full" | "silent" = "full") => {
     if (mode === "full") {
@@ -412,7 +417,9 @@ export function RentalHistory() {
         setRenewPlanId(plans[0].id);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not load renew plans");
+      toast.error(
+        e instanceof Error ? e.message : "Could not load renew plans",
+      );
     } finally {
       setRenewLoading(false);
     }
@@ -423,14 +430,14 @@ export function RentalHistory() {
     const { booking } = renewTarget;
     setRenewingBookingId(booking.bookingId);
     try {
-      await apiPost<BookingResponseDto, { specId: number; planId: number; quantity: number }>(
-        "/bookings/subscription",
-        {
-          specId: booking.specId ?? 0,
-          planId: renewPlanId,
-          quantity: 1,
-        },
-      );
+      await apiPost<
+        BookingResponseDto,
+        { specId: number; planId: number; quantity: number }
+      >("/bookings/subscription", {
+        specId: booking.specId ?? 0,
+        planId: renewPlanId,
+        quantity: 1,
+      });
       toast.success("Renewal order created");
       setRenewTarget(null);
       setRenewPlanId(null);
@@ -493,9 +500,7 @@ export function RentalHistory() {
                 Wallet balance
               </p>
               <p className="text-2xl font-bold text-primary">
-                {walletBalance === null
-                  ? "—"
-                  : `${walletBalance.toLocaleString("en-US")} ₫`}
+                {walletBalance === null ? "—" : formatUsd(walletBalance)}
               </p>
             </div>
           </div>
@@ -523,7 +528,7 @@ export function RentalHistory() {
             <div>
               <p className="text-sm text-muted-foreground">Total spent</p>
               <p className="text-2xl font-bold text-accent">
-                {totalSpent.toLocaleString("en-US")} ₫
+                {formatUsd(totalSpent)}
               </p>
             </div>
           </div>
@@ -554,8 +559,16 @@ export function RentalHistory() {
                 type="button"
                 variant={active ? "default" : "outline"}
                 size="sm"
-                onClick={() => setStatusFilter(key as "all" | "pending" | "paid" | "active" | "completed")}
-                className={active ? "bg-primary text-primary-foreground" : "border-border"}
+                onClick={() =>
+                  setStatusFilter(
+                    key as "all" | "pending" | "paid" | "active" | "completed",
+                  )
+                }
+                className={
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "border-border"
+                }
               >
                 {key === "all" ? "All" : key[0].toUpperCase() + key.slice(1)}
               </Button>
@@ -567,7 +580,11 @@ export function RentalHistory() {
               variant={showCancelled ? "default" : "outline"}
               size="sm"
               onClick={() => setShowCancelled((prev) => !prev)}
-              className={showCancelled ? "bg-muted-foreground text-background" : "border-border"}
+              className={
+                showCancelled
+                  ? "bg-muted-foreground text-background"
+                  : "border-border"
+              }
             >
               {showCancelled ? "Hide cancelled" : "Show cancelled"}
             </Button>
@@ -591,8 +608,7 @@ export function RentalHistory() {
                   <AlertTriangle className="w-5 h-5 shrink-0 text-destructive mt-0.5" />
                   <div>
                     <strong>Non-refundable:</strong> After this payment is
-                    completed, amounts are not refunded to your wallet except
-                    where required by policy or support.
+                    completed, amounts are not refunded to your wallet.
                   </div>
                 </div>
                 {payRemaining != null && payRemaining > 0 && (
@@ -617,7 +633,7 @@ export function RentalHistory() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
                     <span className="font-bold text-primary">
-                      {price.toLocaleString("en-US")} ₫
+                      {formatUsd(price)}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -625,9 +641,7 @@ export function RentalHistory() {
                       Current balance
                     </span>
                     <span className="font-medium">
-                      {walletBalance === null
-                        ? "—"
-                        : `${walletBalance.toLocaleString("en-US")} ₫`}
+                      {walletBalance === null ? "—" : formatUsd(walletBalance)}
                     </span>
                   </div>
                   {balanceAfter !== null && (
@@ -636,7 +650,7 @@ export function RentalHistory() {
                         Balance after payment
                       </span>
                       <span className="font-bold text-foreground">
-                        {balanceAfter.toLocaleString("en-US")} ₫
+                        {formatUsd(balanceAfter)}
                       </span>
                     </div>
                   )}
@@ -749,8 +763,8 @@ export function RentalHistory() {
                   {renewTarget?.booking.specName} renewal options
                 </p>
                 <p className="text-muted-foreground">
-                  Order <strong>#{renewTarget?.booking.bookingId}</strong> will be renewed as a new
-                  subscription booking.
+                  Order <strong>#{renewTarget?.booking.bookingId}</strong> will
+                  be renewed as a new subscription booking.
                 </p>
               </div>
 
@@ -770,12 +784,16 @@ export function RentalHistory() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="font-semibold">{formatDurationLabel(plan.durationDays)}</p>
-                          <p className="text-sm text-muted-foreground">{plan.planName}</p>
+                          <p className="font-semibold">
+                            {formatDurationLabel(plan.durationDays)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {plan.planName}
+                          </p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-primary">
-                            {Number(plan.price ?? 0).toLocaleString("en-US")} ₫
+                            {formatUsd(Number(plan.price ?? 0))}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {plan.durationDays} day(s)
@@ -789,7 +807,8 @@ export function RentalHistory() {
 
               {renewTarget && renewTarget.plans.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  No active subscription plans are configured for this machine group.
+                  No active subscription plans are configured for this machine
+                  group.
                 </p>
               )}
             </div>
@@ -908,8 +927,8 @@ export function RentalHistory() {
 
                   {isPending && pendingCountdown && (
                     <p className="text-sm text-amber-500 mb-2">
-                      Auto-cancel in <strong>about {pendingCountdown}</strong> if you
-                      do not pay yet.
+                      Auto-cancel in <strong>about {pendingCountdown}</strong>{" "}
+                      if you do not pay yet.
                     </p>
                   )}
 
@@ -940,7 +959,7 @@ export function RentalHistory() {
                 <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-end gap-3 lg:min-w-[200px]">
                   <div className="flex flex-col items-end gap-1">
                     <div className="text-2xl font-bold text-primary">
-                      {total.toLocaleString("en-US")} ₫
+                      {formatUsd(total)}
                     </div>
                   </div>
 
@@ -1046,7 +1065,8 @@ export function RentalHistory() {
                         disabled={renewLoading || renewingBookingId !== null}
                         className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
                       >
-                        {renewLoading && renewTarget?.booking.bookingId === rental.bookingId ? (
+                        {renewLoading &&
+                        renewTarget?.booking.bookingId === rental.bookingId ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             Loading plans…

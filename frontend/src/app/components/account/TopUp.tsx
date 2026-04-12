@@ -6,6 +6,7 @@ import { Wallet, CreditCard, DollarSign, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../../lib/formatUsd";
 
 const quickAmounts = [5, 10, 20, 50, 100, 200];
 
@@ -157,7 +158,7 @@ export function TopUp() {
             <span className="text-muted-foreground">Current balance (display)</span>
           </div>
           <p className="text-3xl font-bold text-primary">
-            {balance === null ? "—" : `$${balance.toLocaleString("en-US")}`}
+            {balance === null ? "—" : formatUsd(balance)}
           </p>
         </Card>
 

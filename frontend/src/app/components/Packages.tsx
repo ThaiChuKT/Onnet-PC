@@ -7,6 +7,10 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { apiPost } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
+
+/** Legacy list prices were in VND; USD amounts use 25,000 VND = 1 USD. */
+const vndToUsd = (vnd: number) => Math.round((vnd / 25_000) * 100) / 100;
 
 type RentMachineResponse = {
   bookingId: number;
@@ -30,9 +34,9 @@ const packages = [
     name: "Basic Gaming",
     icon: Gamepad2,
     pricing: {
-      week: { price: "149,000 ₫", period: "/ week" },
-      month: { price: "3,499,000 ₫", period: "/ month" },
-      year: { price: "34,900,000 ₫", period: "/ year" },
+      week: { amountUsd: vndToUsd(149_000), period: "/ week" },
+      month: { amountUsd: vndToUsd(3_499_000), period: "/ month" },
+      year: { amountUsd: vndToUsd(34_900_000), period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1760708825878-9e7ecf31565a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnYW1pbmclMjBkZXNrdG9wJTIwY29tcHV0ZXIlMjB0b3dlcnxlbnwxfHx8fDE3NzM2NzY1ODh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -51,9 +55,9 @@ const packages = [
     name: "Pro Gaming",
     icon: Zap,
     pricing: {
-      week: { price: "299,000 ₫", period: "/ week" },
-      month: { price: "6,999,000 ₫", period: "/ month" },
-      year: { price: "69,900,000 ₫", period: "/ year" },
+      week: { amountUsd: vndToUsd(299_000), period: "/ week" },
+      month: { amountUsd: vndToUsd(6_999_000), period: "/ month" },
+      year: { amountUsd: vndToUsd(69_900_000), period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1738347826086-cadfac03cd45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoaWdoJTIwZW5kJTIwZ2FtaW5nJTIwY29tcHV0ZXJ8ZW58MXx8fHwxNzczNjc2NTg3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -72,9 +76,9 @@ const packages = [
     name: "Ultra Gaming",
     icon: Cpu,
     pricing: {
-      week: { price: "499,000 ₫", period: "/ week" },
-      month: { price: "11,999,000 ₫", period: "/ month" },
-      year: { price: "119,900,000 ₫", period: "/ year" },
+      week: { amountUsd: vndToUsd(499_000), period: "/ week" },
+      month: { amountUsd: vndToUsd(11_999_000), period: "/ month" },
+      year: { amountUsd: vndToUsd(119_900_000), period: "/ year" },
     },
     image:
       "https://images.unsplash.com/photo-1636914011676-039d36b73765?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYyUyMGdhbWluZyUyMHJvb20lMjBzZXR1cHxlbnwxfHx8fDE3NzM2NzY1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -222,7 +226,7 @@ export function Packages() {
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1 flex-wrap">
                       <span className="text-4xl font-bold text-primary">
-                        {currentPricing.price}
+                        {formatUsd(currentPricing.amountUsd)}
                       </span>
                       <span className="text-muted-foreground">
                         {currentPricing.period}
@@ -285,7 +289,11 @@ export function Packages() {
             </div>
             <div className="hidden sm:block w-px h-12 bg-border"></div>
             <div className="text-sm text-muted-foreground">
-              Security deposit: <span className="text-primary font-bold">500,000 ₫</span> — refunded
+              Security deposit:{" "}
+              <span className="text-primary font-bold">
+                {formatUsd(vndToUsd(500_000))}
+              </span>{" "}
+              — refunded
               when hardware is returned
             </div>
           </div>

@@ -14,6 +14,7 @@ import { Monitor, Plus, Edit, Trash2, Search, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../../lib/formatUsd";
 
 interface Computer {
   pcId: number;
@@ -396,7 +397,9 @@ export function ComputerList() {
                 <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
                   <div className="p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground block">Giờ</span>
-                    <span className="font-bold text-primary">{Number(computer.pricePerHour).toLocaleString("vi-VN")}đ</span>
+                    <span className="font-bold text-primary">
+                      {formatUsd(Number(computer.pricePerHour))}
+                    </span>
                   </div>
                 </div>
               </div>

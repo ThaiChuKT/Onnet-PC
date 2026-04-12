@@ -12,26 +12,28 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { formatUsd, formatUsdCompact } from "../../lib/formatUsd";
 
+/** Demo chart data; amounts converted from prior VND mock at 25,000 VND = 1 USD. */
 const monthlyData = [
-  { month: "T1", revenue: 45000000, orders: 35, customers: 28 },
-  { month: "T2", revenue: 52000000, orders: 42, customers: 35 },
-  { month: "T3", revenue: 48000000, orders: 38, customers: 32 },
-  { month: "T4", revenue: 61000000, orders: 48, customers: 40 },
-  { month: "T5", revenue: 58000000, orders: 45, customers: 38 },
-  { month: "T6", revenue: 67000000, orders: 52, customers: 45 },
-  { month: "T7", revenue: 72000000, orders: 58, customers: 50 },
-  { month: "T8", revenue: 69000000, orders: 55, customers: 48 },
-  { month: "T9", revenue: 75000000, orders: 60, customers: 52 },
-  { month: "T10", revenue: 82000000, orders: 65, customers: 58 },
-  { month: "T11", revenue: 78000000, orders: 62, customers: 55 },
-  { month: "T12", revenue: 88000000, orders: 70, customers: 62 },
+  { month: "T1", revenue: 1800, orders: 35, customers: 28 },
+  { month: "T2", revenue: 2080, orders: 42, customers: 35 },
+  { month: "T3", revenue: 1920, orders: 38, customers: 32 },
+  { month: "T4", revenue: 2440, orders: 48, customers: 40 },
+  { month: "T5", revenue: 2320, orders: 45, customers: 38 },
+  { month: "T6", revenue: 2680, orders: 52, customers: 45 },
+  { month: "T7", revenue: 2880, orders: 58, customers: 50 },
+  { month: "T8", revenue: 2760, orders: 55, customers: 48 },
+  { month: "T9", revenue: 3000, orders: 60, customers: 52 },
+  { month: "T10", revenue: 3280, orders: 65, customers: 58 },
+  { month: "T11", revenue: 3120, orders: 62, customers: 55 },
+  { month: "T12", revenue: 3520, orders: 70, customers: 62 },
 ];
 
 const categoryData = [
-  { name: "Basic Gaming", revenue: 180000000, percentage: 25 },
-  { name: "Pro Gaming", revenue: 360000000, percentage: 50 },
-  { name: "Ultra Gaming", revenue: 180000000, percentage: 25 },
+  { name: "Basic Gaming", revenue: 7200, percentage: 25 },
+  { name: "Pro Gaming", revenue: 14400, percentage: 50 },
+  { name: "Ultra Gaming", revenue: 7200, percentage: 25 },
 ];
 
 export function RevenueStats() {
@@ -60,7 +62,7 @@ export function RevenueStats() {
             Tổng Doanh Thu {currentYear}
           </p>
           <p className="text-3xl font-bold text-primary mb-1">
-            {(totalRevenue / 1000000).toFixed(0)}M đ
+            {formatUsd(totalRevenue)}
           </p>
           <p className="text-xs text-accent">
             +{growthRate.toFixed(1)}% so với tháng trước
@@ -88,7 +90,7 @@ export function RevenueStats() {
           </div>
           <p className="text-sm text-muted-foreground mb-1">Giá Trị TB/Đơn</p>
           <p className="text-3xl font-bold text-secondary mb-1">
-            {(avgOrderValue / 1000).toFixed(0)}K đ
+            {formatUsd(avgOrderValue)}
           </p>
           <p className="text-xs text-muted-foreground">
             Doanh thu trung bình mỗi đơn
@@ -146,7 +148,7 @@ export function RevenueStats() {
               key="revenue-yaxis"
               stroke="#888"
               style={{ fontSize: "12px" }}
-              tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              tickFormatter={(value) => formatUsdCompact(Number(value))}
             />
             <Tooltip
               key="revenue-tooltip"
@@ -156,8 +158,8 @@ export function RevenueStats() {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value: any) => [
-                `${Number(value ?? 0).toLocaleString("vi-VN")}đ`,
+              formatter={(value: unknown) => [
+                formatUsd(Number(value ?? 0)),
                 "Doanh thu",
               ]}
             />
@@ -266,7 +268,7 @@ export function RevenueStats() {
                   <div>
                     <h4 className="font-bold">{category.name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {category.revenue.toLocaleString("vi-VN")}đ
+                      {formatUsd(category.revenue)}
                     </p>
                   </div>
                 </div>
@@ -287,10 +289,9 @@ export function RevenueStats() {
               Tổng doanh thu phân khúc:
             </span>
             <span className="text-2xl font-bold text-primary">
-              {categoryData
-                .reduce((sum, cat) => sum + cat.revenue, 0)
-                .toLocaleString("vi-VN")}
-              đ
+              {formatUsd(
+                categoryData.reduce((sum, cat) => sum + cat.revenue, 0),
+              )}
             </span>
           </div>
         </div>
