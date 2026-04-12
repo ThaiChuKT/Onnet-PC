@@ -77,9 +77,10 @@ export function LoginPage() {
     try {
       if (isLogin) {
         try {
-          await login({ email: formData.email.trim(), password: formData.password });
+          const profile = await login({ email: formData.email.trim(), password: formData.password });
           const state = location.state as { from?: string } | null;
-          const redirectTo = state?.from ?? "/";
+          const isAdminAccount = (profile.role ?? "").toUpperCase().includes("ADMIN");
+          const redirectTo = state?.from ?? (isAdminAccount ? "/dashboard" : "/");
           toast.success("Signed in successfully");
           navigate(redirectTo, { replace: true });
         } catch (err) {

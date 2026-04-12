@@ -16,7 +16,6 @@ import { useNavigate } from "react-router";
 import { Folder, Search, Pencil, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet } from "../api/http";
 import { toast } from "sonner";
-import { formatUsd } from "../lib/formatUsd";
 
 type AdminPackageItemResponse = {
   planId: number;
@@ -45,14 +44,34 @@ type PageResponse<T> = {
   size: number;
 };
 
-export function ComputersPage() {
+type TierKey = "basic" | "pro" | "ultra";
+
+type TierPackage = {
+  tier: TierKey;
+  title: string;
+  plans: AdminPackageItemResponse[];
+  specIds: number[];
+  active: boolean;
+};
+
+const TIER_ORDER: TierKey[] = ["basic", "pro", "ultra"];
+
+function detectTier(text: string): TierKey | null {
+  const t = text.toLowerCase();
+  if (t.includes("basic")) return "basic";
+  if (t.includes("pro")) return "pro";
+  if (t.includes("ultra")) return "ultra";
+  return null;
+}
+
+export function PackageFoldersPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState<AdminPackageItemResponse[]>([]);
   const [machines, setMachines] = useState<AdminPcItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
-  const [expandedPlanIds, setExpandedPlanIds] = useState<number[]>([]);
+  const [expandedTiers, setExpandedTiers] = useState<TierKey[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -73,21 +92,49 @@ export function ComputersPage() {
     void load();
   }, []);
 
+  const tierPackages = useMemo<TierPackage[]>(() => {
+    const grouped = new Map<TierKey, TierPackage>();
+    for (const pkg of packages) {
+      const tier = detectTier(`${pkg.planName} ${pkg.specName}`);
+      if (!tier) continue;
+      const existing = grouped.get(tier);
+      if (!existing) {
+        grouped.set(tier, {
+          tier,
+          title: tier.toUpperCase(),
+          plans: [pkg],
+          specIds: [pkg.specId],
+          active: !!pkg.active,
+        });
+      } else {
+        existing.plans.push(pkg);
+        existing.specIds = Array.from(new Set([...existing.specIds, pkg.specId]));
+        existing.active = existing.active || !!pkg.active;
+      }
+    }
+
+    return TIER_ORDER.map((tier) => grouped.get(tier))
+      .filter((v): v is TierPackage => !!v)
+      .map((entry) => ({
+        ...entry,
+        plans: [...entry.plans].sort((a, b) => Number(a.durationDays ?? 0) - Number(b.durationDays ?? 0)),
+      }));
+  }, [packages]);
+
   const filteredPackages = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    return packages.filter((pkg) => {
+    return tierPackages.filter((pkg) => {
       const matchesSearch =
         !q ||
-        String(pkg.planId).includes(q) ||
-        (pkg.planName ?? "").toLowerCase().includes(q) ||
-        (pkg.specName ?? "").toLowerCase().includes(q);
+        (pkg.title ?? "").toLowerCase().includes(q) ||
+        pkg.plans.some((p) => String(p.planId).includes(q) || (p.planName ?? "").toLowerCase().includes(q) || (p.specName ?? "").toLowerCase().includes(q));
       const matchesActive =
         activeFilter === "all" ||
         (activeFilter === "active" && !!pkg.active) ||
         (activeFilter === "inactive" && !pkg.active);
       return matchesSearch && matchesActive;
     });
-  }, [activeFilter, packages, searchTerm]);
+  }, [activeFilter, searchTerm, tierPackages]);
 
   const machinesBySpec = useMemo(() => {
     return machines.reduce<Record<number, AdminPcItemResponse[]>>((acc, item) => {
@@ -98,9 +145,9 @@ export function ComputersPage() {
     }, {});
   }, [machines]);
 
-  const toggleMachines = (planId: number) => {
-    setExpandedPlanIds((prev) =>
-      prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId],
+  const toggleMachines = (tier: TierKey) => {
+    setExpandedTiers((prev) =>
+      prev.includes(tier) ? prev.filter((id) => id !== tier) : [...prev, tier],
     );
   };
 
@@ -154,73 +201,39 @@ export function ComputersPage() {
             )}
 
             {!isLoading && filteredPackages.map((pkg) => {
-              const planMachines = machinesBySpec[pkg.specId] ?? [];
-              const expanded = expandedPlanIds.includes(pkg.planId);
+              const planMachines = pkg.specIds.flatMap((specId) => machinesBySpec[specId] ?? []);
+              const expanded = expandedTiers.includes(pkg.tier);
+              const yearly = pkg.plans.find((p) => Number(p.durationDays) >= 365);
+              const monthly = pkg.plans.find((p) => Number(p.durationDays) >= 28 && Number(p.durationDays) < 365);
+              const weekly = pkg.plans.find((p) => Number(p.durationDays) < 28);
               return (
-                <Card key={pkg.planId} className="p-5 border-border">
+                <Card key={pkg.tier} className="p-5 border-border">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Folder className="w-5 h-5 text-primary" />
-                        <h3 className="text-xl font-bold">{pkg.planName}</h3>
+                        <h3 className="text-xl font-bold">{pkg.title}</h3>
                         <Badge className={pkg.active ? "bg-accent/20 text-accent border-accent/50" : "bg-muted text-muted-foreground border-border"}>
                           {pkg.active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-
-                      <Badge className="bg-primary/20 text-primary border-primary/50">
-                        PC #{computer.pcId}
-                      </Badge>
-
-                      {/* Specs */}
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Cpu className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.cpu}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.gpu}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MemoryStick className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.ram}GB
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <HardDrive className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.storage}GB
-                          </span>
-                        </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Specs linked: {pkg.specIds.length}</p>
+                        <p>Yearly: {yearly ? `${Number(yearly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
+                        <p>Monthly: {monthly ? `${Number(monthly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
+                        <p>Weekly: {weekly ? `${Number(weekly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
                       </div>
-
-                      {/* Pricing */}
-                      <div className="pt-3 border-t border-border">
-                        <div className="grid grid-cols-1 gap-2 text-sm">
-                          <div>
-                            <p className="text-muted-foreground text-xs">Hourly rate</p>
-                            <p className="font-bold text-primary">
-                              {Number(computer.hourlyPrice).toLocaleString("en-US")} ₫
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    </div>
 
                     <div className="flex flex-wrap gap-2">
                       <Button
-                        onClick={() => navigate(`/packages/${pkg.planId}/edit`)}
+                        onClick={() => navigate(`/packages/${pkg.tier}/edit`)}
                         className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                       >
                         <Pencil className="w-4 h-4 mr-2" />
                         Edit price
                       </Button>
-                      <Button variant="outline" onClick={() => toggleMachines(pkg.planId)}>
+                      <Button variant="outline" onClick={() => toggleMachines(pkg.tier)}>
                         <Monitor className="w-4 h-4 mr-2" />
                         {expanded ? "Hide machines" : "Show machines"}
                         {expanded ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
@@ -230,7 +243,7 @@ export function ComputersPage() {
 
                   {expanded && (
                     <div className="mt-4 pt-4 border-t border-border">
-                      <p className="text-sm text-muted-foreground mb-3">Machines in this package</p>
+                      <p className="text-sm text-muted-foreground mb-3">Machines in this tier package</p>
                       {planMachines.length === 0 ? (
                         <Card className="p-4 border-border bg-muted/20">
                           <p className="text-sm text-muted-foreground">No machine found for this spec.</p>

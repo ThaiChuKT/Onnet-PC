@@ -1,6 +1,7 @@
 package com.onnet.onnetpc.admin.service;
 
 import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminPackageItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
@@ -9,6 +10,7 @@ import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetReviewStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetUserActiveRequest;
+import com.onnet.onnetpc.admin.dto.UpdatePackageRequest;
 import com.onnet.onnetpc.admin.dto.UpdatePcRequest;
 import com.onnet.onnetpc.booking.entity.Booking;
 import com.onnet.onnetpc.booking.enums.BookingStatus;
@@ -22,9 +24,12 @@ import com.onnet.onnetpc.pcs.ReviewStatus;
 import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.pcs.repository.PcSpecRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
+import com.onnet.onnetpc.subscription.SubscriptionPlan;
+import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import com.onnet.onnetpc.wallet.WalletTransaction;
+import com.onnet.onnetpc.wallet.WalletTransactionType;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
 import java.time.Instant;
 import java.util.List;
@@ -44,6 +49,7 @@ public class AdminService {
     private final BookingRepository bookingRepository;
     private final ReviewRepository reviewRepository;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     public AdminService(
         UserRepository userRepository,
@@ -51,7 +57,8 @@ public class AdminService {
         PcSpecRepository pcSpecRepository,
         BookingRepository bookingRepository,
         ReviewRepository reviewRepository,
-        WalletTransactionRepository walletTransactionRepository
+        WalletTransactionRepository walletTransactionRepository,
+        SubscriptionPlanRepository subscriptionPlanRepository
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
@@ -59,6 +66,7 @@ public class AdminService {
         this.bookingRepository = bookingRepository;
         this.reviewRepository = reviewRepository;
         this.walletTransactionRepository = walletTransactionRepository;
+        this.subscriptionPlanRepository = subscriptionPlanRepository;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +128,51 @@ public class AdminService {
             .stream()
             .map((tx) -> toAdminUserPayment(user, tx))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserPaymentItemResponse> listTopUpPayments(int page, int size) {
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return walletTransactionRepository
+            .findByTypeOrderByCreatedAtDesc(WalletTransactionType.top_up, pageable)
+            .map(this::toAdminUserPayment);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPackageItemResponse> listPackages(int page, int size) {
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        return subscriptionPlanRepository.findAll(pageable).map(this::toAdminPackage);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminPackageItemResponse getPackage(Long planId) {
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Package not found"));
+        return toAdminPackage(plan);
+    }
+
+    @Transactional
+    public AdminPackageItemResponse updatePackage(Long planId, UpdatePackageRequest request) {
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Package not found"));
+
+        if (request.price() != null) {
+            if (request.price().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Price must be greater than 0");
+            }
+            plan.setPrice(request.price());
+        }
+        if (request.maxHoursPerDay() != null) {
+            if (request.maxHoursPerDay() < 0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "maxHoursPerDay cannot be negative");
+            }
+            plan.setMaxHoursPerDay(request.maxHoursPerDay());
+        }
+        if (request.active() != null) {
+            plan.setActive(request.active());
+        }
+
+        return toAdminPackage(subscriptionPlanRepository.save(plan));
     }
 
     @Transactional(readOnly = true)
@@ -192,6 +245,9 @@ public class AdminService {
         }
         if (request.pricePerHour() != null) {
             spec.setPricePerHour(request.pricePerHour());
+        }
+        if (request.available() != null) {
+            spec.setAvailable(request.available());
         }
 
         pcSpecRepository.save(spec);
@@ -269,6 +325,19 @@ public class AdminService {
         );
     }
 
+    private AdminPackageItemResponse toAdminPackage(SubscriptionPlan plan) {
+        return new AdminPackageItemResponse(
+            plan.getId(),
+            plan.getPlanName(),
+            plan.getSpec() == null ? null : plan.getSpec().getId(),
+            plan.getSpec() == null ? null : plan.getSpec().getSpecName(),
+            plan.getDurationDays(),
+            plan.getPrice(),
+            plan.getMaxHoursPerDay(),
+            plan.getActive()
+        );
+    }
+
     private AdminBookingItemResponse toAdminBooking(Booking booking) {
         return new AdminBookingItemResponse(
             booking.getId(),
@@ -305,6 +374,22 @@ public class AdminService {
             user.getId(),
             user.getEmail(),
             user.getFullName(),
+            tx.getAmount(),
+            tx.getType() == null ? null : tx.getType().name(),
+            tx.getReferenceId(),
+            tx.getNote(),
+            tx.getCreatedAt()
+        );
+    }
+
+    private AdminUserPaymentItemResponse toAdminUserPayment(WalletTransaction tx) {
+        User user = tx.getWallet() == null ? null : tx.getWallet().getUser();
+        return new AdminUserPaymentItemResponse(
+            tx.getId(),
+            tx.getWallet() == null ? null : tx.getWallet().getId(),
+            user == null ? null : user.getId(),
+            user == null ? null : user.getEmail(),
+            user == null ? null : user.getFullName(),
             tx.getAmount(),
             tx.getType() == null ? null : tx.getType().name(),
             tx.getReferenceId(),

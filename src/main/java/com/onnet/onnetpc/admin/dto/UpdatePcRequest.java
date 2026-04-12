@@ -11,6 +11,7 @@ public record UpdatePcRequest(
     String operatingSystem,
     String description,
     BigDecimal pricePerHour,
+    Boolean available,
     String location,
     String status
 ) {

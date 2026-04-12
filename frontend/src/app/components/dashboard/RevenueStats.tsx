@@ -1,5 +1,8 @@
 import { Card } from "../ui/card";
 import { TrendingUp, DollarSign, Calendar, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import {
   LineChart,
   Line,
@@ -37,18 +40,54 @@ const categoryData = [
 ];
 
 export function RevenueStats() {
+  const [monthWindow, setMonthWindow] = useState("12");
+  const [categoryQuery, setCategoryQuery] = useState("");
   const currentYear = 2026;
-  const totalRevenue = monthlyData.reduce((sum, item) => sum + item.revenue, 0);
-  const totalOrders = monthlyData.reduce((sum, item) => sum + item.orders, 0);
+  const filteredMonthlyData = useMemo(() => {
+    const len = Math.max(1, Number(monthWindow) || 12);
+    return monthlyData.slice(-len);
+  }, [monthWindow]);
+
+  const filteredCategoryData = useMemo(() => {
+    const q = categoryQuery.trim().toLowerCase();
+    if (!q) return categoryData;
+    return categoryData.filter((cat) => cat.name.toLowerCase().includes(q));
+  }, [categoryQuery]);
+
+  const totalRevenue = filteredMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalOrders = filteredMonthlyData.reduce((sum, item) => sum + item.orders, 0);
   const avgOrderValue = totalRevenue / totalOrders;
-  const currentMonth = monthlyData[monthlyData.length - 1];
-  const previousMonth = monthlyData[monthlyData.length - 2];
+  const currentMonth = filteredMonthlyData[filteredMonthlyData.length - 1] ?? monthlyData[monthlyData.length - 1];
+  const previousMonth =
+    filteredMonthlyData[filteredMonthlyData.length - 2] ??
+    filteredMonthlyData[filteredMonthlyData.length - 1] ??
+    monthlyData[monthlyData.length - 2];
   const growthRate =
-    ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) *
-    100;
+    previousMonth.revenue > 0
+      ? ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100
+      : 0;
 
   return (
     <div>
+      <div className="grid md:grid-cols-2 gap-3 mb-6">
+        <Select value={monthWindow} onValueChange={setMonthWindow}>
+          <SelectTrigger className="bg-input-background border-border">
+            <SelectValue placeholder="Khoảng thời gian" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="12">12 tháng gần nhất</SelectItem>
+            <SelectItem value="6">6 tháng gần nhất</SelectItem>
+            <SelectItem value="3">3 tháng gần nhất</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          value={categoryQuery}
+          onChange={(e) => setCategoryQuery(e.target.value)}
+          placeholder="Lọc phân khúc theo tên..."
+          className="bg-input-background border-border"
+        />
+      </div>
+
       {/* Stats Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
@@ -78,7 +117,7 @@ export function RevenueStats() {
           <p className="text-sm text-muted-foreground mb-1">Tổng Đơn Hàng</p>
           <p className="text-3xl font-bold mb-1">{totalOrders}</p>
           <p className="text-xs text-muted-foreground">
-            Trung bình {(totalOrders / 12).toFixed(0)} đơn/tháng
+            Trung bình {(totalOrders / Math.max(filteredMonthlyData.length, 1)).toFixed(0)} đơn/tháng
           </p>
         </Card>
 
@@ -106,7 +145,7 @@ export function RevenueStats() {
           <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
           <p className="text-3xl font-bold mb-1">{currentMonth.customers}</p>
           <p className="text-xs text-muted-foreground">
-            Tháng {monthlyData.length} năm {currentYear}
+            Tháng {filteredMonthlyData.length || monthlyData.length} năm {currentYear}
           </p>
         </Card>
       </div>
@@ -122,13 +161,13 @@ export function RevenueStats() {
             </span>
           </h2>
           <p className="text-muted-foreground text-sm">
-            Theo dõi doanh thu và số đơn hàng theo từng tháng
+            Theo dõi doanh thu và số đơn hàng theo từng tháng (áp dụng bộ lọc dashboard)
           </p>
         </div>
 
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
-            data={monthlyData}
+            data={filteredMonthlyData}
             id="revenue-chart"
             key="revenue-line-chart"
           >
@@ -194,7 +233,7 @@ export function RevenueStats() {
         </div>
 
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={monthlyData} id="orders-chart" key="orders-bar-chart">
+          <BarChart data={filteredMonthlyData} id="orders-chart" key="orders-bar-chart">
             <CartesianGrid
               key="orders-grid"
               strokeDasharray="3 3"
@@ -256,7 +295,7 @@ export function RevenueStats() {
         </div>
 
         <div className="space-y-4">
-          {categoryData.map((category, index) => (
+          {filteredCategoryData.map((category, index) => (
             <div key={index} className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -292,6 +331,10 @@ export function RevenueStats() {
               {formatUsd(
                 categoryData.reduce((sum, cat) => sum + cat.revenue, 0),
               )}
+              {filteredCategoryData
+                .reduce((sum, cat) => sum + cat.revenue, 0)
+                .toLocaleString("vi-VN")}
+              đ
             </span>
           </div>
         </div>

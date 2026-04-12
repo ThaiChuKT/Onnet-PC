@@ -1,6 +1,7 @@
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Input } from "../ui/input";
 import {
   Dialog,
   DialogContent,
@@ -8,11 +9,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
-import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, TrendingUp, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
 import { formatUsd } from "../../lib/formatUsd";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 type AdminBookingItemResponse = {
   bookingId: number;
@@ -64,6 +66,10 @@ const statusConfig: Record<
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<AdminBookingItemResponse[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<AdminBookingItemResponse | null>(null);
 
@@ -94,19 +100,80 @@ export function OrderManagement() {
     }
   };
 
+  const filteredOrders = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const selectedStatus = statusFilter.toLowerCase();
+    return orders.filter((o) => {
+      const rawStatus = (o.status ?? "").toLowerCase();
+      const isPaid = rawStatus === "active" || rawStatus === "completed";
+      const isExpired = rawStatus === "completed";
+      const searchHit =
+        !q ||
+        String(o.bookingId).includes(q) ||
+        (o.userEmail ?? "").toLowerCase().includes(q) ||
+        (o.specName ?? "").toLowerCase().includes(q) ||
+        (o.bookingType ?? "").toLowerCase().includes(q);
+      const statusHit =
+        selectedStatus === "all" ||
+        rawStatus === selectedStatus ||
+        (selectedStatus === "paid" && isPaid) ||
+        (selectedStatus === "expired" && isExpired);
+
+      if (!o.createdAt) return searchHit && statusHit;
+      const createdAt = new Date(o.createdAt);
+      if (fromDate) {
+        const from = new Date(`${fromDate}T00:00:00`);
+        if (createdAt < from) return false;
+      }
+      if (toDate) {
+        const to = new Date(`${toDate}T23:59:59`);
+        if (createdAt > to) return false;
+      }
+      return searchHit && statusHit;
+    });
+  }, [fromDate, orders, searchTerm, statusFilter, toDate]);
+
   const stats = useMemo(() => {
-    const total = orders.length;
-    const pending = orders.filter((o) => (o.status ?? "").toLowerCase() === "pending").length;
-    const active = orders.filter((o) => (o.status ?? "").toLowerCase() === "active").length;
-    const completed = orders.filter((o) => (o.status ?? "").toLowerCase() === "completed").length;
-    const totalRevenue = orders
+    const total = filteredOrders.length;
+    const pending = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "pending").length;
+    const active = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "active").length;
+    const completed = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "completed").length;
+    const totalRevenue = filteredOrders
       .filter((o) => ["active", "completed"].includes((o.status ?? "").toLowerCase()))
       .reduce((sum, o) => sum + Number(o.totalPrice ?? 0), 0);
     return { total, pending, active, completed, totalRevenue };
-  }, [orders]);
+  }, [filteredOrders]);
 
   return (
     <div>
+      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="relative md:col-span-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo mã đơn, email, cấu hình..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-input-background border-border"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="bg-input-background border-border">
+            <SelectValue placeholder="Trạng thái đơn" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+      </div>
+
       <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="p-4 border-border bg-card/50">
           <div className="flex items-center gap-3">
@@ -179,7 +246,7 @@ export function OrderManagement() {
           </Card>
         )}
 
-        {orders.map((order) => {
+        {filteredOrders.map((order) => {
           const key = (order.status ?? "").toLowerCase();
           const cfg = statusConfig[key] ?? {
             label: order.status ?? "N/A",
@@ -311,11 +378,11 @@ export function OrderManagement() {
         })}
       </div>
 
-      {!isLoading && orders.length === 0 && (
+      {!isLoading && filteredOrders.length === 0 && (
         <Card className="p-12 border-border text-center">
           <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">Chưa có đơn nào</h3>
-          <p className="text-muted-foreground">Đơn hàng sẽ hiển thị ở đây</p>
+          <p className="text-muted-foreground">Không có dữ liệu phù hợp với bộ lọc hiện tại</p>
         </Card>
       )}
     </div>
