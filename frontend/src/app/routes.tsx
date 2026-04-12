@@ -12,6 +12,7 @@ import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
 import { TopUp } from "./components/account/TopUp";
+import { TopUpBills } from "./components/account/TopUpBills";
 import { ComputerList } from "./components/dashboard/ComputerList";
 import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
@@ -93,6 +94,10 @@ export const router = createBrowserRouter([
       {
         path: "top-up",
         Component: TopUp,
+      },
+      {
+        path: "top-up-bills",
+        Component: TopUpBills,
       },
     ],
   },
