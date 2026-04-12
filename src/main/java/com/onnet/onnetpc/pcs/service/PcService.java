@@ -125,6 +125,8 @@ public class PcService {
             pc.getSpec().getDescription(),
             pc.getSpec().getPricePerHour(),
             pc.getLocation(),
+            pc.getStatus() == null ? null : pc.getStatus().name(),
+            pc.getSpec().getAvailable(),
             plans,
             reviews
         );

@@ -15,6 +15,8 @@ public record MachineDetailResponse(
     String description,
     BigDecimal hourlyPrice,
     String location,
+    String status,
+    Boolean available,
     List<SubscriptionPlanPriceResponse> plans,
     List<ReviewSummaryResponse> approvedReviews
 ) {

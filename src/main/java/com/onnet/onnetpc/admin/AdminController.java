@@ -1,6 +1,7 @@
 package com.onnet.onnetpc.admin;
 
 import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminPackageItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
@@ -9,6 +10,7 @@ import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetReviewStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetUserActiveRequest;
+import com.onnet.onnetpc.admin.dto.UpdatePackageRequest;
 import com.onnet.onnetpc.admin.dto.UpdatePcRequest;
 import com.onnet.onnetpc.admin.service.AdminService;
 import com.onnet.onnetpc.common.response.ApiResponse;
@@ -69,6 +71,27 @@ public class AdminController {
         @RequestParam(defaultValue = "10") int size
     ) {
         return ApiResponse.success(adminService.listTopUpPayments(page, size));
+    }
+
+    @GetMapping("/packages")
+    public ApiResponse<Page<AdminPackageItemResponse>> listPackages(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(adminService.listPackages(page, size));
+    }
+
+    @GetMapping("/packages/{planId}")
+    public ApiResponse<AdminPackageItemResponse> getPackage(@PathVariable Long planId) {
+        return ApiResponse.success(adminService.getPackage(planId));
+    }
+
+    @PatchMapping("/packages/{planId}")
+    public ApiResponse<AdminPackageItemResponse> updatePackage(
+        @PathVariable Long planId,
+        @RequestBody UpdatePackageRequest request
+    ) {
+        return ApiResponse.success(adminService.updatePackage(planId, request));
     }
 
     @GetMapping("/pcs")

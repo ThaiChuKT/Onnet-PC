@@ -1,8 +1,9 @@
 import { createBrowserRouter } from "react-router";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
-import { ComputersPage } from "./pages/ComputersPage";
+import { PackageFoldersPage } from "./pages/PackageFoldersPage";
 import { ComputerDetailPage } from "./pages/ComputerDetailPage";
+import { PackagePricingPage } from "./pages/PackagePricingPage";
 import { AIChatPage } from "./pages/AIChatPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -37,7 +38,7 @@ export const router = createBrowserRouter([
     path: "/computers",
     element: (
       <AdminRoute>
-        <ComputersPage />
+        <PackageFoldersPage />
       </AdminRoute>
     ),
   },
@@ -46,6 +47,14 @@ export const router = createBrowserRouter([
     element: (
       <AdminRoute>
         <ComputerDetailPage />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/packages/:tier/edit",
+    element: (
+      <AdminRoute>
+        <PackagePricingPage />
       </AdminRoute>
     ),
   },
