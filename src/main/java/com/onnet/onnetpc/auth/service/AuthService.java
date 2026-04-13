@@ -110,12 +110,16 @@ public class AuthService {
         token.setExpiresAt(Instant.now().plusSeconds(verificationCodeExpiryMinutes * 60));
         tokenRepository.save(token);
 
-        sendVerificationCodeEmail(email, verificationCode);
+        boolean emailSent = sendVerificationCodeEmail(email, verificationCode);
+
+        String registerMessage = emailSent
+            ? "Verification code sent to your email. Enter the code to complete registration."
+            : "Account created, but we could not send the verification email right now. Please try again later.";
 
         return new RegisterResponse(
             targetUser.getId(),
             email,
-            "Verification code sent to your email. Enter the code to complete registration."
+            registerMessage
         );
     }
 
@@ -184,7 +188,7 @@ public class AuthService {
         return String.valueOf(code);
     }
 
-    private void sendVerificationCodeEmail(String email, String code) {
+    private boolean sendVerificationCodeEmail(String email, String code) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(verificationMailFrom);
@@ -195,9 +199,10 @@ public class AuthService {
                     + "This code expires in " + verificationCodeExpiryMinutes + " minutes."
             );
             mailSender.send(message);
+            return true;
         } catch (Exception ex) {
             LOGGER.error("Failed to send verification email to {} via SMTP", email, ex);
-            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send verification email");
+            return false;
         }
     }
 
