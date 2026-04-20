@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { Monitor, Users, TrendingUp, ShoppingCart, ReceiptText } from "lucide-react";
+import { Monitor, Users, TrendingUp, ShoppingCart, ReceiptText, Activity } from "lucide-react";
 
 const menuItems = [
   {
@@ -28,6 +28,11 @@ const menuItems = [
     path: "/dashboard/revenue",
     label: "Revenue",
     icon: TrendingUp,
+  },
+  {
+    path: "/dashboard/sessions",
+    label: "Sessions",
+    icon: Activity,
   },
 ];
 

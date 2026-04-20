@@ -3,6 +3,8 @@ package com.onnet.onnetpc.session;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -61,4 +63,22 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 				order by s.id asc
 		""")
 		List<Long> findExpiredActiveSessionIds(@Param("now") Instant now);
+
+		@Query("""
+				select s
+				from Session s
+				where (:status is null or lower(s.status) = lower(:status))
+					and (
+						:keyword is null
+						or lower(coalesce(s.user.email, '')) like lower(concat('%', :keyword, '%'))
+						or lower(coalesce(s.user.fullName, '')) like lower(concat('%', :keyword, '%'))
+						or lower(coalesce(s.pc.location, '')) like lower(concat('%', :keyword, '%'))
+					)
+				order by s.startTime desc
+		""")
+		Page<Session> searchForAdmin(
+				@Param("status") String status,
+				@Param("keyword") String keyword,
+				Pageable pageable
+		);
 }

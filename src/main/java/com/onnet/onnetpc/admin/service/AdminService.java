@@ -4,6 +4,7 @@ import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPackageItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminSessionItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
@@ -24,6 +25,9 @@ import com.onnet.onnetpc.pcs.ReviewStatus;
 import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.pcs.repository.PcSpecRepository;
 import com.onnet.onnetpc.pcs.repository.ReviewRepository;
+import com.onnet.onnetpc.session.Session;
+import com.onnet.onnetpc.session.SessionRepository;
+import com.onnet.onnetpc.session.dto.EndSessionResponse;
 import com.onnet.onnetpc.subscription.SubscriptionPlan;
 import com.onnet.onnetpc.subscription.repository.SubscriptionPlanRepository;
 import com.onnet.onnetpc.users.User;
@@ -50,6 +54,7 @@ public class AdminService {
     private final ReviewRepository reviewRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final SessionRepository sessionRepository;
 
     public AdminService(
         UserRepository userRepository,
@@ -58,7 +63,8 @@ public class AdminService {
         BookingRepository bookingRepository,
         ReviewRepository reviewRepository,
         WalletTransactionRepository walletTransactionRepository,
-        SubscriptionPlanRepository subscriptionPlanRepository
+        SubscriptionPlanRepository subscriptionPlanRepository,
+        SessionRepository sessionRepository
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
@@ -67,6 +73,7 @@ public class AdminService {
         this.reviewRepository = reviewRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
+        this.sessionRepository = sessionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -136,6 +143,51 @@ public class AdminService {
         return walletTransactionRepository
             .findByTypeOrderByCreatedAtDesc(WalletTransactionType.top_up, pageable)
             .map(this::toAdminUserPayment);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminSessionItemResponse> listSessions(String status, String keyword, int page, int size) {
+        var pageable = PageRequest.of(page, size);
+        String normalizedStatus = status == null || status.isBlank() ? null : status.trim();
+        String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        return sessionRepository.searchForAdmin(normalizedStatus, normalizedKeyword, pageable).map(this::toAdminSession);
+    }
+
+    @Transactional
+    public EndSessionResponse forceEndSession(Long sessionId) {
+        Session session = sessionRepository.findByIdAndStatusForUpdate(sessionId, "active")
+            .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Only ACTIVE session can be force-ended"));
+
+        Instant now = Instant.now();
+        session.setEndTime(now);
+        session.setStatus("ended");
+        sessionRepository.save(session);
+
+        Booking booking = bookingRepository.findById(session.getBooking().getId())
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        boolean hasRemainingTime = booking.getEndTime() != null && now.isBefore(booking.getEndTime());
+        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.completed);
+        booking.setUpdatedAt(now);
+        bookingRepository.save(booking);
+
+        Pc pc = pcRepository.findByIdForUpdate(session.getPc().getId())
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine not found"));
+        if (pc.getStatus() != PcStatus.maintenance) {
+            pc.setStatus(PcStatus.available);
+        }
+        pc.setUpdatedAt(now);
+        pcRepository.save(pc);
+
+        return new EndSessionResponse(
+            session.getId(),
+            booking.getId(),
+            now,
+            true,
+            session.getStatus(),
+            hasRemainingTime
+                ? "Session force-ended by admin. Booking remains paid for remaining time."
+                : "Session force-ended by admin. Booking is fully used."
+        );
     }
 
     @Transactional(readOnly = true)
@@ -351,6 +403,23 @@ public class AdminService {
             booking.getTotalPrice(),
             booking.getStatus() == null ? null : booking.getStatus().name(),
             booking.getCreatedAt()
+        );
+    }
+
+    private AdminSessionItemResponse toAdminSession(Session session) {
+        User user = session.getUser();
+        return new AdminSessionItemResponse(
+            session.getId(),
+            session.getBooking() == null ? null : session.getBooking().getId(),
+            user == null ? null : user.getId(),
+            user == null ? null : user.getEmail(),
+            user == null ? null : user.getFullName(),
+            session.getPc() == null ? null : session.getPc().getId(),
+            session.getPc() == null ? null : session.getPc().getLocation(),
+            session.getStartTime(),
+            session.getEndTime(),
+            session.getTotalCost(),
+            session.getStatus()
         );
     }
 

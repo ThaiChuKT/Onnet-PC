@@ -4,6 +4,7 @@ import com.onnet.onnetpc.admin.dto.AdminBookingItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPackageItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminPcItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
+import com.onnet.onnetpc.admin.dto.AdminSessionItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
@@ -14,6 +15,7 @@ import com.onnet.onnetpc.admin.dto.UpdatePackageRequest;
 import com.onnet.onnetpc.admin.dto.UpdatePcRequest;
 import com.onnet.onnetpc.admin.service.AdminService;
 import com.onnet.onnetpc.common.response.ApiResponse;
+import com.onnet.onnetpc.session.dto.EndSessionResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -71,6 +73,21 @@ public class AdminController {
         @RequestParam(defaultValue = "10") int size
     ) {
         return ApiResponse.success(adminService.listTopUpPayments(page, size));
+    }
+
+    @GetMapping("/sessions")
+    public ApiResponse<Page<AdminSessionItemResponse>> listSessions(
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String keyword,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.success(adminService.listSessions(status, keyword, page, size));
+    }
+
+    @PostMapping("/sessions/{sessionId}/force-end")
+    public ApiResponse<EndSessionResponse> forceEndSession(@PathVariable Long sessionId) {
+        return ApiResponse.success(adminService.forceEndSession(sessionId));
     }
 
     @GetMapping("/packages")

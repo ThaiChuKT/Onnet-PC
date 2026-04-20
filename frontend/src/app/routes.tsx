@@ -18,6 +18,7 @@ import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
 import { OrderManagement } from "./components/dashboard/OrderManagement";
 import { InvoiceManagement } from "./components/dashboard/InvoiceManagement";
+import { SessionManagement } from "./components/dashboard/SessionManagement";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { AdminRoute } from "./auth/AdminRoute";
 import { WalletCheckoutPage } from "./pages/WalletCheckoutPage";
@@ -132,6 +133,10 @@ export const router = createBrowserRouter([
       {
         path: "revenue",
         Component: RevenueStats,
+      },
+      {
+        path: "sessions",
+        Component: SessionManagement,
       },
     ],
   },
