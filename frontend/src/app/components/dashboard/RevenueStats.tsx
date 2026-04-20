@@ -1,6 +1,6 @@
 import { Card } from "../ui/card";
 import { TrendingUp, DollarSign, Calendar, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import {
@@ -16,37 +16,149 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatUsd, formatUsdCompact } from "../../lib/formatUsd";
+import { apiGet } from "../../api/http";
+import { toast } from "sonner";
 
-/** Demo chart data; amounts converted from prior VND mock at 25,000 VND = 1 USD. */
-const monthlyData = [
-  { month: "T1", revenue: 1800, orders: 35, customers: 28 },
-  { month: "T2", revenue: 2080, orders: 42, customers: 35 },
-  { month: "T3", revenue: 1920, orders: 38, customers: 32 },
-  { month: "T4", revenue: 2440, orders: 48, customers: 40 },
-  { month: "T5", revenue: 2320, orders: 45, customers: 38 },
-  { month: "T6", revenue: 2680, orders: 52, customers: 45 },
-  { month: "T7", revenue: 2880, orders: 58, customers: 50 },
-  { month: "T8", revenue: 2760, orders: 55, customers: 48 },
-  { month: "T9", revenue: 3000, orders: 60, customers: 52 },
-  { month: "T10", revenue: 3280, orders: 65, customers: 58 },
-  { month: "T11", revenue: 3120, orders: 62, customers: 55 },
-  { month: "T12", revenue: 3520, orders: 70, customers: 62 },
-];
+type AdminBookingItemResponse = {
+  bookingId: number;
+  userEmail: string;
+  specName: string;
+  totalPrice: number;
+  status: string;
+  createdAt: string;
+};
 
-const categoryData = [
-  { name: "Basic Gaming", revenue: 7200, percentage: 25 },
-  { name: "Pro Gaming", revenue: 14400, percentage: 50 },
-  { name: "Ultra Gaming", revenue: 7200, percentage: 25 },
-];
+type AdminUserPaymentItemResponse = {
+  transactionId: number;
+  amount: number;
+  createdAt: string;
+};
+
+type PageResponse<T> = {
+  content: T[];
+};
+
+type MonthSeed = {
+  key: string;
+  month: string;
+};
+
+type RevenueMonth = {
+  month: string;
+  key: string;
+  revenue: number;
+  orders: number;
+  customers: number;
+};
+
+const PAID_BOOKING_STATUSES = new Set(["active", "completed"]);
+
+function getMonthKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function createRecentMonths(count: number): MonthSeed[] {
+  const now = new Date();
+  const seeds: MonthSeed[] = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const month = d.toLocaleDateString("vi-VN", { month: "short" }).replace("thg", "T").replace(" ", "");
+    seeds.push({ key: getMonthKey(d), month });
+  }
+  return seeds;
+}
 
 export function RevenueStats() {
   const [monthWindow, setMonthWindow] = useState("12");
   const [categoryQuery, setCategoryQuery] = useState("");
-  const currentYear = 2026;
-  const filteredMonthlyData = useMemo(() => {
+  const [bookings, setBookings] = useState<AdminBookingItemResponse[]>([]);
+  const [topUps, setTopUps] = useState<AdminUserPaymentItemResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const [bookingPage, topUpPage] = await Promise.all([
+          apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", { page: 0, size: 500 }),
+          apiGet<PageResponse<AdminUserPaymentItemResponse>>("/admin/payments/topups", { page: 0, size: 500 }),
+        ]);
+        setBookings(bookingPage.content ?? []);
+        setTopUps(topUpPage.content ?? []);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not load revenue data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  const filteredMonthlyData = useMemo<RevenueMonth[]>(() => {
     const len = Math.max(1, Number(monthWindow) || 12);
-    return monthlyData.slice(-len);
-  }, [monthWindow]);
+    const monthSeeds = createRecentMonths(len);
+    const monthIndex = new Map(monthSeeds.map((seed) => [seed.key, seed]));
+    const revenueByMonth = new Map<string, number>();
+    const ordersByMonth = new Map<string, number>();
+    const customersByMonth = new Map<string, Set<string>>();
+
+    bookings
+      .filter((item) => PAID_BOOKING_STATUSES.has((item.status ?? "").toLowerCase()))
+      .forEach((item) => {
+        if (!item.createdAt) return;
+        const createdAt = new Date(item.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return;
+        const key = getMonthKey(createdAt);
+        if (!monthIndex.has(key)) return;
+
+        revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + Number(item.totalPrice ?? 0));
+        ordersByMonth.set(key, (ordersByMonth.get(key) ?? 0) + 1);
+
+        const customerSet = customersByMonth.get(key) ?? new Set<string>();
+        if (item.userEmail) {
+          customerSet.add(item.userEmail.toLowerCase());
+        }
+        customersByMonth.set(key, customerSet);
+      });
+
+    topUps.forEach((item) => {
+      if (!item.createdAt) return;
+      const createdAt = new Date(item.createdAt);
+      if (Number.isNaN(createdAt.getTime())) return;
+      const key = getMonthKey(createdAt);
+      if (!monthIndex.has(key)) return;
+      revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + Number(item.amount ?? 0));
+    });
+
+    return monthSeeds.map((seed) => ({
+      month: seed.month,
+      key: seed.key,
+      revenue: revenueByMonth.get(seed.key) ?? 0,
+      orders: ordersByMonth.get(seed.key) ?? 0,
+      customers: (customersByMonth.get(seed.key) ?? new Set<string>()).size,
+    }));
+  }, [bookings, monthWindow, topUps]);
+
+  const categoryData = useMemo(() => {
+    const categoryMap = new Map<string, number>();
+
+    bookings
+      .filter((item) => PAID_BOOKING_STATUSES.has((item.status ?? "").toLowerCase()))
+      .forEach((item) => {
+        const key = (item.specName ?? "Unknown").trim() || "Unknown";
+        categoryMap.set(key, (categoryMap.get(key) ?? 0) + Number(item.totalPrice ?? 0));
+      });
+
+    const total = Array.from(categoryMap.values()).reduce((sum, value) => sum + value, 0);
+
+    return Array.from(categoryMap.entries())
+      .map(([name, revenue]) => ({
+        name,
+        revenue,
+        percentage: total > 0 ? (revenue / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [bookings]);
 
   const filteredCategoryData = useMemo(() => {
     const q = categoryQuery.trim().toLowerCase();
@@ -54,21 +166,43 @@ export function RevenueStats() {
     return categoryData.filter((cat) => cat.name.toLowerCase().includes(q));
   }, [categoryQuery]);
 
+  const currentYear = new Date().getFullYear();
   const totalRevenue = filteredMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
   const totalOrders = filteredMonthlyData.reduce((sum, item) => sum + item.orders, 0);
-  const avgOrderValue = totalRevenue / totalOrders;
-  const currentMonth = filteredMonthlyData[filteredMonthlyData.length - 1] ?? monthlyData[monthlyData.length - 1];
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const totalCustomers = filteredMonthlyData.reduce((sum, item) => sum + item.customers, 0);
+  const currentMonth =
+    filteredMonthlyData[filteredMonthlyData.length - 1] ?? {
+      month: "T0",
+      key: "",
+      revenue: 0,
+      orders: 0,
+      customers: 0,
+    };
   const previousMonth =
     filteredMonthlyData[filteredMonthlyData.length - 2] ??
-    filteredMonthlyData[filteredMonthlyData.length - 1] ??
-    monthlyData[monthlyData.length - 2];
+    filteredMonthlyData[filteredMonthlyData.length - 1] ?? {
+      month: "T0",
+      key: "",
+      revenue: 0,
+      orders: 0,
+      customers: 0,
+    };
   const growthRate =
     previousMonth.revenue > 0
       ? ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100
       : 0;
 
+  const selectedCategoryRevenue = filteredCategoryData.reduce((sum, cat) => sum + cat.revenue, 0);
+
   return (
     <div>
+      {isLoading && (
+        <Card className="p-6 border-border mb-6">
+          <p className="text-muted-foreground">Đang tải dữ liệu doanh thu...</p>
+        </Card>
+      )}
+
       <div className="grid md:grid-cols-2 gap-3 mb-6">
         <Select value={monthWindow} onValueChange={setMonthWindow}>
           <SelectTrigger className="bg-input-background border-border">
@@ -142,10 +276,10 @@ export function RevenueStats() {
               <Users className="w-6 h-6 text-primary" />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
-          <p className="text-3xl font-bold mb-1">{currentMonth.customers}</p>
+          <p className="text-sm text-muted-foreground mb-1">Khách Hàng (tổng theo tháng)</p>
+          <p className="text-3xl font-bold mb-1">{totalCustomers}</p>
           <p className="text-xs text-muted-foreground">
-            Tháng {filteredMonthlyData.length || monthlyData.length} năm {currentYear}
+            Tháng hiện tại: {currentMonth.customers} khách hàng
           </p>
         </Card>
       </div>
@@ -161,7 +295,7 @@ export function RevenueStats() {
             </span>
           </h2>
           <p className="text-muted-foreground text-sm">
-            Theo dõi doanh thu và số đơn hàng theo từng tháng (áp dụng bộ lọc dashboard)
+            Theo dõi doanh thu theo từng tháng từ đơn hàng đã thanh toán và top-up ví
           </p>
         </div>
 
@@ -259,6 +393,7 @@ export function RevenueStats() {
                 borderRadius: "8px",
                 color: "#fff",
               }}
+              formatter={(value: unknown, name: string) => [Number(value ?? 0), name]}
             />
             <Legend key="orders-legend" wrapperStyle={{ color: "#fff" }} />
             <Bar
@@ -295,13 +430,13 @@ export function RevenueStats() {
         </div>
 
         <div className="space-y-4">
-          {filteredCategoryData.map((category, index) => (
-            <div key={index} className="space-y-2">
+          {filteredCategoryData.map((category) => (
+            <div key={category.name} className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                     <span className="text-white font-bold text-sm">
-                      {category.percentage}%
+                      {category.percentage.toFixed(0)}%
                     </span>
                   </div>
                   <div>
@@ -315,11 +450,15 @@ export function RevenueStats() {
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                  style={{ width: `${category.percentage}%` }}
+                  style={{ width: `${Math.min(100, category.percentage)}%` }}
                 />
               </div>
             </div>
           ))}
+
+          {filteredCategoryData.length === 0 && (
+            <p className="text-sm text-muted-foreground">Không có phân khúc phù hợp với bộ lọc.</p>
+          )}
         </div>
 
         <div className="mt-6 pt-6 border-t border-border">
@@ -328,13 +467,7 @@ export function RevenueStats() {
               Tổng doanh thu phân khúc:
             </span>
             <span className="text-2xl font-bold text-primary">
-              {formatUsd(
-                categoryData.reduce((sum, cat) => sum + cat.revenue, 0),
-              )}
-              {filteredCategoryData
-                .reduce((sum, cat) => sum + cat.revenue, 0)
-                .toLocaleString("vi-VN")}
-              đ
+              {formatUsd(selectedCategoryRevenue)}
             </span>
           </div>
         </div>
