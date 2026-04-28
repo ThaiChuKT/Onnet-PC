@@ -5,7 +5,14 @@ import { Badge } from "../ui/badge";
 import { apiGet } from "../../api/http";
 import { toast } from "sonner";
 import { Input } from "../ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { formatUsd } from "../../lib/formatUsd";
 
 type AdminUserPaymentItemResponse = {
   transactionId: number;
@@ -47,7 +54,9 @@ function inDateRange(createdAt: string, fromDate: string, toDate: string) {
 }
 
 export function InvoiceManagement() {
-  const [topUpItems, setTopUpItems] = useState<AdminUserPaymentItemResponse[]>([]);
+  const [topUpItems, setTopUpItems] = useState<AdminUserPaymentItemResponse[]>(
+    [],
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -58,7 +67,9 @@ export function InvoiceManagement() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const topUpPage = await apiGet<PageResponse<AdminUserPaymentItemResponse>>("/admin/payments/topups", {
+        const topUpPage = await apiGet<
+          PageResponse<AdminUserPaymentItemResponse>
+        >("/admin/payments/topups", {
           page: 0,
           size: 200,
         });
@@ -85,7 +96,10 @@ export function InvoiceManagement() {
     }));
 
     return topUpInvoices.sort((a, b) => {
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      return (
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime()
+      );
     });
   }, [topUpItems]);
 
@@ -111,7 +125,10 @@ export function InvoiceManagement() {
   const stats = useMemo(() => {
     const total = filtered.length;
     const paid = filtered.filter((it) => it.status === "paid").length;
-    const totalAmount = filtered.reduce((sum, it) => sum + Number(it.amount ?? 0), 0);
+    const totalAmount = filtered.reduce(
+      (sum, it) => sum + Number(it.amount ?? 0),
+      0,
+    );
     return { total, paid, unpaid: total - paid, totalAmount };
   }, [filtered]);
 
@@ -142,8 +159,16 @@ export function InvoiceManagement() {
           </SelectContent>
         </Select>
         <div className="grid grid-cols-2 gap-2">
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+          />
         </div>
       </div>
 
@@ -162,7 +187,9 @@ export function InvoiceManagement() {
         </Card>
         <Card className="p-4 border-border bg-gradient-to-br from-primary/10 to-accent/10">
           <p className="text-sm text-muted-foreground">Total bill value</p>
-          <p className="text-xl font-bold text-primary">{stats.totalAmount.toLocaleString("vi-VN")}đ</p>
+          <p className="text-xl font-bold text-primary">
+            {formatUsd(stats.totalAmount)}
+          </p>
         </Card>
       </div>
 
@@ -174,43 +201,66 @@ export function InvoiceManagement() {
           </Card>
         )}
 
-        {!isLoading && filtered.map((item) => {
-          const paid = item.status === "paid";
-          return (
-            <Card key={item.id} className="p-5 border-border hover:border-primary/40 transition-all">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-bold text-lg">{item.code}</h3>
-                    <Badge className={paid ? "bg-accent/20 text-accent border-accent/40" : "bg-yellow-500/20 text-yellow-500 border-yellow-500/40"}>
-                      {paid ? "Paid" : "Unpaid"}
-                    </Badge>
-                    <Badge className="bg-primary/15 text-primary border-primary/40">Top-up</Badge>
-                    <Badge className="bg-muted text-muted-foreground border-border">{item.rawStatus}</Badge>
+        {!isLoading &&
+          filtered.map((item) => {
+            const paid = item.status === "paid";
+            return (
+              <Card
+                key={item.id}
+                className="p-5 border-border hover:border-primary/40 transition-all"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-bold text-lg">{item.code}</h3>
+                      <Badge
+                        className={
+                          paid
+                            ? "bg-accent/20 text-accent border-accent/40"
+                            : "bg-yellow-500/20 text-yellow-500 border-yellow-500/40"
+                        }
+                      >
+                        {paid ? "Paid" : "Unpaid"}
+                      </Badge>
+                      <Badge className="bg-primary/15 text-primary border-primary/40">
+                        Top-up
+                      </Badge>
+                      <Badge className="bg-muted text-muted-foreground border-border">
+                        {item.rawStatus}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {item.userEmail}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Created:{" "}
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleString("vi-VN")
+                        : "-"}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{item.userEmail}</p>
-                  <p className="text-sm text-muted-foreground">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Created: {item.createdAt ? new Date(item.createdAt).toLocaleString("vi-VN") : "-"}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="inline-flex items-center gap-2 text-primary font-bold text-lg">
-                    <Wallet className="w-4 h-4" />
-                    {Number(item.amount ?? 0).toLocaleString("vi-VN")}đ
+                  <div className="text-right">
+                    <div className="inline-flex items-center gap-2 text-primary font-bold text-lg">
+                      <Wallet className="w-4 h-4" />
+                      {formatUsd(Number(item.amount ?? 0))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          );
-        })}
+              </Card>
+            );
+          })}
       </div>
 
       {!isLoading && filtered.length === 0 && (
         <Card className="p-10 text-center border-border">
           <ReceiptText className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
           <p className="font-medium">No invoices found</p>
-          <p className="text-sm text-muted-foreground">Thử thay đổi bộ lọc của tab Invoices.</p>
+          <p className="text-sm text-muted-foreground">
+            Thử thay đổi bộ lọc của tab Invoices.
+          </p>
         </Card>
       )}
     </div>
