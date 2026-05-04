@@ -1,11 +1,24 @@
--- Seed data for rentable PCs (specs + pcs + subscription plans)
--- Safe to import into the existing onnetpc schema from v2_rs.sql.
+-- Reseed core rentable data for 3 plans: Basic, Pro, Ultra
+-- Each plan has exactly 5 PCs.
+-- This script is intended for local/dev reseed.
 
 USE onnetpc;
 
 START TRANSACTION;
 
--- PC SPECS
+-- Clear dependent runtime data first so specs/pcs can be recreated safely.
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE session_queue;
+TRUNCATE TABLE sessions;
+TRUNCATE TABLE reviews;
+TRUNCATE TABLE bookings;
+TRUNCATE TABLE subscription_plans;
+TRUNCATE TABLE pcs;
+TRUNCATE TABLE membership_tier_spec_mappings;
+TRUNCATE TABLE pc_specs;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- 3 plan specs (Basic / Pro / Ultra)
 INSERT INTO pc_specs (
   spec_name,
   cpu,
@@ -18,37 +31,83 @@ INSERT INTO pc_specs (
   is_exclusive,
   is_available
 ) VALUES
-  ('Nebula Starter', 'Intel Core i5-12400F', 'NVIDIA RTX 3060', 16, 512, 'Windows 11', 2.50, 'Entry gaming and school projects', FALSE, TRUE),
-  ('Nebula Plus', 'Intel Core i5-13400F', 'NVIDIA RTX 4060', 16, 1024, 'Windows 11', 3.20, '1080p ultra gaming and livestreaming', FALSE, TRUE),
-  ('Nebula Creator', 'AMD Ryzen 7 5700X', 'NVIDIA RTX 4060 Ti', 32, 1024, 'Windows 11', 3.80, 'Video editing and design workflows', FALSE, TRUE),
-  ('Orion Balanced', 'Intel Core i7-12700F', 'NVIDIA RTX 4070', 32, 1024, 'Windows 11', 4.70, 'Balanced gaming and productivity', FALSE, TRUE),
-  ('Orion Pro', 'AMD Ryzen 7 7700X', 'NVIDIA RTX 4070 Super', 32, 2048, 'Windows 11', 5.40, '4K content creation and rendering', FALSE, TRUE),
-  ('Atlas Gamer', 'Intel Core i7-13700K', 'NVIDIA RTX 4080', 32, 2048, 'Windows 11', 6.90, 'High refresh AAA gaming setup', FALSE, TRUE),
-  ('Atlas Creator', 'AMD Ryzen 9 7900X', 'NVIDIA RTX 4080 Super', 64, 2048, 'Windows 11', 7.80, 'Heavy Adobe and Blender projects', FALSE, TRUE),
-  ('Titan Workstation', 'Intel Core i9-13900K', 'NVIDIA RTX 4090', 64, 4096, 'Windows 11 Pro', 9.50, 'Workstation class compute and rendering', TRUE, TRUE),
-  ('Titan AI', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 128, 4096, 'Ubuntu 22.04', 10.50, 'ML experiments and container workflows', TRUE, TRUE),
-  ('Zephyr Dev', 'AMD Ryzen 5 7600', 'NVIDIA RTX 3070', 32, 1024, 'Ubuntu 22.04', 4.20, 'Programming, docker, and test automation', FALSE, TRUE);
+  (
+    'Basic',
+    'Intel Core i5-12400F',
+    'NVIDIA RTX 3060 12GB',
+    16,
+    512,
+    'Windows 11',
+    2.20,
+    'Balanced entry gaming and study workloads',
+    FALSE,
+    TRUE
+  ),
+  (
+    'Pro',
+    'Intel Core i7-13700F',
+    'NVIDIA RTX 4070 Super 12GB',
+    32,
+    1024,
+    'Windows 11',
+    4.30,
+    'High-FPS gaming, editing, and streaming',
+    FALSE,
+    TRUE
+  ),
+  (
+    'Ultra',
+    'Intel Core i9-14900K',
+    'NVIDIA RTX 4090 24GB',
+    64,
+    2048,
+    'Windows 11 Pro',
+    8.90,
+    'Top-tier rendering, AI, and premium gaming',
+    TRUE,
+    TRUE
+  );
 
--- PCS (physical machines linked to specs)
-INSERT INTO pcs (
-  spec_id,
-  status,
-  location,
-  updated_at,
-  deleted_at
-) VALUES
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Nebula Starter' ORDER BY id DESC LIMIT 1), 'available', 'Zone A - Seat 01', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Nebula Plus' ORDER BY id DESC LIMIT 1), 'available', 'Zone A - Seat 02', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Nebula Creator' ORDER BY id DESC LIMIT 1), 'available', 'Zone A - Seat 03', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Orion Balanced' ORDER BY id DESC LIMIT 1), 'available', 'Zone B - Seat 01', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Orion Pro' ORDER BY id DESC LIMIT 1), 'available', 'Zone B - Seat 02', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Atlas Gamer' ORDER BY id DESC LIMIT 1), 'available', 'Zone B - Seat 03', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Atlas Creator' ORDER BY id DESC LIMIT 1), 'available', 'Zone C - Seat 01', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Titan Workstation' ORDER BY id DESC LIMIT 1), 'available', 'Zone C - Seat 02', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Titan AI' ORDER BY id DESC LIMIT 1), 'available', 'Zone C - Seat 03', NOW(), NULL),
-  ((SELECT id FROM pc_specs WHERE spec_name = 'Zephyr Dev' ORDER BY id DESC LIMIT 1), 'available', 'Zone D - Seat 01', NOW(), NULL);
+-- Map tiers to specs (by tier name, case-insensitive)
+INSERT INTO membership_tier_spec_mappings (tier_id, spec_id)
+SELECT t.id, s.id
+FROM membership_tiers t
+JOIN pc_specs s ON LOWER(t.tier_name) = LOWER(s.spec_name)
+WHERE LOWER(t.tier_name) IN ('basic', 'pro', 'ultra');
 
--- SUBSCRIPTION PLANS (7/30/365 days) for each spec so detail page can display package prices
+-- Seed 5 physical machines per plan
+-- Basic (5)
+INSERT INTO pcs (spec_id, status, location, updated_at, deleted_at)
+SELECT s.id, 'available', CONCAT('Zone A - Seat 0', n.num), NOW(), NULL
+FROM pc_specs s
+JOIN (
+  SELECT 1 AS num UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+) n
+WHERE s.spec_name = 'Basic';
+
+-- Pro (5)
+INSERT INTO pcs (spec_id, status, location, updated_at, deleted_at)
+SELECT s.id, 'available', CONCAT('Zone B - Seat 0', n.num), NOW(), NULL
+FROM pc_specs s
+JOIN (
+  SELECT 1 AS num UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+) n
+WHERE s.spec_name = 'Pro';
+
+-- Ultra (5)
+INSERT INTO pcs (spec_id, status, location, updated_at, deleted_at)
+SELECT s.id, 'available', CONCAT('Zone C - Seat 0', n.num), NOW(), NULL
+FROM pc_specs s
+JOIN (
+  SELECT 1 AS num UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+) n
+WHERE s.spec_name = 'Ultra';
+
+-- Seed subscription plans for each spec
+-- Weekly  = hourly * 4
+-- Monthly = hourly * 12
+-- Yearly  = hourly * 120
+
 INSERT INTO subscription_plans (
   plan_name,
   spec_id,
@@ -57,20 +116,15 @@ INSERT INTO subscription_plans (
   max_hours_per_day,
   is_active
 )
-SELECT CONCAT(s.spec_name, ' - Weekly'), s.id, 7, ROUND(s.price_per_hour * 4, 2), NULL, TRUE
+SELECT
+  CONCAT(s.spec_name, ' - Weekly'),
+  s.id,
+  7,
+  ROUND(s.price_per_hour * 4, 2),
+  NULL,
+  TRUE
 FROM pc_specs s
-WHERE s.spec_name IN (
-  'Nebula Starter',
-  'Nebula Plus',
-  'Nebula Creator',
-  'Orion Balanced',
-  'Orion Pro',
-  'Atlas Gamer',
-  'Atlas Creator',
-  'Titan Workstation',
-  'Titan AI',
-  'Zephyr Dev'
-);
+WHERE s.spec_name IN ('Basic', 'Pro', 'Ultra');
 
 INSERT INTO subscription_plans (
   plan_name,
@@ -80,20 +134,15 @@ INSERT INTO subscription_plans (
   max_hours_per_day,
   is_active
 )
-SELECT CONCAT(s.spec_name, ' - Monthly'), s.id, 30, ROUND(s.price_per_hour * 12, 2), NULL, TRUE
+SELECT
+  CONCAT(s.spec_name, ' - Monthly'),
+  s.id,
+  30,
+  ROUND(s.price_per_hour * 12, 2),
+  NULL,
+  TRUE
 FROM pc_specs s
-WHERE s.spec_name IN (
-  'Nebula Starter',
-  'Nebula Plus',
-  'Nebula Creator',
-  'Orion Balanced',
-  'Orion Pro',
-  'Atlas Gamer',
-  'Atlas Creator',
-  'Titan Workstation',
-  'Titan AI',
-  'Zephyr Dev'
-);
+WHERE s.spec_name IN ('Basic', 'Pro', 'Ultra');
 
 INSERT INTO subscription_plans (
   plan_name,
@@ -103,19 +152,14 @@ INSERT INTO subscription_plans (
   max_hours_per_day,
   is_active
 )
-SELECT CONCAT(s.spec_name, ' - Yearly'), s.id, 365, ROUND(s.price_per_hour * 120, 2), NULL, TRUE
+SELECT
+  CONCAT(s.spec_name, ' - Yearly'),
+  s.id,
+  365,
+  ROUND(s.price_per_hour * 120, 2),
+  NULL,
+  TRUE
 FROM pc_specs s
-WHERE s.spec_name IN (
-  'Nebula Starter',
-  'Nebula Plus',
-  'Nebula Creator',
-  'Orion Balanced',
-  'Orion Pro',
-  'Atlas Gamer',
-  'Atlas Creator',
-  'Titan Workstation',
-  'Titan AI',
-  'Zephyr Dev'
-);
+WHERE s.spec_name IN ('Basic', 'Pro', 'Ultra');
 
 COMMIT;
