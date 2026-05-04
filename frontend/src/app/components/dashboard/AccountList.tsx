@@ -4,12 +4,12 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import {
   CheckCircle,
-  CreditCard,
   Search,
   Shield,
   Trash2,
   User,
   XCircle,
+  BookOpen,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPatch } from "../../api/http";
@@ -46,17 +46,20 @@ type PageResponse<T> = {
   size: number;
 };
 
-type AdminUserPaymentItemResponse = {
-  transactionId: number;
-  walletId: number;
-  userId: number;
+type AdminBookingItemResponse = {
+  bookingId: number;
   userEmail: string;
-  userFullName: string;
-  amount: number;
-  type: string;
-  referenceId: number | null;
-  note: string;
+  specName: string;
+  pcId: number | null;
+  bookingType: string;
+  totalHours: number | null;
+  startTime: string;
+  endTime: string | null;
+  totalPrice: number;
+  status: string;
   createdAt: string;
+  planName: string | null;
+  durationDays: number | null;
 };
 
 export function AccountList() {
@@ -65,12 +68,13 @@ export function AccountList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
-  const [paymentsByUserId, setPaymentsByUserId] = useState<
-    Record<number, AdminUserPaymentItemResponse[]>
+  const [bookingsByUserId, setBookingsByUserId] = useState<
+    Record<number, AdminBookingItemResponse[]>
   >({});
-  const [loadingPaymentsUserId, setLoadingPaymentsUserId] = useState<
+  const [loadingBookingsUserId, setLoadingBookingsUserId] = useState<
     number | null
   >(null);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState("all");
 
   const loadUsers = async (keyword?: string) => {
     setIsLoading(true);
@@ -141,7 +145,7 @@ export function AccountList() {
     }
   };
 
-  const handleTogglePayments = async (user: AdminUserItemResponse) => {
+  const handleToggleBookings = async (user: AdminUserItemResponse) => {
     const isExpanded = expandedUserId === user.id;
     if (isExpanded) {
       setExpandedUserId(null);
@@ -149,22 +153,22 @@ export function AccountList() {
     }
 
     setExpandedUserId(user.id);
-    if (paymentsByUserId[user.id]) {
+    if (bookingsByUserId[user.id]) {
       return;
     }
 
-    setLoadingPaymentsUserId(user.id);
+    setLoadingBookingsUserId(user.id);
     try {
-      const rows = await apiGet<AdminUserPaymentItemResponse[]>(
-        `/admin/users/${user.id}/payments`,
+      const rows = await apiGet<AdminBookingItemResponse[]>(
+        `/admin/users/${user.id}/bookings`,
       );
-      setPaymentsByUserId((prev) => ({ ...prev, [user.id]: rows ?? [] }));
+      setBookingsByUserId((prev) => ({ ...prev, [user.id]: rows ?? [] }));
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Không thể tải lịch sử thanh toán",
+        e instanceof Error ? e.message : "Không thể tải lịch sử subscriptions",
       );
     } finally {
-      setLoadingPaymentsUserId(null);
+      setLoadingBookingsUserId(null);
     }
   };
 
@@ -177,6 +181,28 @@ export function AccountList() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Không thể xóa tài khoản");
     }
+  };
+
+  const getSubscriptionStatus = (booking: AdminBookingItemResponse) => {
+    const now = new Date();
+    const endTime = booking.endTime ? new Date(booking.endTime) : null;
+    
+    if (!endTime) return "unknown";
+    
+    const daysUntilExpiry = Math.ceil(
+      (endTime.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    
+    if (daysUntilExpiry < 0) return "expired";
+    if (daysUntilExpiry <= 3) return "almost-expired";
+    return "active";
+  };
+
+  const getFilteredBookings = (bookings: AdminBookingItemResponse[]) => {
+    return bookings.filter((b) => {
+      if (bookingStatusFilter === "all") return true;
+      return getSubscriptionStatus(b) === bookingStatusFilter;
+    });
   };
 
   const stats = {
@@ -351,11 +377,11 @@ export function AccountList() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleTogglePayments(u)}
+                  onClick={() => handleToggleBookings(u)}
                   className="border-border text-foreground hover:bg-muted"
-                  title="Payment history"
+                  title="Subscription history"
                 >
-                  <CreditCard className="w-4 h-4" />
+                  <BookOpen className="w-4 h-4" />
                 </Button>
 
                 <Button
@@ -385,47 +411,101 @@ export function AccountList() {
             </div>
             {expandedUserId === u.id && (
               <div className="mt-5 rounded-lg border border-border bg-muted/30 p-4">
-                <h4 className="font-semibold mb-3">Payment history</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <h4 className="font-semibold">Subscription history</h4>
+                  <Select value={bookingStatusFilter} onValueChange={setBookingStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-[200px] bg-input-background border-border text-sm">
+                      <SelectValue placeholder="Filter subscriptions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All subscriptions</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="almost-expired">Almost expired (≤3 days)</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                {loadingPaymentsUserId === u.id && (
+                {loadingBookingsUserId === u.id && (
                   <p className="text-sm text-muted-foreground">
-                    Loading payment history...
+                    Loading subscription history...
                   </p>
                 )}
 
-                {loadingPaymentsUserId !== u.id &&
-                  (paymentsByUserId[u.id] ?? []).length === 0 && (
+                {loadingBookingsUserId !== u.id &&
+                  getFilteredBookings(bookingsByUserId[u.id] ?? []).length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      No transactions found for this account.
+                      No subscriptions found for this account.
                     </p>
                   )}
 
-                {loadingPaymentsUserId !== u.id &&
-                  (paymentsByUserId[u.id] ?? []).length > 0 && (
+                {loadingBookingsUserId !== u.id &&
+                  getFilteredBookings(bookingsByUserId[u.id] ?? []).length > 0 && (
                     <div className="space-y-2">
-                      {(paymentsByUserId[u.id] ?? []).slice(0, 10).map((p) => (
-                        <div
-                          key={p.transactionId}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-border bg-card/70 px-3 py-2"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">
-                              #{p.transactionId} • {p.type}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {p.note || "No note"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {p.createdAt
-                                ? new Date(p.createdAt).toLocaleString("vi-VN")
-                                : "-"}
-                            </p>
+                      {getFilteredBookings(bookingsByUserId[u.id] ?? []).slice(0, 10).map((b) => {
+                        const status = getSubscriptionStatus(b);
+                        const statusBadge = status === "active" 
+                          ? "bg-emerald-500/20 text-emerald-600 border-emerald-500/50"
+                          : status === "almost-expired"
+                          ? "bg-yellow-500/20 text-yellow-600 border-yellow-500/50"
+                          : "bg-red-500/20 text-red-600 border-red-500/50";
+                        const statusLabel = status === "active" 
+                          ? "Active" 
+                          : status === "almost-expired" 
+                          ? "Almost expired" 
+                          : "Expired";
+
+                        return (
+                          <div
+                            key={b.bookingId}
+                            className="flex flex-col gap-2 rounded-md border border-border bg-card/70 px-3 py-2"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">
+                                  {b.planName || b.specName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {b.durationDays ? `${b.durationDays} day plan` : "Custom duration"}
+                                </p>
+                              </div>
+                              <Badge className={statusBadge}>
+                                {statusLabel}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Start:</span>
+                                <p className="font-medium">
+                                  {new Date(b.startTime).toLocaleString("vi-VN", {
+                                    year: "numeric",
+                                    month: "2-digit",
+                                    day: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">End:</span>
+                                <p className="font-medium">
+                                  {b.endTime
+                                    ? new Date(b.endTime).toLocaleString("vi-VN", {
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                      })
+                                    : "-"}
+                                </p>
+                              </div>
+                              <div className="sm:text-right">
+                                <span className="text-muted-foreground">Price:</span>
+                                <p className="font-medium text-primary">
+                                  {formatUsd(Number(b.totalPrice ?? 0))}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <p className="font-semibold text-primary">
-                            {formatUsd(Number(p.amount ?? 0))}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
               </div>

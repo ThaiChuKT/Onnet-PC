@@ -139,6 +139,19 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<AdminBookingItemResponse> listUserBookings(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        var bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 100));
+        return bookings.getContent()
+            .stream()
+            .filter(b -> b.getBookingType() == BookingType.subscription)
+            .map(this::toAdminBooking)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Page<AdminUserPaymentItemResponse> listTopUpPayments(int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return walletTransactionRepository

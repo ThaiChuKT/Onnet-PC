@@ -415,7 +415,7 @@ export function RevenueStats() {
             <TrendingUp className="w-5 h-5 text-accent" />
           </div>
           <p className="text-sm text-muted-foreground mb-1">
-            Doanh Thu Top Up {currentYear}
+            Doanh thu từ nạp ví 
           </p>
           <p className="text-3xl font-bold text-primary mb-1">
             {formatUsd(topUpRevenue)}

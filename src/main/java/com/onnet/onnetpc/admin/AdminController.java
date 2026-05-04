@@ -67,6 +67,11 @@ public class AdminController {
         return ApiResponse.success(adminService.listUserPayments(userId));
     }
 
+    @GetMapping("/users/{userId}/bookings")
+    public ApiResponse<List<AdminBookingItemResponse>> listUserBookings(@PathVariable Long userId) {
+        return ApiResponse.success(adminService.listUserBookings(userId));
+    }
+
     @GetMapping("/payments/topups")
     public ApiResponse<Page<AdminUserPaymentItemResponse>> listTopUpPayments(
         @RequestParam(defaultValue = "0") int page,
