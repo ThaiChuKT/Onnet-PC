@@ -15,6 +15,7 @@ import com.onnet.onnetpc.admin.dto.UpdatePackageRequest;
 import com.onnet.onnetpc.admin.dto.UpdatePcRequest;
 import com.onnet.onnetpc.booking.entity.Booking;
 import com.onnet.onnetpc.booking.enums.BookingStatus;
+import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.pcs.Pc;
@@ -350,6 +351,39 @@ public class AdminService {
     }
 
     private AdminUserItemResponse toAdminUser(User user) {
+        Long subscriptionBookingId = null;
+        String subscriptionSpecName = null;
+        java.time.Instant subscriptionEndTime = null;
+        Long activePcId = null;
+        String activePcLocation = null;
+
+        try {
+            var page = bookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(0, 20));
+            for (Booking b : page.getContent()) {
+                if (b.getBookingType() == BookingType.subscription && b.getStatus() == BookingStatus.paid) {
+                    subscriptionBookingId = b.getId();
+                    subscriptionSpecName = b.getSpec() == null ? null : b.getSpec().getSpecName();
+                    subscriptionEndTime = b.getEndTime();
+                    break;
+                }
+            }
+        } catch (Exception ex) {
+            
+        }
+
+        try {
+            var sessions = sessionRepository.findActiveByUserId(user.getId());
+            if (sessions != null && !sessions.isEmpty()) {
+                Session s = sessions.get(0);
+                if (s.getPc() != null) {
+                    activePcId = s.getPc().getId();
+                    activePcLocation = s.getPc().getLocation();
+                }
+            }
+        } catch (Exception ex) {
+            
+        }
+
         return new AdminUserItemResponse(
             user.getId(),
             user.getFullName(),
@@ -357,7 +391,12 @@ public class AdminService {
             user.getPhone(),
             user.getRole() == null ? null : user.getRole().name(),
             user.getActive(),
-            user.getVerified()
+            user.getVerified(),
+            subscriptionBookingId,
+            subscriptionSpecName,
+            subscriptionEndTime,
+            activePcId,
+            activePcLocation
         );
     }
 

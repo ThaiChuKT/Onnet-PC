@@ -16,7 +16,6 @@ import { useNavigate } from "react-router";
 import { Folder, Search, Pencil, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet } from "../api/http";
 import { toast } from "sonner";
-import { formatUsd } from "../lib/formatUsd";
 
 type AdminPackageItemResponse = {
   planId: number;
@@ -159,8 +158,8 @@ export function ComputersPage() {
               return (
                 <Card key={pkg.planId} className="p-5 border-border">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Folder className="w-5 h-5 text-primary" />
                         <h3 className="text-xl font-bold">{pkg.planName}</h3>
                         <Badge className={pkg.active ? "bg-accent/20 text-accent border-accent/50" : "bg-muted text-muted-foreground border-border"}>
@@ -168,63 +167,38 @@ export function ComputersPage() {
                         </Badge>
                       </div>
 
-                      <Badge className="bg-primary/20 text-primary border-primary/50">
-                        PC #{computer.pcId}
-                      </Badge>
-
-                      {/* Specs */}
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Cpu className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.cpu}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.gpu}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MemoryStick className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.ram}GB
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <HardDrive className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {computer.storage}GB
-                          </span>
-                        </div>
+                      <div className="flex flex-wrap gap-2 mb-3 text-sm">
+                        <Badge className="bg-primary/20 text-primary border-primary/50">
+                          {pkg.specName}
+                        </Badge>
+                        <Badge variant="outline" className="border-border">
+                          {pkg.durationDays} days
+                        </Badge>
+                        <Badge variant="outline" className="border-border">
+                          Spec #{pkg.specId}
+                        </Badge>
                       </div>
 
-                      {/* Pricing */}
-                      <div className="pt-3 border-t border-border">
-                        <div className="grid grid-cols-1 gap-2 text-sm">
-                          <div>
-                            <p className="text-muted-foreground text-xs">Hourly rate</p>
-                            <p className="font-bold text-primary">
-                              {Number(computer.hourlyPrice).toLocaleString("en-US")} ₫
-                            </p>
-                          </div>
-                        </div>
+                      <div className="grid gap-2 text-sm text-muted-foreground">
+                        <p>Plan ID: <span className="text-foreground font-medium">{pkg.planId}</span></p>
+                        <p>Max hours/day: <span className="text-foreground font-medium">{pkg.maxHoursPerDay ?? "—"}</span></p>
+                        <p>Price: <span className="text-primary font-bold">{pkg.price.toLocaleString("vi-VN")} ₫</span></p>
                       </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => navigate(`/packages/${pkg.planId}/edit`)}
-                        className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                      >
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit price
-                      </Button>
-                      <Button variant="outline" onClick={() => toggleMachines(pkg.planId)}>
-                        <Monitor className="w-4 h-4 mr-2" />
-                        {expanded ? "Hide machines" : "Show machines"}
-                        {expanded ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
-                      </Button>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <Button
+                          onClick={() => navigate(`/packages/${pkg.planId}/edit`)}
+                          className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit price
+                        </Button>
+                        <Button variant="outline" onClick={() => toggleMachines(pkg.planId)}>
+                          <Monitor className="w-4 h-4 mr-2" />
+                          {expanded ? "Hide machines" : "Show machines"}
+                          {expanded ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
+                        </Button>
+                      </div>
                     </div>
                   </div>
 

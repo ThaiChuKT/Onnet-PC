@@ -7,6 +7,11 @@ public record AdminUserItemResponse(
     String phone,
     String role,
     Boolean active,
-    Boolean verified
+    Boolean verified,
+    Long subscriptionBookingId,
+    String subscriptionSpecName,
+    java.time.Instant subscriptionEndTime,
+    Long activePcId,
+    String activePcLocation
 ) {
 }

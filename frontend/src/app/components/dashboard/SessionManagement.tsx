@@ -15,6 +15,26 @@ import {
 import { Activity, Power, Search } from "lucide-react";
 import { formatUsd } from "../../lib/formatUsd";
 
+function formatDuration(startTime: string, endTime?: string | null): string {
+  const start = new Date(startTime).getTime();
+  const end = endTime ? new Date(endTime).getTime() : Date.now();
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+    return "-";
+  }
+
+  const totalMinutes = Math.floor((end - start) / 60000);
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
 type AdminSessionItemResponse = {
   sessionId: number;
   bookingId: number;
@@ -57,6 +77,7 @@ export function SessionManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [nowTick, setNowTick] = useState(Date.now());
   const [processingSessionId, setProcessingSessionId] = useState<number | null>(
     null,
   );
@@ -85,6 +106,11 @@ export function SessionManagement() {
     const handle = window.setTimeout(() => void loadSessions(), 250);
     return () => window.clearTimeout(handle);
   }, [statusFilter, searchTerm]);
+
+  useEffect(() => {
+    const handle = window.setInterval(() => setNowTick(Date.now()), 60000);
+    return () => window.clearInterval(handle);
+  }, []);
 
   const stats = useMemo(() => {
     const active = items.filter(
@@ -181,6 +207,13 @@ export function SessionManagement() {
           items.map((item) => {
             const status = (item.status ?? "").toLowerCase();
             const isActive = status === "active";
+            const lastUsedLabel =
+              !isActive && item.endTime
+                ? new Date(item.endTime).toLocaleString("vi-VN")
+                : "-";
+            const activeDuration = isActive
+              ? formatDuration(item.startTime, new Date(nowTick).toISOString())
+              : "-";
             return (
               <Card
                 key={item.sessionId}
@@ -200,8 +233,9 @@ export function SessionManagement() {
                       >
                         {item.status}
                       </Badge>
-                      <Badge className="bg-primary/15 text-primary border-primary/40">
-                        Booking #{item.bookingId}
+                      <Badge className="bg-slate-200 text-slate-700 border-slate-300">
+                        {isActive ? "Using for:" : "Last used:"} {" "}
+                        {isActive ? activeDuration : lastUsedLabel}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
