@@ -28,6 +28,8 @@ type AdminBookingItemResponse = {
   totalPrice: number;
   status: string;
   createdAt: string;
+  planName?: string | null;
+  durationDays?: number | null;
 };
 
 type PageResponse<T> = {
@@ -112,6 +114,7 @@ export function OrderManagement() {
         String(o.bookingId).includes(q) ||
         (o.userEmail ?? "").toLowerCase().includes(q) ||
         (o.specName ?? "").toLowerCase().includes(q) ||
+        (o.planName ?? "").toLowerCase().includes(q) ||
         (o.bookingType ?? "").toLowerCase().includes(q);
       const statusHit =
         selectedStatus === "all" ||
@@ -274,8 +277,12 @@ export function OrderManagement() {
                       <span className="font-medium">{order.userEmail}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Spec:</span>{" "}
-                      <span className="font-medium">{order.specName}</span>
+                      <span className="text-muted-foreground">Package:</span>{" "}
+                      <span className="font-medium">
+                        {order.bookingType === "subscription" && order.planName
+                          ? `${order.planName} (${order.durationDays}d)`
+                          : order.specName}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">PC:</span>{" "}
@@ -340,6 +347,9 @@ export function OrderManagement() {
                           <div className="space-y-2 text-sm">
                             <div><span className="text-muted-foreground">User:</span> <span className="font-medium">{selectedOrder.userEmail}</span></div>
                             <div><span className="text-muted-foreground">Spec:</span> <span className="font-medium">{selectedOrder.specName}</span></div>
+                            {selectedOrder.bookingType === "subscription" && selectedOrder.planName && (
+                              <div><span className="text-muted-foreground">Package:</span> <span className="font-medium">{selectedOrder.planName} ({selectedOrder.durationDays}d)</span></div>
+                            )}
                             <div><span className="text-muted-foreground">PC:</span> <span className="font-medium">{selectedOrder.pcId ?? "—"}</span></div>
                             <div><span className="text-muted-foreground">BookingType:</span> <span className="font-medium">{selectedOrder.bookingType}</span></div>
                           </div>

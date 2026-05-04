@@ -430,6 +430,22 @@ public class AdminService {
     }
 
     private AdminBookingItemResponse toAdminBooking(Booking booking) {
+        String planName = null;
+        Integer durationDays = null;
+        
+        if (booking.getBookingType() == BookingType.subscription && booking.getSpec() != null) {
+            try {
+                var plans = subscriptionPlanRepository.findBySpecIdAndActiveTrueOrderByDurationDaysAsc(booking.getSpec().getId());
+                if (!plans.isEmpty()) {
+                    SubscriptionPlan plan = plans.get(0);
+                    planName = plan.getPlanName();
+                    durationDays = plan.getDurationDays();
+                }
+            } catch (Exception ex) {
+                // best effort
+            }
+        }
+        
         return new AdminBookingItemResponse(
             booking.getId(),
             booking.getUser() == null ? null : booking.getUser().getEmail(),
@@ -441,7 +457,9 @@ public class AdminService {
             booking.getEndTime(),
             booking.getTotalPrice(),
             booking.getStatus() == null ? null : booking.getStatus().name(),
-            booking.getCreatedAt()
+            booking.getCreatedAt(),
+            planName,
+            durationDays
         );
     }
 

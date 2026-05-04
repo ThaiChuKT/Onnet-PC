@@ -14,6 +14,8 @@ public record AdminBookingItemResponse(
     Instant endTime,
     BigDecimal totalPrice,
     String status,
-    Instant createdAt
+    Instant createdAt,
+    String planName,
+    Integer durationDays
 ) {
 }
