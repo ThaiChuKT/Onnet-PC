@@ -18,6 +18,7 @@ import {
 import { formatUsd, formatUsdCompact } from "../../lib/formatUsd";
 import { apiGet } from "../../api/http";
 import { toast } from "sonner";
+import { Link } from "react-router";
 
 type AdminBookingItemResponse = {
   bookingId: number;
@@ -51,7 +52,9 @@ type RevenueMonth = {
   customers: number;
 };
 
-const PAID_BOOKING_STATUSES = new Set(["active", "completed"]);
+type DetailMode = "topup" | "bookingRevenue" | "bookingOrders";
+
+const PAID_BOOKING_STATUSES = new Set(["paid", "completed"]);
 
 function getMonthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -71,9 +74,14 @@ function createRecentMonths(count: number): MonthSeed[] {
 export function RevenueStats() {
   const [monthWindow, setMonthWindow] = useState("12");
   const [categoryQuery, setCategoryQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [bookings, setBookings] = useState<AdminBookingItemResponse[]>([]);
   const [topUps, setTopUps] = useState<AdminUserPaymentItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
+  const [selectedMonthLabel, setSelectedMonthLabel] = useState<string>("");
+  const [detailMode, setDetailMode] = useState<DetailMode>("topup");
 
   useEffect(() => {
     const load = async () => {
@@ -85,6 +93,9 @@ export function RevenueStats() {
         ]);
         setBookings(bookingPage.content ?? []);
         setTopUps(topUpPage.content ?? []);
+        // Use console.log instead of console.debug so logs are visible with default DevTools filters.
+        console.log("RevenueStats: bookings loaded", bookingPage.content?.length, bookingPage.content?.slice(0, 3));
+        console.log("RevenueStats: topUps loaded", topUpPage.content?.length, topUpPage.content?.slice(0, 3));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not load revenue data");
       } finally {
@@ -94,9 +105,40 @@ export function RevenueStats() {
     void load();
   }, []);
 
-  const filteredMonthlyData = useMemo<RevenueMonth[]>(() => {
+  const dateRangeStart = useMemo(() => {
+    if (!startDate) return null;
+    const d = new Date(startDate);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [startDate]);
+
+  const dateRangeEnd = useMemo(() => {
+    if (!endDate) return null;
+    const d = new Date(endDate);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [endDate]);
+
+  const monthSeeds = useMemo(() => {
+    if (dateRangeStart || dateRangeEnd) {
+      const start = dateRangeStart || new Date(1970, 0, 1);
+      const end = dateRangeEnd || new Date();
+      const seeds: MonthSeed[] = [];
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (current <= end) {
+        const month = current.toLocaleDateString("vi-VN", { month: "short" }).replace("thg", "T").replace(" ", "");
+        seeds.push({ key: getMonthKey(current), month });
+        current.setMonth(current.getMonth() + 1);
+      }
+      return seeds;
+    }
     const len = Math.max(1, Number(monthWindow) || 12);
-    const monthSeeds = createRecentMonths(len);
+    return createRecentMonths(len);
+  }, [dateRangeStart, dateRangeEnd, monthWindow]);
+
+  const bookingMonthlyData = useMemo<RevenueMonth[]>(() => {
     const monthIndex = new Map(monthSeeds.map((seed) => [seed.key, seed]));
     const revenueByMonth = new Map<string, number>();
     const ordersByMonth = new Map<string, number>();
@@ -108,6 +150,9 @@ export function RevenueStats() {
         if (!item.createdAt) return;
         const createdAt = new Date(item.createdAt);
         if (Number.isNaN(createdAt.getTime())) return;
+        if (dateRangeStart && createdAt < dateRangeStart) return;
+        if (dateRangeEnd && createdAt > dateRangeEnd) return;
+
         const key = getMonthKey(createdAt);
         if (!monthIndex.has(key)) return;
 
@@ -115,16 +160,30 @@ export function RevenueStats() {
         ordersByMonth.set(key, (ordersByMonth.get(key) ?? 0) + 1);
 
         const customerSet = customersByMonth.get(key) ?? new Set<string>();
-        if (item.userEmail) {
-          customerSet.add(item.userEmail.toLowerCase());
-        }
+        if (item.userEmail) customerSet.add(item.userEmail.toLowerCase());
         customersByMonth.set(key, customerSet);
       });
+
+    return monthSeeds.map((seed) => ({
+      month: seed.month,
+      key: seed.key,
+      revenue: revenueByMonth.get(seed.key) ?? 0,
+      orders: ordersByMonth.get(seed.key) ?? 0,
+      customers: (customersByMonth.get(seed.key) ?? new Set<string>()).size,
+    }));
+  }, [bookings, monthSeeds, dateRangeStart, dateRangeEnd]);
+
+  const topUpMonthlyData = useMemo(() => {
+    const monthIndex = new Map(monthSeeds.map((seed) => [seed.key, seed]));
+    const revenueByMonth = new Map<string, number>();
 
     topUps.forEach((item) => {
       if (!item.createdAt) return;
       const createdAt = new Date(item.createdAt);
       if (Number.isNaN(createdAt.getTime())) return;
+      if (dateRangeStart && createdAt < dateRangeStart) return;
+      if (dateRangeEnd && createdAt > dateRangeEnd) return;
+
       const key = getMonthKey(createdAt);
       if (!monthIndex.has(key)) return;
       revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + Number(item.amount ?? 0));
@@ -134,17 +193,24 @@ export function RevenueStats() {
       month: seed.month,
       key: seed.key,
       revenue: revenueByMonth.get(seed.key) ?? 0,
-      orders: ordersByMonth.get(seed.key) ?? 0,
-      customers: (customersByMonth.get(seed.key) ?? new Set<string>()).size,
     }));
-  }, [bookings, monthWindow, topUps]);
+  }, [topUps, monthSeeds, dateRangeStart, dateRangeEnd]);
 
   const categoryData = useMemo(() => {
     const categoryMap = new Map<string, number>();
+    const monthIndex = new Map(monthSeeds.map((seed) => [seed.key, seed]));
 
     bookings
       .filter((item) => PAID_BOOKING_STATUSES.has((item.status ?? "").toLowerCase()))
       .forEach((item) => {
+        if (!item.createdAt) return;
+        const createdAt = new Date(item.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return;
+        if (dateRangeStart && createdAt < dateRangeStart) return;
+        if (dateRangeEnd && createdAt > dateRangeEnd) return;
+        const keyByMonth = getMonthKey(createdAt);
+        if (!monthIndex.has(keyByMonth)) return;
+
         const key = (item.specName ?? "Unknown").trim() || "Unknown";
         categoryMap.set(key, (categoryMap.get(key) ?? 0) + Number(item.totalPrice ?? 0));
       });
@@ -158,7 +224,7 @@ export function RevenueStats() {
         percentage: total > 0 ? (revenue / total) * 100 : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue);
-  }, [bookings]);
+  }, [bookings, monthSeeds, dateRangeStart, dateRangeEnd]);
 
   const filteredCategoryData = useMemo(() => {
     const q = categoryQuery.trim().toLowerCase();
@@ -167,12 +233,12 @@ export function RevenueStats() {
   }, [categoryQuery]);
 
   const currentYear = new Date().getFullYear();
-  const totalRevenue = filteredMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
-  const totalOrders = filteredMonthlyData.reduce((sum, item) => sum + item.orders, 0);
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const totalCustomers = filteredMonthlyData.reduce((sum, item) => sum + item.customers, 0);
+  const topUpRevenue = topUpMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
+  const bookingRevenue = bookingMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalOrders = bookingMonthlyData.reduce((sum, item) => sum + item.orders, 0);
+  const totalCustomers = bookingMonthlyData.reduce((sum, item) => sum + item.customers, 0);
   const currentMonth =
-    filteredMonthlyData[filteredMonthlyData.length - 1] ?? {
+    bookingMonthlyData[bookingMonthlyData.length - 1] ?? {
       month: "T0",
       key: "",
       revenue: 0,
@@ -180,20 +246,123 @@ export function RevenueStats() {
       customers: 0,
     };
   const previousMonth =
-    filteredMonthlyData[filteredMonthlyData.length - 2] ??
-    filteredMonthlyData[filteredMonthlyData.length - 1] ?? {
+    topUpMonthlyData[topUpMonthlyData.length - 2] ??
+    topUpMonthlyData[topUpMonthlyData.length - 1] ?? {
       month: "T0",
       key: "",
       revenue: 0,
-      orders: 0,
-      customers: 0,
+    };
+  const currentTopUpMonth =
+    topUpMonthlyData[topUpMonthlyData.length - 1] ?? {
+      month: "T0",
+      key: "",
+      revenue: 0,
     };
   const growthRate =
     previousMonth.revenue > 0
-      ? ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100
+      ? ((currentTopUpMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100
       : 0;
 
   const selectedCategoryRevenue = filteredCategoryData.reduce((sum, cat) => sum + cat.revenue, 0);
+
+  const selectedMonthBookingDetails = useMemo(() => {
+    if (!selectedMonthKey) return [];
+    return bookings
+      .filter((item) => PAID_BOOKING_STATUSES.has((item.status ?? "").toLowerCase()))
+      .filter((item) => {
+        if (!item.createdAt) return false;
+        const createdAt = new Date(item.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return false;
+        return getMonthKey(createdAt) === selectedMonthKey;
+      })
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  }, [bookings, selectedMonthKey]);
+
+  const selectedMonthTopUpDetails = useMemo(() => {
+    if (!selectedMonthKey) return [];
+    return topUps
+      .filter((item) => {
+        if (!item.createdAt) return false;
+        const createdAt = new Date(item.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return false;
+        return getMonthKey(createdAt) === selectedMonthKey;
+      })
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  }, [topUps, selectedMonthKey]);
+
+  const openMonthDetails = (payload: { key?: string; month?: string } | undefined, mode: DetailMode) => {
+    if (!payload?.key) return;
+    setSelectedMonthKey(payload.key);
+    setSelectedMonthLabel(payload.month ?? payload.key);
+    setDetailMode(mode);
+  };
+
+  const makeClickableDot = (mode: DetailMode, fill: string) => (props: any) => {
+    const { cx, cy, payload } = props;
+    if (cx == null || cy == null) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={fill}
+        stroke="none"
+        style={{ cursor: "pointer" }}
+        onClick={(event) => {
+          event.stopPropagation();
+          openMonthDetails(payload, mode);
+        }}
+      />
+    );
+  };
+
+  const makeClickableBarShape = (mode: DetailMode, fill: string) => (props: any) => {
+    const { x, y, width, height, payload } = props;
+    if (x == null || y == null || width == null || height == null) return null;
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={8}
+        ry={8}
+        fill={fill}
+        style={{ cursor: "pointer" }}
+        onClick={(event) => {
+          event.stopPropagation();
+          openMonthDetails(payload, mode);
+        }}
+      />
+    );
+  };
+
+  const clearDetails = () => {
+    setSelectedMonthKey(null);
+    setSelectedMonthLabel("");
+  };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString("vi-VN");
+  };
+
+  useEffect(() => {
+    console.log("RevenueStats: aggregates", {
+      bookingsCount: bookings.length,
+      topUpsCount: topUps.length,
+      paidStatuses: Array.from(PAID_BOOKING_STATUSES),
+      topUpRevenue,
+      bookingRevenue,
+      totalOrders,
+      totalCustomers,
+      startDate,
+      endDate,
+      monthWindow,
+    });
+  }, [bookings.length, topUps.length, topUpRevenue, bookingRevenue, totalOrders, totalCustomers, startDate, endDate, monthWindow]);
 
   return (
     <div>
@@ -203,8 +372,8 @@ export function RevenueStats() {
         </Card>
       )}
 
-      <div className="grid md:grid-cols-2 gap-3 mb-6">
-        <Select value={monthWindow} onValueChange={setMonthWindow}>
+      <div className="grid md:grid-cols-4 gap-3 mb-6">
+        <Select value={monthWindow} onValueChange={setMonthWindow} disabled={!!startDate || !!endDate}>
           <SelectTrigger className="bg-input-background border-border">
             <SelectValue placeholder="Khoảng thời gian" />
           </SelectTrigger>
@@ -214,6 +383,20 @@ export function RevenueStats() {
             <SelectItem value="3">3 tháng gần nhất</SelectItem>
           </SelectContent>
         </Select>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          placeholder="Từ ngày"
+          className="bg-input-background border-border"
+        />
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          placeholder="Đến ngày"
+          className="bg-input-background border-border"
+        />
         <Input
           value={categoryQuery}
           onChange={(e) => setCategoryQuery(e.target.value)}
@@ -232,13 +415,13 @@ export function RevenueStats() {
             <TrendingUp className="w-5 h-5 text-accent" />
           </div>
           <p className="text-sm text-muted-foreground mb-1">
-            Tổng Doanh Thu {currentYear}
+            Doanh Thu Top Up {currentYear}
           </p>
           <p className="text-3xl font-bold text-primary mb-1">
-            {formatUsd(totalRevenue)}
+            {formatUsd(topUpRevenue)}
           </p>
           <p className="text-xs text-accent">
-            +{growthRate.toFixed(1)}% so với tháng trước
+            +{growthRate.toFixed(1)}% top up so với tháng trước
           </p>
         </Card>
 
@@ -251,7 +434,7 @@ export function RevenueStats() {
           <p className="text-sm text-muted-foreground mb-1">Tổng Đơn Hàng</p>
           <p className="text-3xl font-bold mb-1">{totalOrders}</p>
           <p className="text-xs text-muted-foreground">
-            Trung bình {(totalOrders / Math.max(filteredMonthlyData.length, 1)).toFixed(0)} đơn/tháng
+            Trung bình {(totalOrders / Math.max(bookingMonthlyData.length, 1)).toFixed(0)} đơn/tháng
           </p>
         </Card>
 
@@ -261,12 +444,12 @@ export function RevenueStats() {
               <DollarSign className="w-6 h-6 text-secondary" />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mb-1">Giá Trị TB/Đơn</p>
+          <p className="text-sm text-muted-foreground mb-1">Doanh thu từ khách đặt máy</p>
           <p className="text-3xl font-bold text-secondary mb-1">
-            {formatUsd(avgOrderValue)}
+            {formatUsd(bookingRevenue)}
           </p>
           <p className="text-xs text-muted-foreground">
-            Doanh thu trung bình mỗi đơn
+            Tổng doanh thu phát sinh từ đơn thuê máy (không gồm nạp ví)
           </p>
         </Card>
 
@@ -276,7 +459,7 @@ export function RevenueStats() {
               <Users className="w-6 h-6 text-primary" />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mb-1">Khách Hàng (tổng theo tháng)</p>
+          <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
           <p className="text-3xl font-bold mb-1">{totalCustomers}</p>
           <p className="text-xs text-muted-foreground">
             Tháng hiện tại: {currentMonth.customers} khách hàng
@@ -284,72 +467,133 @@ export function RevenueStats() {
         </Card>
       </div>
 
-      {/* Revenue Chart */}
-      <Card className="p-6 border-border mb-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2">
-            Biểu Đồ
-            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              {" "}
-              Doanh Thu Năm {currentYear}
-            </span>
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Theo dõi doanh thu theo từng tháng từ đơn hàng đã thanh toán và top-up ví
-          </p>
-        </div>
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <Card className="p-6 border-border">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-2">
+              Biểu Đồ
+              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                {" "}
+                Top Up
+              </span>
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Theo dõi doanh thu top up theo từng tháng
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Nhấn vào điểm trên biểu đồ để xem chi tiết tháng.</p>
+          </div>
 
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart
-            data={filteredMonthlyData}
-            id="revenue-chart"
-            key="revenue-line-chart"
-          >
-            <CartesianGrid
-              key="revenue-grid"
-              strokeDasharray="3 3"
-              stroke="#333"
-              opacity={0.3}
-            />
-            <XAxis
-              key="revenue-xaxis"
-              dataKey="month"
-              stroke="#888"
-              style={{ fontSize: "12px" }}
-            />
-            <YAxis
-              key="revenue-yaxis"
-              stroke="#888"
-              style={{ fontSize: "12px" }}
-              tickFormatter={(value) => formatUsdCompact(Number(value))}
-            />
-            <Tooltip
-              key="revenue-tooltip"
-              contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #444",
-                borderRadius: "8px",
-                color: "#fff",
-              }}
-              formatter={(value: unknown) => [
-                formatUsd(Number(value ?? 0)),
-                "Doanh thu",
-              ]}
-            />
-            <Legend key="revenue-legend" wrapperStyle={{ color: "#fff" }} />
-            <Line
-              key="revenue-line"
-              type="monotone"
-              dataKey="revenue"
-              name="Doanh thu"
-              stroke="#ff6b35"
-              strokeWidth={3}
-              dot={{ fill: "#ff6b35", r: 4 }}
-              activeDot={{ r: 6, fill: "#ff4500" }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={topUpMonthlyData} id="topup-chart" key="topup-line-chart">
+              <CartesianGrid
+                key="topup-grid"
+                strokeDasharray="3 3"
+                stroke="#333"
+                opacity={0.3}
+              />
+              <XAxis
+                key="topup-xaxis"
+                dataKey="month"
+                stroke="#888"
+                style={{ fontSize: "12px" }}
+              />
+              <YAxis
+                key="topup-yaxis"
+                stroke="#888"
+                style={{ fontSize: "12px" }}
+                tickFormatter={(value) => formatUsdCompact(Number(value))}
+              />
+              <Tooltip
+                key="topup-tooltip"
+                contentStyle={{
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #444",
+                  borderRadius: "8px",
+                  color: "#fff",
+                }}
+                formatter={(value: unknown) => [
+                  formatUsd(Number(value ?? 0)),
+                  "Top up",
+                ]}
+              />
+              <Legend key="topup-legend" wrapperStyle={{ color: "#fff" }} />
+              <Line
+                key="topup-line"
+                type="monotone"
+                dataKey="revenue"
+                name="Top up"
+                stroke="#ff6b35"
+                strokeWidth={3}
+                dot={makeClickableDot("topup", "#ff6b35")}
+                activeDot={{ r: 6, fill: "#ff4500" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card className="p-6 border-border">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-2">
+              Biểu Đồ
+              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                {" "}
+                Booking
+              </span>
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Theo dõi doanh thu booking theo từng tháng
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Nhấn vào điểm trên biểu đồ để xem chi tiết tháng.</p>
+          </div>
+
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={bookingMonthlyData} id="booking-chart" key="booking-line-chart">
+              <CartesianGrid
+                key="booking-grid"
+                strokeDasharray="3 3"
+                stroke="#333"
+                opacity={0.3}
+              />
+              <XAxis
+                key="booking-xaxis"
+                dataKey="month"
+                stroke="#888"
+                style={{ fontSize: "12px" }}
+              />
+              <YAxis
+                key="booking-yaxis"
+                stroke="#888"
+                style={{ fontSize: "12px" }}
+                tickFormatter={(value) => formatUsdCompact(Number(value))}
+              />
+              <Tooltip
+                key="booking-tooltip"
+                contentStyle={{
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #444",
+                  borderRadius: "8px",
+                  color: "#fff",
+                }}
+                formatter={(value: unknown) => [
+                  formatUsd(Number(value ?? 0)),
+                  "Booking",
+                ]}
+              />
+              <Legend key="booking-legend" wrapperStyle={{ color: "#fff" }} />
+              <Line
+                key="booking-line"
+                type="monotone"
+                dataKey="revenue"
+                name="Booking"
+                stroke="#4ade80"
+                strokeWidth={3}
+                dot={makeClickableDot("bookingRevenue", "#4ade80")}
+                activeDot={{ r: 6, fill: "#22c55e" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
 
       {/* Orders Chart */}
       <Card className="p-6 border-border mb-6">
@@ -364,10 +608,11 @@ export function RevenueStats() {
           <p className="text-muted-foreground text-sm">
             So sánh số lượng đơn hàng và khách hàng theo tháng
           </p>
+          <p className="text-xs text-muted-foreground mt-1">Nhấn vào cột để xem chi tiết booking của tháng.</p>
         </div>
 
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={filteredMonthlyData} id="orders-chart" key="orders-bar-chart">
+          <BarChart data={bookingMonthlyData} id="orders-chart" key="orders-bar-chart">
             <CartesianGrid
               key="orders-grid"
               strokeDasharray="3 3"
@@ -393,7 +638,7 @@ export function RevenueStats() {
                 borderRadius: "8px",
                 color: "#fff",
               }}
-              formatter={(value: unknown, name: string) => [Number(value ?? 0), name]}
+                 formatter={(value: unknown) => [Number(value ?? 0)]}
             />
             <Legend key="orders-legend" wrapperStyle={{ color: "#fff" }} />
             <Bar
@@ -401,6 +646,7 @@ export function RevenueStats() {
               dataKey="orders"
               name="Đơn hàng"
               fill="#ff6b35"
+              shape={makeClickableBarShape("bookingOrders", "#ff6b35")}
               radius={[8, 8, 0, 0]}
             />
             <Bar
@@ -408,69 +654,144 @@ export function RevenueStats() {
               dataKey="customers"
               name="Khách hàng"
               fill="#4ade80"
+              shape={makeClickableBarShape("bookingOrders", "#4ade80")}
               radius={[8, 8, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
       </Card>
 
-      {/* Category Revenue */}
-      <Card className="p-6 border-border">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2">
-            Doanh Thu
-            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              {" "}
-              Theo Phân Khúc
-            </span>
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Phân tích doanh thu theo từng loại máy
-          </p>
-        </div>
+      {selectedMonthKey && (
+        <Card className="p-6 border-border mb-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-xl font-bold">Chi tiết tháng {selectedMonthLabel}</h3>
+              <p className="text-sm text-muted-foreground">
+                {detailMode === "topup" && "Danh sách giao dịch top up"}
+                {detailMode === "bookingRevenue" && "Danh sách booking theo doanh thu"}
+                {detailMode === "bookingOrders" && "Danh sách booking từ biểu đồ đơn hàng"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearDetails}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Đóng chi tiết
+            </button>
+          </div>
 
-        <div className="space-y-4">
-          {filteredCategoryData.map((category) => (
-            <div key={category.name} className="space-y-2">
+          {detailMode === "topup" ? (
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">
-                      {category.percentage.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold">{category.name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {formatUsd(category.revenue)}
-                    </p>
+                <span className="text-sm text-muted-foreground">Số giao dịch: {selectedMonthTopUpDetails.length}</span>
+                <Link to="/dashboard/invoices" className="text-sm text-primary hover:underline">
+                  Xem đầy đủ trong Invoices
+                </Link>
+              </div>
+              {selectedMonthTopUpDetails.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Không có giao dịch top up trong tháng này.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedMonthTopUpDetails.slice(0, 20).map((item) => (
+                    <div key={item.transactionId} className="border border-border rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Top up #{item.transactionId}</p>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
+                      </div>
+                      <p className="font-semibold text-primary">{formatUsd(Number(item.amount ?? 0))}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Số booking: {selectedMonthBookingDetails.length}</span>
+                <Link to="/dashboard/orders" className="text-sm text-primary hover:underline">
+                  Xem đầy đủ trong Orders
+                </Link>
+              </div>
+              {selectedMonthBookingDetails.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Không có booking phù hợp trong tháng này.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedMonthBookingDetails.slice(0, 20).map((item) => (
+                    <div key={item.bookingId} className="border border-border rounded-lg p-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">Booking #{item.bookingId} - {item.userEmail || "(no email)"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.specName || "Unknown spec"} | {String(item.status || "").toUpperCase()} | {formatDateTime(item.createdAt)}
+                        </p>
+                      </div>
+                      <p className="font-semibold text-secondary">{formatUsd(Number(item.totalPrice ?? 0))}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Category Revenue */}
+      <Card className="p-6 border-border mb-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-2">
+              Doanh Thu
+              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                {" "}
+                Theo Phân Khúc
+              </span>
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Phân tích doanh thu theo từng loại máy
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {filteredCategoryData.map((category) => (
+              <div key={category.name} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">
+                        {category.percentage.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold">{category.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {formatUsd(category.revenue)}
+                      </p>
+                    </div>
                   </div>
                 </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, category.percentage)}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, category.percentage)}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
 
-          {filteredCategoryData.length === 0 && (
-            <p className="text-sm text-muted-foreground">Không có phân khúc phù hợp với bộ lọc.</p>
-          )}
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">
-              Tổng doanh thu phân khúc:
-            </span>
-            <span className="text-2xl font-bold text-primary">
-              {formatUsd(selectedCategoryRevenue)}
-            </span>
+            {filteredCategoryData.length === 0 && (
+              <p className="text-sm text-muted-foreground">Không có phân khúc phù hợp với bộ lọc.</p>
+            )}
           </div>
-        </div>
+
+          <div className="mt-6 pt-6 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">
+                Tổng doanh thu phân khúc:
+              </span>
+              <span className="text-2xl font-bold text-primary">
+                {formatUsd(selectedCategoryRevenue)}
+              </span>
+            </div>
+          </div>
       </Card>
     </div>
   );
