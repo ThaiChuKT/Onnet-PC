@@ -6,7 +6,7 @@ USE onnetpc;
 
 START TRANSACTION;
 
--- Clear dependent runtime data first so specs/pcs can be recreated safely.
+-- Clear dependent runtime data first so specs/pcs can be recreated safely. (bỏ nếu lỗi)
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE session_queue;
 TRUNCATE TABLE sessions;
