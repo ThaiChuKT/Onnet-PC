@@ -4,6 +4,7 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import {
   CheckCircle,
+  CreditCard,
   Search,
   Shield,
   Trash2,
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { formatUsd } from "../../lib/formatUsd";
 
 type AdminUserItemResponse = {
   id: number;
@@ -44,11 +46,31 @@ type PageResponse<T> = {
   size: number;
 };
 
+type AdminUserPaymentItemResponse = {
+  transactionId: number;
+  walletId: number;
+  userId: number;
+  userEmail: string;
+  userFullName: string;
+  amount: number;
+  type: string;
+  referenceId: number | null;
+  note: string;
+  createdAt: string;
+};
+
 export function AccountList() {
   const [users, setUsers] = useState<AdminUserItemResponse[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [paymentsByUserId, setPaymentsByUserId] = useState<
+    Record<number, AdminUserPaymentItemResponse[]>
+  >({});
+  const [loadingPaymentsUserId, setLoadingPaymentsUserId] = useState<
+    number | null
+  >(null);
 
   const loadUsers = async (keyword?: string) => {
     setIsLoading(true);
@@ -116,6 +138,33 @@ export function AccountList() {
       toast.error(
         e instanceof Error ? e.message : "Không thể cập nhật trạng thái",
       );
+    }
+  };
+
+  const handleTogglePayments = async (user: AdminUserItemResponse) => {
+    const isExpanded = expandedUserId === user.id;
+    if (isExpanded) {
+      setExpandedUserId(null);
+      return;
+    }
+
+    setExpandedUserId(user.id);
+    if (paymentsByUserId[user.id]) {
+      return;
+    }
+
+    setLoadingPaymentsUserId(user.id);
+    try {
+      const rows = await apiGet<AdminUserPaymentItemResponse[]>(
+        `/admin/users/${user.id}/payments`,
+      );
+      setPaymentsByUserId((prev) => ({ ...prev, [user.id]: rows ?? [] }));
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Không thể tải lịch sử thanh toán",
+      );
+    } finally {
+      setLoadingPaymentsUserId(null);
     }
   };
 
@@ -302,6 +351,16 @@ export function AccountList() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => handleTogglePayments(u)}
+                  className="border-border text-foreground hover:bg-muted"
+                  title="Payment history"
+                >
+                  <CreditCard className="w-4 h-4" />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleToggleActive(u)}
                   className="border-primary text-foreground hover:bg-primary/10"
                   title={u.active ? "Deactivate" : "Activate"}
@@ -324,6 +383,53 @@ export function AccountList() {
                 </Button>
               </div>
             </div>
+            {expandedUserId === u.id && (
+              <div className="mt-5 rounded-lg border border-border bg-muted/30 p-4">
+                <h4 className="font-semibold mb-3">Payment history</h4>
+
+                {loadingPaymentsUserId === u.id && (
+                  <p className="text-sm text-muted-foreground">
+                    Loading payment history...
+                  </p>
+                )}
+
+                {loadingPaymentsUserId !== u.id &&
+                  (paymentsByUserId[u.id] ?? []).length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No transactions found for this account.
+                    </p>
+                  )}
+
+                {loadingPaymentsUserId !== u.id &&
+                  (paymentsByUserId[u.id] ?? []).length > 0 && (
+                    <div className="space-y-2">
+                      {(paymentsByUserId[u.id] ?? []).slice(0, 10).map((p) => (
+                        <div
+                          key={p.transactionId}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-border bg-card/70 px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              #{p.transactionId} • {p.type}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {p.note || "No note"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {p.createdAt
+                                ? new Date(p.createdAt).toLocaleString("vi-VN")
+                                : "-"}
+                            </p>
+                          </div>
+                          <p className="font-semibold text-primary">
+                            {formatUsd(Number(p.amount ?? 0))}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            )}
           </Card>
         ))}
       </div>
