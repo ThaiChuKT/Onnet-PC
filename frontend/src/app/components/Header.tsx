@@ -19,7 +19,9 @@ export function Header() {
       return;
     }
     try {
-      const wallet = await apiGet<{ walletId: number; balance: number }>("/wallet");
+      const wallet = await apiGet<{ walletId: number; balance: number }>(
+        "/wallet",
+      );
       setBalance(Number(wallet.balance));
     } catch {
       setBalance(null);
@@ -46,7 +48,10 @@ export function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to={isAdmin ? "/dashboard" : "/"} className="flex items-center gap-2">
+        <Link
+          to={isAdmin ? "/dashboard" : "/"}
+          className="flex items-center gap-2"
+        >
           <div className="bg-gradient-to-br from-primary to-accent p-2 rounded-lg">
             <Monitor className="w-6 h-6 text-white" />
           </div>
@@ -57,68 +62,60 @@ export function Header() {
 
         <nav className="hidden md:flex items-center gap-8">
           {isAdmin ? (
-            <Link
-              to="/dashboard"
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Dashboard Home
-            </Link>
+            <>
+              <Link
+                to="/dashboard"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                Dashboard Home
+              </Link>
+              <Link
+                to="/computers"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                PC catalog
+              </Link>
+            </>
           ) : (
-            <a
-              href="/#home"
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Home
-            </a>
+            <>
+              <a
+                href="/#home"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                Home
+              </a>
+              <a
+                href="/#packages"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                Plans
+              </a>
+              <a
+                href="/#features"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                Features
+              </a>
+            </>
           )}
-          {isAdmin && (
-            <Link
-              to="/computers"
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              PC catalog
-            </Link>
-          )}
-          <a
-            href="/#packages"
-            className="text-foreground hover:text-primary transition-colors"
-          >
-            Plans
-          </a>
-          <a
-            href="/#features"
-            className="text-foreground hover:text-primary transition-colors"
-          >
-            Features
-          </a>
-          {isAdmin && (
-            <Link
-              to="/dashboard"
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Dashboard
-            </Link>
-          )}
-          <a
-            href="/#contact"
-            className="text-foreground hover:text-primary transition-colors"
-          >
-            Contact
-          </a>
         </nav>
 
         <div className="flex items-center gap-4">
           {isAuthenticated ? (
             <>
-              <div className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
-                <Wallet className="w-5 h-5 text-primary" />
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Balance</span>
-                  <span className="text-sm font-bold text-primary">
-                    {balance === null ? "—" : formatUsd(balance)}
-                  </span>
+              {!isAdmin && (
+                <div className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">
+                      Balance
+                    </span>
+                    <span className="text-sm font-bold text-primary">
+                      {balance === null ? "—" : formatUsd(balance)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div
                 onClick={() => navigate("/account")}
@@ -131,9 +128,7 @@ export function Header() {
                   <span className="text-sm font-bold">
                     {user?.email?.split("@")[0] ?? "User"}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    Account
-                  </span>
+                  <span className="text-xs text-muted-foreground">Account</span>
                 </div>
               </div>
 
