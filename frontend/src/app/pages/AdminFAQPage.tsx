@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Card } from "../components/ui/card";
 import { ChevronDown } from "lucide-react";
+import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
 
 type FAQItem = {
   id: string;
@@ -148,7 +150,9 @@ export function AdminFAQPage() {
     : FAQItems;
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <Header />
+      <div className="min-h-screen bg-background pt-20">
       <div className="max-w-4xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-12 text-center">
@@ -242,6 +246,8 @@ export function AdminFAQPage() {
           </div>
         </Card>
       </div>
-    </div>
+      </div>
+      <Footer />
+    </>
   );
 }
