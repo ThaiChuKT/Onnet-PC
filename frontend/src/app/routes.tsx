@@ -75,6 +75,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/faq-admin",
+    element: (
+      <AdminRoute>
+        <AdminFAQPage />
+      </AdminRoute>
+    ),
+  },
+  {
     path: "/account",
     element: (
       <ProtectedRoute>
@@ -143,10 +151,6 @@ export const router = createBrowserRouter([
       {
         path: "sessions",
         Component: SessionManagement,
-      },
-      {
-        path: "faq",
-        Component: AdminFAQPage,
       },
     ],
   },

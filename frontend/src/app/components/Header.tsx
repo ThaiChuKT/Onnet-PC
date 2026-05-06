@@ -75,6 +75,13 @@ export function Header() {
               >
                 PC catalog
               </Link>
+              <Link
+                to="/faq-admin"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                FAQ Management
+              </Link>
+
             </>
           ) : (
             <>
@@ -95,6 +102,12 @@ export function Header() {
                 className="text-foreground hover:text-primary transition-colors"
               >
                 Features
+              </a>
+              <a
+                href="/faq"
+                className="text-foreground hover:text-primary transition-colors"
+              >
+                FAQ
               </a>
             </>
           )}
