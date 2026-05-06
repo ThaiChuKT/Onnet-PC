@@ -8,6 +8,8 @@ import { AIChatPage } from "./pages/AIChatPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EmailVerificationPage } from "./pages/EmailVerificationPage";
+import { FAQPage } from "./pages/FAQPage";
+import { AdminFAQPage } from "./pages/AdminFAQPage";
 import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
@@ -103,6 +105,10 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    path: "/faq",
+    Component: FAQPage,
+  },
+  {
     path: "/dashboard",
     element: (
       <AdminRoute>
@@ -137,6 +143,10 @@ export const router = createBrowserRouter([
       {
         path: "sessions",
         Component: SessionManagement,
+      },
+      {
+        path: "faq",
+        Component: AdminFAQPage,
       },
     ],
   },
