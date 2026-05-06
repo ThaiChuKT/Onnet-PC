@@ -74,6 +74,10 @@ function createRecentMonths(count: number): MonthSeed[] {
 export function RevenueStats() {
   const [monthWindow, setMonthWindow] = useState("12");
   const [categoryQuery, setCategoryQuery] = useState("");
+  const [categoryRevenueMin, setCategoryRevenueMin] = useState("");
+  const [categoryRevenueMax, setCategoryRevenueMax] = useState("");
+  const [categoryUsersMin, setCategoryUsersMin] = useState("");
+  const [categoryUsersMax, setCategoryUsersMax] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [bookings, setBookings] = useState<AdminBookingItemResponse[]>([]);
@@ -197,7 +201,7 @@ export function RevenueStats() {
   }, [topUps, monthSeeds, dateRangeStart, dateRangeEnd]);
 
   const categoryData = useMemo(() => {
-    const categoryMap = new Map<string, number>();
+    const categoryMap = new Map<string, { revenue: number; users: Set<string>; count: number }>();
     const monthIndex = new Map(monthSeeds.map((seed) => [seed.key, seed]));
 
     bookings
@@ -212,27 +216,61 @@ export function RevenueStats() {
         if (!monthIndex.has(keyByMonth)) return;
 
         const key = (item.specName ?? "Unknown").trim() || "Unknown";
-        categoryMap.set(key, (categoryMap.get(key) ?? 0) + Number(item.totalPrice ?? 0));
+        const current = categoryMap.get(key) ?? { revenue: 0, users: new Set<string>(), count: 0 };
+        current.revenue += Number(item.totalPrice ?? 0);
+        current.count += 1;
+        if (item.userEmail) current.users.add(item.userEmail.toLowerCase());
+        categoryMap.set(key, current);
       });
 
-    const total = Array.from(categoryMap.values()).reduce((sum, value) => sum + value, 0);
+    const total = Array.from(categoryMap.values()).reduce((sum, value) => sum + value.revenue, 0);
 
-    return Array.from(categoryMap.entries())
-      .map(([name, revenue]) => ({
+    const result = Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
         name,
-        revenue,
-        percentage: total > 0 ? (revenue / total) * 100 : 0,
+        revenue: data.revenue,
+        percentage: total > 0 ? (data.revenue / total) * 100 : 0,
+        users: data.users.size,
+        count: data.count,
       }))
       .sort((a, b) => b.revenue - a.revenue);
+
+    console.log("RevenueStats categoryData:", {
+      categoryMap: Object.fromEntries(categoryMap.entries()),
+      result,
+      total,
+      bookingsCount: bookings.length,
+    });
+
+    return result;
   }, [bookings, monthSeeds, dateRangeStart, dateRangeEnd]);
 
   const filteredCategoryData = useMemo(() => {
+    let result = categoryData;
+    
+    // Filter by name
     const q = categoryQuery.trim().toLowerCase();
-    if (!q) return categoryData;
-    return categoryData.filter((cat) => cat.name.toLowerCase().includes(q));
-  }, [categoryQuery]);
+    if (q) {
+      result = result.filter((cat) => cat.name.toLowerCase().includes(q));
+    }
 
-  const currentYear = new Date().getFullYear();
+    // Filter by revenue range
+    if (categoryRevenueMin || categoryRevenueMax) {
+      const min = categoryRevenueMin ? Number(categoryRevenueMin) : 0;
+      const max = categoryRevenueMax ? Number(categoryRevenueMax) : Infinity;
+      result = result.filter((cat) => cat.revenue >= min && cat.revenue <= max);
+    }
+
+    // Filter by users range
+    if (categoryUsersMin || categoryUsersMax) {
+      const min = categoryUsersMin ? Number(categoryUsersMin) : 0;
+      const max = categoryUsersMax ? Number(categoryUsersMax) : Infinity;
+      result = result.filter((cat) => cat.users >= min && cat.users <= max);
+    }
+
+    return result;
+  }, [categoryData, categoryQuery, categoryRevenueMin, categoryRevenueMax, categoryUsersMin, categoryUsersMax]);
+
   const topUpRevenue = topUpMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
   const bookingRevenue = bookingMonthlyData.reduce((sum, item) => sum + item.revenue, 0);
   const totalOrders = bookingMonthlyData.reduce((sum, item) => sum + item.orders, 0);
@@ -407,64 +445,72 @@ export function RevenueStats() {
 
       {/* Stats Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-primary/20 p-3 rounded-lg">
-              <DollarSign className="w-6 h-6 text-primary" />
+        <Link to="/dashboard/invoices">
+          <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10 cursor-pointer hover:shadow-lg hover:shadow-primary/25 transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-primary/20 p-3 rounded-lg">
+                <DollarSign className="w-6 h-6 text-primary" />
+              </div>
+              <TrendingUp className="w-5 h-5 text-accent" />
             </div>
-            <TrendingUp className="w-5 h-5 text-accent" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">
-            Doanh thu từ nạp ví 
-          </p>
-          <p className="text-3xl font-bold text-primary mb-1">
-            {formatUsd(topUpRevenue)}
-          </p>
-          <p className="text-xs text-accent">
-            +{growthRate.toFixed(1)}% top up so với tháng trước
-          </p>
-        </Card>
+            <p className="text-sm text-muted-foreground mb-1">
+              Doanh thu từ nạp ví 
+            </p>
+            <p className="text-3xl font-bold text-primary mb-1">
+              {formatUsd(topUpRevenue)}
+            </p>
+            <p className="text-xs text-accent">
+              +{growthRate.toFixed(1)}% top up so với tháng trước
+            </p>
+          </Card>
+        </Link>
 
-        <Card className="p-6 border-border bg-card/50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-accent/20 p-3 rounded-lg">
-              <Calendar className="w-6 h-6 text-accent" />
+        <Link to="/dashboard/orders">
+          <Card className="p-6 border-border bg-card/50 cursor-pointer hover:shadow-lg hover:shadow-accent/25 transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-accent/20 p-3 rounded-lg">
+                <Calendar className="w-6 h-6 text-accent" />
+              </div>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Tổng Đơn Hàng</p>
-          <p className="text-3xl font-bold mb-1">{totalOrders}</p>
-          <p className="text-xs text-muted-foreground">
-            Trung bình {(totalOrders / Math.max(bookingMonthlyData.length, 1)).toFixed(0)} đơn/tháng
-          </p>
-        </Card>
+            <p className="text-sm text-muted-foreground mb-1">Tổng Đơn Hàng</p>
+            <p className="text-3xl font-bold mb-1">{totalOrders}</p>
+            <p className="text-xs text-muted-foreground">
+              Trung bình {(totalOrders / Math.max(bookingMonthlyData.length, 1)).toFixed(0)} đơn/tháng
+            </p>
+          </Card>
+        </Link>
 
-        <Card className="p-6 border-border bg-card/50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-secondary/20 p-3 rounded-lg">
-              <DollarSign className="w-6 h-6 text-secondary" />
+        <Link to="/dashboard/orders">
+          <Card className="p-6 border-border bg-card/50 cursor-pointer hover:shadow-lg hover:shadow-secondary/25 transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-secondary/20 p-3 rounded-lg">
+                <DollarSign className="w-6 h-6 text-secondary" />
+              </div>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Doanh thu từ khách đặt máy</p>
-          <p className="text-3xl font-bold text-secondary mb-1">
-            {formatUsd(bookingRevenue)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Tổng doanh thu phát sinh từ đơn thuê máy (không gồm nạp ví)
-          </p>
-        </Card>
+            <p className="text-sm text-muted-foreground mb-1">Doanh thu từ khách đặt máy</p>
+            <p className="text-3xl font-bold text-secondary mb-1">
+              {formatUsd(bookingRevenue)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Tổng doanh thu phát sinh từ đơn thuê máy (không gồm nạp ví)
+            </p>
+          </Card>
+        </Link>
 
-        <Card className="p-6 border-border bg-card/50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="bg-primary/20 p-3 rounded-lg">
-              <Users className="w-6 h-6 text-primary" />
+        <Link to="/dashboard/accounts">
+          <Card className="p-6 border-border bg-card/50 cursor-pointer hover:shadow-lg hover:shadow-primary/25 transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="bg-primary/20 p-3 rounded-lg">
+                <Users className="w-6 h-6 text-primary" />
+              </div>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
-          <p className="text-3xl font-bold mb-1">{totalCustomers}</p>
-          <p className="text-xs text-muted-foreground">
-            Tháng hiện tại: {currentMonth.customers} khách hàng
-          </p>
-        </Card>
+            <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
+            <p className="text-3xl font-bold mb-1">{totalCustomers}</p>
+            <p className="text-xs text-muted-foreground">
+              Tháng hiện tại: {currentMonth.customers} khách hàng
+            </p>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -750,20 +796,73 @@ export function RevenueStats() {
             </p>
           </div>
 
+          <div className="grid md:grid-cols-4 gap-3 mb-6">
+            <Input
+              value={categoryQuery}
+              onChange={(e) => setCategoryQuery(e.target.value)}
+              placeholder="Tìm kiếm phân khúc..."
+              className="bg-input-background border-border"
+            />
+            <Input
+              type="number"
+              value={categoryRevenueMin}
+              onChange={(e) => setCategoryRevenueMin(e.target.value)}
+              placeholder="Doanh thu tối thiểu..."
+              className="bg-input-background border-border"
+            />
+            <Input
+              type="number"
+              value={categoryRevenueMax}
+              onChange={(e) => setCategoryRevenueMax(e.target.value)}
+              placeholder="Doanh thu tối đa..."
+              className="bg-input-background border-border"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryQuery("");
+                setCategoryRevenueMin("");
+                setCategoryRevenueMax("");
+                setCategoryUsersMin("");
+                setCategoryUsersMax("");
+              }}
+              className="px-4 py-2 bg-muted text-muted-foreground hover:bg-muted/80 rounded-md transition-colors text-sm"
+            >
+              Xóa bộ lọc
+            </button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-3 mb-6">
+            <Input
+              type="number"
+              value={categoryUsersMin}
+              onChange={(e) => setCategoryUsersMin(e.target.value)}
+              placeholder="Số khách hàng tối thiểu..."
+              className="bg-input-background border-border"
+            />
+            <Input
+              type="number"
+              value={categoryUsersMax}
+              onChange={(e) => setCategoryUsersMax(e.target.value)}
+              placeholder="Số khách hàng tối đa..."
+              className="bg-input-background border-border"
+            />
+          </div>
+
           <div className="space-y-4">
             {filteredCategoryData.map((category) => (
               <div key={category.name} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                       <span className="text-white font-bold text-sm">
                         {category.percentage.toFixed(0)}%
                       </span>
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-bold">{category.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {formatUsd(category.revenue)}
+                        {formatUsd(category.revenue)} • {category.users} khách • {category.count} lượt
                       </p>
                     </div>
                   </div>
