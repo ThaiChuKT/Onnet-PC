@@ -33,7 +33,7 @@ public class Pc {
 	@Column(name = "status")
 	private PcStatus status;
 
-	@Column(name = "location")
+	@Column(name = "location", nullable = true)
 	private String location;
 
 	@Column(name = "updated_at")

@@ -253,21 +253,30 @@ public class AdminService {
 
     @Transactional
     public AdminPcItemResponse createPc(CreatePcRequest request) {
-        PcSpec spec = new PcSpec();
-        spec.setSpecName(request.specName());
-        spec.setCpu(request.cpu());
-        spec.setGpu(request.gpu());
-        spec.setRam(request.ram());
-        spec.setStorage(request.storage());
-        spec.setOs(request.operatingSystem());
-        spec.setDescription(request.description());
-        spec.setPricePerHour(request.pricePerHour());
-        spec.setAvailable(true);
-        spec.setExclusive(false);
-        PcSpec savedSpec = pcSpecRepository.save(spec);
+        PcSpec spec;
+
+        if (request.specId() != null) {
+            // Use existing spec
+            spec = pcSpecRepository.findById(request.specId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Spec not found"));
+        } else {
+            // Create new spec
+            spec = new PcSpec();
+            spec.setSpecName(request.specName());
+            spec.setCpu(request.cpu());
+            spec.setGpu(request.gpu());
+            spec.setRam(request.ram());
+            spec.setStorage(request.storage());
+            spec.setOs(request.operatingSystem());
+            spec.setDescription(request.description());
+            spec.setPricePerHour(request.pricePerHour());
+            spec.setAvailable(true);
+            spec.setExclusive(false);
+            spec = pcSpecRepository.save(spec);
+        }
 
         Pc pc = new Pc();
-        pc.setSpec(savedSpec);
+        pc.setSpec(spec);
         pc.setLocation(request.location());
         pc.setStatus(parsePcStatusOrDefault(request.status(), PcStatus.available));
         pc.setUpdatedAt(Instant.now());

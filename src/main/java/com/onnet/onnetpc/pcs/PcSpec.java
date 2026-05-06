@@ -21,7 +21,7 @@ public class PcSpec {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(name = "spec_name", nullable = false)
+	@Column(name = "spec_name", nullable = true)
 	private String specName;
 
 	@Column(name = "cpu")
@@ -39,7 +39,7 @@ public class PcSpec {
 	@Column(name = "os")
 	private String os;
 
-	@Column(name = "price_per_hour", nullable = false)
+	@Column(name = "price_per_hour", nullable = true)
 	private BigDecimal pricePerHour;
 
 	@Column(name = "description")
