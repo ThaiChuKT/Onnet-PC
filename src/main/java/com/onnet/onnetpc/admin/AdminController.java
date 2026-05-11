@@ -72,6 +72,16 @@ public class AdminController {
         return ApiResponse.success(adminService.listUserBookings(userId));
     }
 
+    @GetMapping("/users/{userId}/orders")
+    public ApiResponse<List<AdminBookingItemResponse>> listUserOrders(@PathVariable Long userId) {
+        return ApiResponse.success(adminService.listUserOrders(userId));
+    }
+
+    @GetMapping("/users/{userId}")
+    public ApiResponse<AdminUserItemResponse> getUser(@PathVariable Long userId) {
+        return ApiResponse.success(adminService.getUser(userId));
+    }
+
     @GetMapping("/payments/topups")
     public ApiResponse<Page<AdminUserPaymentItemResponse>> listTopUpPayments(
         @RequestParam(defaultValue = "0") int page,
@@ -139,6 +149,11 @@ public class AdminController {
     public ApiResponse<String> softDeletePc(@PathVariable Long pcId) {
         adminService.softDeletePc(pcId);
         return ApiResponse.success("Machine soft-deleted");
+    }
+
+    @PostMapping("/pcs/{pcId}/lock")
+    public ApiResponse<AdminPcItemResponse> lockPc(@PathVariable Long pcId) {
+        return ApiResponse.success(adminService.lockPc(pcId));
     }
 
     @GetMapping("/bookings")

@@ -139,6 +139,25 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public AdminUserItemResponse getUser(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+        return toAdminUser(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminBookingItemResponse> listUserOrders(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 100))
+            .getContent()
+            .stream()
+            .map(this::toAdminBooking)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminBookingItemResponse> listUserBookings(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
@@ -339,6 +358,21 @@ public class AdminService {
         pcRepository.save(pc);
     }
 
+    @Transactional
+    public AdminPcItemResponse lockPc(Long pcId) {
+        Pc pc = pcRepository.findByIdForUpdate(pcId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine not found"));
+
+        var activeSessionIds = sessionRepository.findActiveSessionIdsByPcId(pcId);
+        for (Long sessionId : activeSessionIds) {
+            forceEndSession(sessionId);
+        }
+
+        pc.setStatus(PcStatus.maintenance);
+        pc.setUpdatedAt(Instant.now());
+        return toAdminPc(pcRepository.save(pc));
+    }
+
     @Transactional(readOnly = true)
     public Page<AdminBookingItemResponse> listBookings(String status, int page, int size) {
         var pageable = PageRequest.of(page, size);
@@ -470,6 +504,8 @@ public class AdminService {
         
         return new AdminBookingItemResponse(
             booking.getId(),
+            booking.getUser() == null ? null : booking.getUser().getId(),
+            booking.getUser() == null ? null : booking.getUser().getFullName(),
             booking.getUser() == null ? null : booking.getUser().getEmail(),
             booking.getSpec() == null ? null : booking.getSpec().getSpecName(),
             booking.getPc() == null ? null : booking.getPc().getId(),

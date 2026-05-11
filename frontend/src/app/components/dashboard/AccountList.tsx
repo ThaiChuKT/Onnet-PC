@@ -12,6 +12,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { apiDelete, apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
 import {
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { formatUsd } from "../../lib/formatUsd";
+import { ListPagination } from "./ListPagination";
 
 type AdminUserItemResponse = {
   id: number;
@@ -64,6 +66,8 @@ type AdminBookingItemResponse = {
 
 export function AccountList() {
   const [users, setUsers] = useState<AdminUserItemResponse[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -76,14 +80,16 @@ export function AccountList() {
   >(null);
   const [bookingStatusFilter, setBookingStatusFilter] = useState("all");
 
-  const loadUsers = async (keyword?: string) => {
+  const loadUsers = async (keyword?: string, nextPage = 0) => {
     setIsLoading(true);
     try {
       const page = await apiGet<PageResponse<AdminUserItemResponse>>(
         "/admin/users",
-        { keyword, page: 0, size: 50 },
+        { keyword, page: nextPage, size: 4 },
       );
       setUsers(page.content ?? []);
+      setTotalPages(page.totalPages ?? 0);
+      setPage(page.number ?? nextPage);
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Không thể tải danh sách tài khoản",
@@ -94,12 +100,15 @@ export function AccountList() {
   };
 
   useEffect(() => {
-    void loadUsers();
-  }, []);
+    void loadUsers(searchTerm.trim() || undefined, page);
+  }, [page]);
 
   useEffect(() => {
     const handle = window.setTimeout(
-      () => void loadUsers(searchTerm.trim() || undefined),
+      () => {
+        setPage(0);
+        void loadUsers(searchTerm.trim() || undefined, 0);
+      },
       250,
     );
     return () => window.clearTimeout(handle);
@@ -171,6 +180,8 @@ export function AccountList() {
       setLoadingBookingsUserId(null);
     }
   };
+
+  void handleToggleBookings;
 
   const handleDelete = async (user: AdminUserItemResponse) => {
     if (!confirm("Bạn có chắc chắn muốn xóa tài khoản này?")) return;
@@ -375,13 +386,15 @@ export function AccountList() {
 
               <div className="flex gap-2">
                 <Button
+                  asChild
                   variant="outline"
                   size="sm"
-                  onClick={() => handleToggleBookings(u)}
                   className="border-border text-foreground hover:bg-muted"
-                  title="Subscription history"
+                  title="Open account detail"
                 >
-                  <BookOpen className="w-4 h-4" />
+                  <Link to={`/dashboard/accounts/${u.id}`}>
+                    <BookOpen className="w-4 h-4" />
+                  </Link>
                 </Button>
 
                 <Button
@@ -523,6 +536,10 @@ export function AccountList() {
           <p className="text-muted-foreground">Thử tìm kiếm với từ khóa khác</p>
         </Card>
       )}
+
+      <div className="mt-6">
+        <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
     </div>
   );
 }

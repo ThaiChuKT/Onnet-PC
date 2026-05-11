@@ -2,59 +2,61 @@ import { Outlet, Link, useLocation } from "react-router";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { useEffect, useState } from "react";
-import { Monitor, Users, TrendingUp, ShoppingCart, ReceiptText, Activity, Menu } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  Monitor,
+  ReceiptText,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 
-const menuItems = [
+const navGroups = [
   {
-    path: "/dashboard/computers",
-    label: "Machines",
-    icon: Monitor,
+    label: "Machines and Sessions",
+    items: [
+      { path: "/dashboard/computers", label: "Machines", icon: Monitor },
+      { path: "/dashboard/sessions", label: "Sessions", icon: Activity },
+    ],
   },
   {
-    path: "/dashboard/orders",
-    label: "Orders",
-    icon: ShoppingCart,
+    label: "Revenue, Orders and Invoices",
+    items: [
+      { path: "/dashboard/revenue", label: "Revenue", icon: TrendingUp },
+      { path: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
+      { path: "/dashboard/invoices", label: "Invoices", icon: ReceiptText },
+    ],
   },
   {
-    path: "/dashboard/invoices",
-    label: "Invoices",
-    icon: ReceiptText,
-  },
-  {
-    path: "/dashboard/accounts",
-    label: "Accounts",
-    icon: Users,
-  },
-  {
-    path: "/dashboard/revenue",
-    label: "Revenue",
-    icon: TrendingUp,
-  },
-  {
-    path: "/dashboard/sessions",
-    label: "Sessions",
-    icon: Activity,
+    label: "Account",
+    items: [
+      { path: "/dashboard/accounts", label: "Accounts", icon: Users },
+    ],
   },
 ];
 
 export function DashboardPage() {
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
-      const raw = localStorage.getItem("adminSidebarOpen");
-      return raw === null ? true : raw === "1";
+      const raw = localStorage.getItem("adminSidebarCollapsed");
+      return raw === "1";
     } catch {
-      return true;
+      return false;
     }
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem("adminSidebarOpen", sidebarOpen ? "1" : "0");
+      localStorage.setItem("adminSidebarCollapsed", sidebarCollapsed ? "1" : "0");
     } catch {
       // ignore
     }
-  }, [sidebarOpen]);
+  }, [sidebarCollapsed]);
+
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -63,7 +65,7 @@ export function DashboardPage() {
       <main className="flex-1 pt-20 pb-12 bg-muted/30">
         <div className="container mx-auto px-4 py-8">
           {/* Dashboard Header */}
-          <div className="mb-8 flex items-center justify-between">
+          <div className="mb-8 flex items-center justify-between gap-4">
             <div>
               <h1 className="text-4xl font-bold mb-2">
                 Admin
@@ -76,51 +78,59 @@ export function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen((s) => !s)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded bg-muted/60 hover:bg-muted"
-              >
-                <Menu className="w-4 h-4" />
-                <span>{sidebarOpen ? "Ẩn menu" : "Hiện menu"}</span>
-              </button>
-            </div>
           </div>
 
-          <div className={`grid ${sidebarOpen ? 'lg:grid-cols-[280px_1fr]' : 'lg:grid-cols-1'} gap-8`}>
-            {/* Sidebar (collapsible) */}
-            {sidebarOpen && (
-              <aside className="lg:sticky lg:top-24 h-fit">
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-lg font-bold px-2">Menu</h2>
-                    <button onClick={() => setSidebarOpen(false)} className="px-2 py-1 rounded bg-muted/60">&times;</button>
+          <div className={`grid ${sidebarCollapsed ? "lg:grid-cols-[88px_1fr]" : "lg:grid-cols-[280px_1fr]"} gap-8`}>
+            <aside className="lg:sticky lg:top-24 h-fit">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className={sidebarCollapsed ? "sr-only" : ""}>
+                    <h2 className="text-lg font-bold px-2">Navigation</h2>
+                    <p className="text-xs text-muted-foreground px-2">Admin control center</p>
                   </div>
-                  <nav className="space-y-1">
-                    {menuItems.map((item) => {
-                      const isActive =
-                        location.pathname === item.path ||
-                        (location.pathname === "/dashboard" && item.path === "/dashboard/revenue");
-                      return (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                            isActive
-                              ? "bg-gradient-to-r from-primary to-accent text-white"
-                              : "text-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <item.icon className="w-5 h-5" />
-                          <span>{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </nav>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed((value) => !value)}
+                    className="inline-flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
+                    aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+                    title={sidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}
+                  >
+                    {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                    <span className={sidebarCollapsed ? "sr-only" : ""}>{sidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}</span>
+                  </button>
                 </div>
-              </aside>
-            )}
+
+                <nav className="space-y-4">
+                  {navGroups.map((group) => (
+                    <div key={group.label} className="space-y-2">
+                      <div className={sidebarCollapsed ? "sr-only" : "px-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"}>
+                        {group.label}
+                      </div>
+                      <div className="space-y-1">
+                        {group.items.map((item) => {
+                          const active = isActive(item.path);
+                          return (
+                            <Link
+                              key={item.path}
+                              to={item.path}
+                              title={item.label}
+                              className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${
+                                active
+                                  ? "bg-gradient-to-r from-primary to-accent text-white shadow-md"
+                                  : "text-foreground hover:bg-muted"
+                              } ${sidebarCollapsed ? "justify-center" : ""}`}
+                            >
+                              <item.icon className="h-5 w-5 shrink-0" />
+                              <span className={sidebarCollapsed ? "sr-only" : ""}>{item.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </nav>
+              </div>
+            </aside>
 
             {/* Main Content */}
             <div className="min-h-[600px]">

@@ -2,6 +2,7 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { Link } from "react-router";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +16,12 @@ import { apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
 import { formatUsd } from "../../lib/formatUsd";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { ListPagination } from "./ListPagination";
 
 type AdminBookingItemResponse = {
   bookingId: number;
+  userId: number | null;
+  userFullName: string | null;
   userEmail: string;
   specName: string;
   pcId: number | null;
@@ -68,6 +72,8 @@ const statusConfig: Record<
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<AdminBookingItemResponse[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -75,11 +81,17 @@ export function OrderManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<AdminBookingItemResponse | null>(null);
 
-  const loadOrders = async () => {
+  const loadOrders = async (nextPage = 0) => {
     setIsLoading(true);
     try {
-      const page = await apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", { page: 0, size: 50 });
-      setOrders(page.content ?? []);
+      const response = await apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", {
+        page: nextPage,
+        size: 4,
+        status: statusFilter === "all" ? undefined : statusFilter,
+      });
+      setOrders(response.content ?? []);
+      setTotalPages(response.totalPages ?? 0);
+      setPage(response.number ?? nextPage);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load orders");
     } finally {
@@ -88,8 +100,8 @@ export function OrderManagement() {
   };
 
   useEffect(() => {
-    void loadOrders();
-  }, []);
+    void loadOrders(page);
+  }, [page, statusFilter]);
 
   const handleStatusChange = async (bookingId: number, status: string) => {
     try {
@@ -102,27 +114,22 @@ export function OrderManagement() {
     }
   };
 
-  const filteredOrders = useMemo(() => {
+  const currentOrders = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    const selectedStatus = statusFilter.toLowerCase();
     return orders.filter((o) => {
-      const rawStatus = (o.status ?? "").toLowerCase();
-      const isPaid = rawStatus === "active" || rawStatus === "completed";
-      const isExpired = rawStatus === "completed";
-      const searchHit =
+      const matchesSearch =
         !q ||
         String(o.bookingId).includes(q) ||
         (o.userEmail ?? "").toLowerCase().includes(q) ||
+        (o.userFullName ?? "").toLowerCase().includes(q) ||
         (o.specName ?? "").toLowerCase().includes(q) ||
         (o.planName ?? "").toLowerCase().includes(q) ||
         (o.bookingType ?? "").toLowerCase().includes(q);
-      const statusHit =
-        selectedStatus === "all" ||
-        rawStatus === selectedStatus ||
-        (selectedStatus === "paid" && isPaid) ||
-        (selectedStatus === "expired" && isExpired);
+      if (!matchesSearch) return false;
 
-      if (!o.createdAt) return searchHit && statusHit;
+      if (!fromDate && !toDate) return true;
+      if (!o.createdAt) return true;
+
       const createdAt = new Date(o.createdAt);
       if (fromDate) {
         const from = new Date(`${fromDate}T00:00:00`);
@@ -132,9 +139,24 @@ export function OrderManagement() {
         const to = new Date(`${toDate}T23:59:59`);
         if (createdAt > to) return false;
       }
-      return searchHit && statusHit;
+      return true;
     });
-  }, [fromDate, orders, searchTerm, statusFilter, toDate]);
+  }, [fromDate, orders, searchTerm, toDate]);
+
+  const filteredOrders = useMemo(() => {
+    const selectedStatus = statusFilter.toLowerCase();
+    return currentOrders.filter((o) => {
+      const rawStatus = (o.status ?? "").toLowerCase();
+      const isPaid = rawStatus === "active" || rawStatus === "completed";
+      const isExpired = rawStatus === "completed";
+      const statusHit =
+        selectedStatus === "all" ||
+        rawStatus === selectedStatus ||
+        (selectedStatus === "paid" && isPaid) ||
+        (selectedStatus === "expired" && isExpired);
+      return statusHit;
+    });
+  }, [currentOrders, statusFilter]);
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
@@ -274,7 +296,9 @@ export function OrderManagement() {
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                     <div>
                       <span className="text-muted-foreground">Khách:</span>{" "}
-                      <span className="font-medium">{order.userEmail}</span>
+                      <Link to={`/dashboard/accounts/${order.userId ?? ""}`} className="font-medium text-primary hover:underline">
+                        {order.userFullName || order.userEmail}
+                      </Link>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Package:</span>{" "}
@@ -345,7 +369,12 @@ export function OrderManagement() {
                           </div>
 
                           <div className="space-y-2 text-sm">
-                            <div><span className="text-muted-foreground">User:</span> <span className="font-medium">{selectedOrder.userEmail}</span></div>
+                            <div>
+                              <span className="text-muted-foreground">User:</span>{" "}
+                              <Link to={`/dashboard/accounts/${selectedOrder.userId ?? ""}`} className="font-medium text-primary hover:underline">
+                                {selectedOrder.userFullName || selectedOrder.userEmail}
+                              </Link>
+                            </div>
                             <div><span className="text-muted-foreground">Spec:</span> <span className="font-medium">{selectedOrder.specName}</span></div>
                             {selectedOrder.bookingType === "subscription" && selectedOrder.planName && (
                               <div><span className="text-muted-foreground">Package:</span> <span className="font-medium">{selectedOrder.planName} ({selectedOrder.durationDays}d)</span></div>
@@ -395,6 +424,10 @@ export function OrderManagement() {
           <p className="text-muted-foreground">Không có dữ liệu phù hợp với bộ lọc hiện tại</p>
         </Card>
       )}
+
+      <div className="mt-6">
+        <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Badge } from "../ui/badge";
 import { apiGet } from "../../api/http";
 import { toast } from "sonner";
 import { Input } from "../ui/input";
+import { Link } from "react-router";
 import {
   Select,
   SelectContent,
@@ -13,9 +14,11 @@ import {
   SelectValue,
 } from "../ui/select";
 import { formatUsd } from "../../lib/formatUsd";
+import { ListPagination } from "./ListPagination";
 
 type AdminUserPaymentItemResponse = {
   transactionId: number;
+  userId: number | null;
   userEmail: string;
   userFullName: string;
   amount: number;
@@ -26,11 +29,17 @@ type AdminUserPaymentItemResponse = {
 
 type PageResponse<T> = {
   content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
 };
 
 type InvoiceRow = {
   id: string;
   code: string;
+  userId: number | null;
+  userFullName: string;
   userEmail: string;
   title: string;
   amount: number;
@@ -57,6 +66,8 @@ export function InvoiceManagement() {
   const [topUpItems, setTopUpItems] = useState<AdminUserPaymentItemResponse[]>(
     [],
   );
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -67,13 +78,12 @@ export function InvoiceManagement() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const topUpPage = await apiGet<
-          PageResponse<AdminUserPaymentItemResponse>
-        >("/admin/payments/topups", {
-          page: 0,
-          size: 200,
+        const topUpPage = await apiGet<PageResponse<AdminUserPaymentItemResponse>>("/admin/payments/topups", {
+          page,
+          size: 4,
         });
         setTopUpItems(topUpPage.content ?? []);
+        setTotalPages(topUpPage.totalPages ?? 0);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not load invoices");
       } finally {
@@ -81,12 +91,14 @@ export function InvoiceManagement() {
       }
     };
     void load();
-  }, []);
+  }, [page]);
 
   const allInvoices = useMemo<InvoiceRow[]>(() => {
     const topUpInvoices: InvoiceRow[] = topUpItems.map((item) => ({
       id: `topup-${item.transactionId}`,
       code: `TOPUP-#${item.transactionId}`,
+      userId: item.userId,
+      userFullName: item.userFullName,
       userEmail: item.userEmail,
       title: item.note || "PayPal top-up",
       amount: Number(item.amount ?? 0),
@@ -111,6 +123,7 @@ export function InvoiceManagement() {
       const matchesSearch =
         !q ||
         item.code.toLowerCase().includes(q) ||
+        (item.userFullName ?? "").toLowerCase().includes(q) ||
         (item.userEmail ?? "").toLowerCase().includes(q) ||
         (item.title ?? "").toLowerCase().includes(q);
       const matchesStatus =
@@ -230,7 +243,9 @@ export function InvoiceManagement() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {item.userEmail}
+                      <Link to={`/dashboard/accounts/${item.userId ?? ""}`} className="text-primary hover:underline">
+                        {item.userFullName || item.userEmail}
+                      </Link>
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {item.title}
@@ -263,6 +278,10 @@ export function InvoiceManagement() {
           </p>
         </Card>
       )}
+
+      <div className="mt-6">
+        <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
     </div>
   );
 }

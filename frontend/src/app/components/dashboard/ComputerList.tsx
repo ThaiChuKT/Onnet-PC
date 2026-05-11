@@ -16,6 +16,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { formatUsd } from "../../lib/formatUsd";
+import { ListPagination } from "./ListPagination";
 
 interface Computer {
   pcId: number;
@@ -99,8 +100,10 @@ export function ComputerList() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState("available");
+  const [page, setPage] = useState(0);
+  const pageSize = 4;
 
-  const visibleComputers = useMemo(() => {
+  const filteredComputers = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     const selectedStatus = statusFilter.toLowerCase();
     return computers.filter((pc) => {
@@ -119,13 +122,21 @@ export function ComputerList() {
     });
   }, [computers, searchTerm, statusFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredComputers.length / pageSize));
+
+  const visibleComputers = useMemo(() => {
+    return filteredComputers.slice(page * pageSize, page * pageSize + pageSize);
+  }, [filteredComputers, page]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter]);
+
   const loadComputers = async () => {
     setIsLoading(true);
     try {
-      console.log("ComputerList.loadComputers: calling GET /admin/pcs with params:", { page: 0, size: 50 });
-      const page = await apiGet<PageResponse<Computer>>("/admin/pcs", { page: 0, size: 50 });
-      console.log("ComputerList.loadComputers response:", { page, contentLength: page.content?.length });
-      setComputers(page.content ?? []);
+      const response = await apiGet<PageResponse<Computer>>("/admin/pcs", { page: 0, size: 200 });
+      setComputers(response.content ?? []);
     } catch (e) {
       console.error("ComputerList.loadComputers error:", e);
       toast.error(e instanceof Error ? e.message : "Không thể tải danh sách máy");
@@ -138,10 +149,10 @@ export function ComputerList() {
     void loadComputers();
   }, []);
 
-  const specs = useMemo(() => {
-    const map = new Map<number, Computer[]>();
+  const tierGroups = useMemo(() => {
+    const map = new Map<string, Computer[]>();
     for (const pc of visibleComputers) {
-      const key = pc.specId ?? -1;
+      const key = detectTier(pc.specName) ?? "other";
       const arr = map.get(key) ?? [];
       arr.push(pc);
       map.set(key, arr);
@@ -258,6 +269,29 @@ export function ComputerList() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Không thể xóa máy");
     }
+  };
+
+  const handleToggleLock = async (computer: Computer) => {
+    try {
+      if ((computer.status ?? "").toLowerCase() === "maintenance") {
+        await apiPatch<Computer, UpdatePcRequest>(`/admin/pcs/${computer.pcId}`, { status: "available" });
+        toast.success("Đã mở khóa máy");
+      } else {
+        await apiPost<Computer>(`/admin/pcs/${computer.pcId}/lock`);
+        toast.success("Đã khóa máy và kết thúc phiên đang hoạt động");
+      }
+      await loadComputers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể thay đổi trạng thái khóa máy");
+    }
+  };
+
+  const getStatusDotClass = (status: string) => {
+    const normalized = (status ?? "").toLowerCase();
+    if (normalized === "available") return "bg-emerald-500";
+    if (normalized === "in_use" || normalized === "in-use" || normalized === "rented") return "bg-blue-500";
+    if (normalized === "maintenance") return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   const stats = {
@@ -571,10 +605,12 @@ export function ComputerList() {
           </Card>
         )}
 
-        {!isLoading && visibleComputers.length > 0 && Array.from(specs.entries()).map(([specId, pcs]) => (
-          <div key={specId} className="space-y-2">
+        {!isLoading && visibleComputers.length > 0 && Array.from(tierGroups.entries()).map(([tier, pcs]) => (
+          <div key={tier} className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">{pcs[0]?.specName ?? 'Unknown Spec'}</h3>
+              <h3 className="text-xl font-bold">
+                {tier === "basic" ? "Basic" : tier === "pro" ? "Pro" : tier === "ultra" ? "Ultra" : "Other"}
+              </h3>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">{pcs.length} máy</span>
                 <input type="checkbox" checked={pcs.every(p=> selectedIds.includes(p.pcId))} onChange={(e) => {
@@ -592,6 +628,7 @@ export function ComputerList() {
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-3">
+                        <span className={`h-3 w-3 rounded-full ${getStatusDotClass(computer.status)}`} />
                         <Badge
                           className={
                             getStatusMeta(computer.status).className
@@ -634,6 +671,15 @@ export function ComputerList() {
                     </div>
 
                     <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleToggleLock(computer)}
+                        className={computer.status === "maintenance" ? "border-accent text-accent hover:bg-accent/10" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"}
+                      >
+                        {computer.status === "maintenance" ? "Mở khóa" : "Khóa"}
+                      </Button>
+
                       <Dialog
                         open={editingComputer?.pcId === computer.pcId}
                         onOpenChange={(open) => !open && setEditingComputer(null)}
@@ -789,6 +835,12 @@ export function ComputerList() {
             Thử tìm kiếm với từ khóa khác hoặc thêm máy mới
           </p>
         </Card>
+      )}
+
+      {!isLoading && totalPages > 1 && (
+        <div className="pt-2">
+          <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </div>
       )}
 
       {selectedIds.length > 0 && (
