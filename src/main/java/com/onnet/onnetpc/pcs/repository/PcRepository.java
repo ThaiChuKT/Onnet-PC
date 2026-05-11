@@ -40,8 +40,38 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         Pageable pageable
     );
 
+    @Query(
+        value = """
+            SELECT *
+            FROM pcs
+            WHERE deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'
+            ORDER BY id DESC
+            """,
+        countQuery = """
+            SELECT COUNT(*)
+            FROM pcs
+            WHERE deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'
+            """,
+        nativeQuery = true
+    )
     Page<Pc> findByDeletedAtIsNull(Pageable pageable);
 
+    @Query(
+        value = """
+            SELECT *
+            FROM pcs
+            WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+              AND LOWER(status) = LOWER(:status)
+            ORDER BY id DESC
+            """,
+        countQuery = """
+            SELECT COUNT(*)
+            FROM pcs
+            WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+              AND LOWER(status) = LOWER(:status)
+            """,
+        nativeQuery = true
+    )
     Page<Pc> findByDeletedAtIsNullAndStatus(PcStatus status, Pageable pageable);
 
     @Query(

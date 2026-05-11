@@ -63,7 +63,7 @@ export function DashboardPage() {
       <Header />
       
       <main className="flex-1 pt-20 pb-12 bg-muted/30">
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full px-4 py-8">
           {/* Dashboard Header */}
           <div className="mb-8 flex items-center justify-between gap-4">
             <div>
@@ -80,8 +80,8 @@ export function DashboardPage() {
 
           </div>
 
-          <div className={`grid ${sidebarCollapsed ? "lg:grid-cols-[88px_1fr]" : "lg:grid-cols-[280px_1fr]"} gap-8`}>
-            <aside className="lg:sticky lg:top-24 h-fit">
+          <div className={`grid items-start ${sidebarCollapsed ? "lg:grid-cols-[88px_minmax(0,1fr)]" : "lg:grid-cols-[280px_minmax(0,1fr)]"} gap-6`}>
+            <aside className="lg:sticky lg:top-24 h-fit self-start">
               <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className={sidebarCollapsed ? "sr-only" : ""}>
@@ -133,7 +133,7 @@ export function DashboardPage() {
             </aside>
 
             {/* Main Content */}
-            <div className="min-h-[600px]">
+            <div className="min-h-[600px] min-w-0">
               <Outlet />
             </div>
           </div>

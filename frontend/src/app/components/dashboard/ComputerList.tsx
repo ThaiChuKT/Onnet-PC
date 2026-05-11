@@ -102,6 +102,7 @@ export function ComputerList() {
   const [bulkStatus, setBulkStatus] = useState("available");
   const [page, setPage] = useState(0);
   const pageSize = 4;
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const filteredComputers = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -134,12 +135,15 @@ export function ComputerList() {
 
   const loadComputers = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const response = await apiGet<PageResponse<Computer>>("/admin/pcs", { page: 0, size: 200 });
       setComputers(response.content ?? []);
     } catch (e) {
       console.error("ComputerList.loadComputers error:", e);
-      toast.error(e instanceof Error ? e.message : "Không thể tải danh sách máy");
+      const message = e instanceof Error ? e.message : "Không thể tải danh sách máy";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -152,13 +156,51 @@ export function ComputerList() {
   const tierGroups = useMemo(() => {
     const map = new Map<string, Computer[]>();
     for (const pc of visibleComputers) {
-      const key = detectTier(pc.specName) ?? "other";
+      const key = detectTier(pc.specName);
+      if (!key) {
+        continue;
+      }
       const arr = map.get(key) ?? [];
       arr.push(pc);
       map.set(key, arr);
     }
     return map;
   }, [visibleComputers]);
+
+  const tierEntries = useMemo(() => {
+    const orderedTiers = ["basic", "pro", "ultra"];
+    return orderedTiers.map((tier) => [tier, tierGroups.get(tier) ?? []] as const);
+  }, [tierGroups]);
+
+  const getTierLabel = (tier: string) => {
+    if (tier === "basic") return "Basic";
+    if (tier === "pro") return "Pro";
+    if (tier === "ultra") return "Ultra";
+    return tier;
+  };
+
+  const statusSummary = useMemo(() => {
+    const counts = {
+      available: 0,
+      in_use: 0,
+      maintenance: 0,
+      unavailable: 0,
+    };
+    for (const pc of visibleComputers) {
+      const normalized = (pc.status ?? "").toLowerCase();
+      if (normalized === "available") counts.available += 1;
+      else if (normalized === "in_use" || normalized === "in-use" || normalized === "rented") counts.in_use += 1;
+      else if (normalized === "maintenance") counts.maintenance += 1;
+      else counts.unavailable += 1;
+    }
+    return counts;
+  }, [visibleComputers]);
+
+  const statusPills = [
+    { key: "available", label: "Available", dot: "bg-emerald-500", count: statusSummary.available },
+    { key: "in_use", label: "In use", dot: "bg-blue-500", count: statusSummary.in_use },
+    { key: "maintenance", label: "Maintenance", dot: "bg-yellow-500", count: statusSummary.maintenance },
+  ];
 
   const specOptions = useMemo(() => {
     const map = new Map<number, Computer>();
@@ -310,7 +352,7 @@ export function ComputerList() {
       {/* Stats Cards */}
       <div className="grid md:grid-cols-4 gap-4 mb-6">
         <button type="button" onClick={() => selectStatusFilter("all")} className="text-left">
-          <Card className={`p-4 border-border bg-card/50 transition-all ${statusFilter === "all" ? "ring-2 ring-primary" : ""}`}>
+          <Card className={`p-4 border-border bg-card/60 transition-all ${statusFilter === "all" ? "ring-2 ring-primary shadow-lg shadow-primary/10" : ""}`}>
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-primary" />
@@ -324,7 +366,7 @@ export function ComputerList() {
         </button>
 
         <button type="button" onClick={() => selectStatusFilter("available")} className="text-left">
-          <Card className={`p-4 border-border bg-card/50 transition-all ${statusFilter === "available" ? "ring-2 ring-primary" : ""}`}>
+          <Card className={`p-4 border-border bg-card/60 transition-all ${statusFilter === "available" ? "ring-2 ring-primary shadow-lg shadow-primary/10" : ""}`}>
           <div className="flex items-center gap-3">
             <div className="bg-accent/20 p-3 rounded-lg">
               <Power className="w-5 h-5 text-accent" />
@@ -338,7 +380,7 @@ export function ComputerList() {
         </button>
 
         <button type="button" onClick={() => selectStatusFilter("in_use")} className="text-left">
-          <Card className={`p-4 border-border bg-card/50 transition-all ${statusFilter === "in_use" ? "ring-2 ring-primary" : ""}`}>
+          <Card className={`p-4 border-border bg-card/60 transition-all ${statusFilter === "in_use" ? "ring-2 ring-primary shadow-lg shadow-primary/10" : ""}`}>
           <div className="flex items-center gap-3">
             <div className="bg-secondary/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-secondary" />
@@ -352,7 +394,7 @@ export function ComputerList() {
         </button>
 
         <button type="button" onClick={() => selectStatusFilter("maintenance")} className="text-left">
-          <Card className={`p-4 border-border bg-card/50 transition-all ${statusFilter === "maintenance" ? "ring-2 ring-primary" : ""}`}>
+          <Card className={`p-4 border-border bg-card/60 transition-all ${statusFilter === "maintenance" ? "ring-2 ring-primary shadow-lg shadow-primary/10" : ""}`}>
           <div className="flex items-center gap-3">
             <div className="bg-muted/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-muted-foreground" />
@@ -592,220 +634,208 @@ export function ComputerList() {
         </div>
 
         {isLoading && (
-          <Card className="p-12 border-border text-center">
+          <Card className="p-12 border-border text-center bg-card/60">
             <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Đang tải danh sách máy...</p>
           </Card>
         )}
 
-        {!isLoading && visibleComputers.length === 0 && computers.length === 0 && (
-          <Card className="p-12 border-border text-center">
+        {loadError && !isLoading && (
+          <Card className="p-8 border-destructive/40 bg-destructive/5 text-center">
+            <p className="font-semibold text-destructive mb-2">Không tải được danh sách máy</p>
+            <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
+            <Button variant="outline" onClick={() => void loadComputers()}>
+              Thử lại
+            </Button>
+          </Card>
+        )}
+
+        {!isLoading && loadError === null && visibleComputers.length === 0 && computers.length === 0 && (
+          <Card className="p-12 border-border text-center bg-card/60">
             <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Không tìm thấy máy nào.</p>
           </Card>
         )}
 
-        {!isLoading && visibleComputers.length > 0 && Array.from(tierGroups.entries()).map(([tier, pcs]) => (
-          <div key={tier} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">
-                {tier === "basic" ? "Basic" : tier === "pro" ? "Pro" : tier === "ultra" ? "Ultra" : "Other"}
-              </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{pcs.length} máy</span>
-                <input type="checkbox" checked={pcs.every(p=> selectedIds.includes(p.pcId))} onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedIds(prev => Array.from(new Set([...prev, ...pcs.map(p=>p.pcId)])));
-                  } else {
-                    setSelectedIds(prev => prev.filter(id => !pcs.some(p=>p.pcId===id)));
-                  }
-                }} />
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              {pcs.map((computer) => (
-                <Card key={computer.pcId} className="p-6 border-border hover:border-primary/50 transition-all">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className={`h-3 w-3 rounded-full ${getStatusDotClass(computer.status)}`} />
-                        <Badge
-                          className={
-                            getStatusMeta(computer.status).className
-                          }
-                        >
-                          {getStatusMeta(computer.status).label}
-                        </Badge>
-                        <Badge className="bg-primary/20 text-primary border-primary/50">PC #{computer.pcId}</Badge>
-                        <div className="ml-2">
-                          <input type="checkbox" checked={selectedIds.includes(computer.pcId)} onChange={(e) => {
-                            if (e.target.checked) setSelectedIds(prev => Array.from(new Set([...prev, computer.pcId])));
-                            else setSelectedIds(prev => prev.filter(id=>id!==computer.pcId));
-                          }} />
-                        </div>
-                      </div>
+        {!isLoading && loadError === null && (
+          <div className="grid gap-4 xl:grid-cols-3">
+            {tierEntries.map(([tier, pcs]) => {
+              const counts = {
+                available: pcs.filter((pc) => (pc.status ?? "").toLowerCase() === "available").length,
+                inUse: pcs.filter((pc) => (pc.status ?? "").toLowerCase() === "in_use" || (pc.status ?? "").toLowerCase() === "in-use" || (pc.status ?? "").toLowerCase() === "rented").length,
+                maintenance: pcs.filter((pc) => (pc.status ?? "").toLowerCase() === "maintenance").length,
+              };
 
-                      <div className="grid sm:grid-cols-1 gap-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">CPU:</span>
-                          <span className="font-medium">{computer.cpu}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">GPU:</span>
-                          <span className="font-medium">{computer.gpu}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        {computer.ram}GB RAM • {computer.storage}GB • {computer.operatingSystem || "OS N/A"}
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
-                        <div className="p-2 bg-muted/50 rounded">
-                          <span className="text-muted-foreground block">Giờ</span>
-                          <span className="font-bold text-primary">
-                            {formatUsd(Number(computer.pricePerHour))}
-                          </span>
-                        </div>
-                      </div>
+              return (
+                <Card key={tier} className="border-border bg-card/60 p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold">{getTierLabel(tier)}</h3>
+                      <p className="text-xs text-muted-foreground">{pcs.length} machines</p>
                     </div>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={pcs.length > 0 && pcs.every((p) => selectedIds.includes(p.pcId))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => Array.from(new Set([...prev, ...pcs.map((p) => p.pcId)])));
+                          } else {
+                            setSelectedIds((prev) => prev.filter((id) => !pcs.some((p) => p.pcId === id)));
+                          }
+                        }}
+                      />
+                      Select
+                    </label>
+                  </div>
 
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleToggleLock(computer)}
-                        className={computer.status === "maintenance" ? "border-accent text-accent hover:bg-accent/10" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"}
-                      >
-                        {computer.status === "maintenance" ? "Mở khóa" : "Khóa"}
-                      </Button>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {statusPills.map((pill) => (
+                      <div key={pill.key} className="rounded-lg border border-border bg-background/60 px-3 py-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className={`h-2.5 w-2.5 rounded-full ${pill.dot}`} />
+                          {pill.label}
+                        </div>
+                        <p className="mt-1 text-lg font-bold">{pill.key === "available" ? counts.available : pill.key === "in_use" ? counts.inUse : counts.maintenance}</p>
+                      </div>
+                    ))}
+                  </div>
 
-                      <Dialog
-                        open={editingComputer?.pcId === computer.pcId}
-                        onOpenChange={(open) => !open && setEditingComputer(null)}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={computer.status !== "available"}
-                            onClick={() => handleEdit(computer)}
-                            className="border-primary text-foreground hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-border">
-                          <DialogHeader>
-                            <DialogTitle>Chỉnh Sửa Máy</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-specName">Tên cấu hình (Spec)</Label>
-                              <Input
-                                id="edit-specName"
-                                value={formData.specName}
-                                onChange={(e) => setFormData({ ...formData, specName: e.target.value })}
-                                className="bg-input-background border-border"
+                  <div className="grid gap-3">
+                    {pcs.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
+                        No machines in this tier.
+                      </div>
+                    ) : (
+                      pcs.map((computer) => (
+                        <Card key={computer.pcId} className="border-border bg-card/80 p-4 transition-all hover:border-primary/40">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`h-2.5 w-2.5 rounded-full ${getStatusDotClass(computer.status)}`} />
+                                <p className="font-semibold truncate">PC #{computer.pcId}</p>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground truncate">{computer.location || computer.specName}</p>
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                {computer.cpu} • {computer.gpu}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {computer.ram}GB RAM • {computer.storage}GB • {computer.operatingSystem || "OS N/A"}
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-primary">
+                                {formatUsd(Number(computer.pricePerHour))}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge className={getStatusMeta(computer.status).className}>
+                                {getStatusMeta(computer.status).label}
+                              </Badge>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(computer.pcId)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedIds((prev) => Array.from(new Set([...prev, computer.pcId])));
+                                  } else {
+                                    setSelectedIds((prev) => prev.filter((id) => id !== computer.pcId));
+                                  }
+                                }}
                               />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-cpu">CPU</Label>
-                              <Input
-                                id="edit-cpu"
-                                value={formData.cpu}
-                                onChange={(e) => setFormData({ ...formData, cpu: e.target.value })}
-                                className="bg-input-background border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-gpu">GPU</Label>
-                              <Input
-                                id="edit-gpu"
-                                value={formData.gpu}
-                                onChange={(e) => setFormData({ ...formData, gpu: e.target.value })}
-                                className="bg-input-background border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-ram">RAM (GB)</Label>
-                              <Input
-                                id="edit-ram"
-                                type="number"
-                                value={formData.ram}
-                                onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
-                                className="bg-input-background border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-storage">Storage (GB)</Label>
-                              <Input
-                                id="edit-storage"
-                                type="number"
-                                value={formData.storage}
-                                onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
-                                className="bg-input-background border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-operatingSystem">Hệ điều hành</Label>
-                              <Input
-                                id="edit-operatingSystem"
-                                value={formData.operatingSystem}
-                                onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })}
-                                className="bg-input-background border-border"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-status">Trạng thái máy</Label>
-                              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                                <SelectTrigger id="edit-status" className="bg-input-background border-border">
-                                  <SelectValue placeholder="Chọn trạng thái" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="available">Máy trống</SelectItem>
-                                  <SelectItem value="in_use">Đang cho thuê</SelectItem>
-                                  <SelectItem value="maintenance">Bảo trì</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Button onClick={() => {
-                                void handleUpdate("single");
-                              }} className="w-full bg-gradient-to-r from-primary to-accent">
-                                Cập Nhật máy này
-                              </Button>
-                              {detectTier(editingComputer?.specName ?? "") && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    void handleUpdate("plan");
-                                  }}
-                                  className="w-full border-primary text-foreground hover:bg-primary/10"
-                                >
-                                  Chỉnh toàn bộ máy trong {String(detectTier(editingComputer?.specName ?? "")).toUpperCase()}
-                                </Button>
-                              )}
                             </div>
                           </div>
-                        </DialogContent>
-                      </Dialog>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(computer.pcId)}
-                        className="border-destructive text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleToggleLock(computer)}
+                              className={computer.status === "maintenance" ? "border-accent text-accent hover:bg-accent/10" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"}
+                            >
+                              {computer.status === "maintenance" ? "Mở khóa" : "Khóa"}
+                            </Button>
+
+                            <Dialog open={editingComputer?.pcId === computer.pcId} onOpenChange={(open) => !open && setEditingComputer(null)}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={computer.status !== "available"}
+                                  onClick={() => handleEdit(computer)}
+                                  className="border-primary text-foreground hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="bg-card border-border">
+                                <DialogHeader>
+                                  <DialogTitle>Chỉnh Sửa Máy</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-specName">Tên cấu hình (Spec)</Label>
+                                    <Input id="edit-specName" value={formData.specName} onChange={(e) => setFormData({ ...formData, specName: e.target.value })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-cpu">CPU</Label>
+                                    <Input id="edit-cpu" value={formData.cpu} onChange={(e) => setFormData({ ...formData, cpu: e.target.value })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-gpu">GPU</Label>
+                                    <Input id="edit-gpu" value={formData.gpu} onChange={(e) => setFormData({ ...formData, gpu: e.target.value })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-ram">RAM (GB)</Label>
+                                    <Input id="edit-ram" type="number" value={formData.ram} onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-storage">Storage (GB)</Label>
+                                    <Input id="edit-storage" type="number" value={formData.storage} onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-operatingSystem">Hệ điều hành</Label>
+                                    <Input id="edit-operatingSystem" value={formData.operatingSystem} onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })} className="bg-input-background border-border" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit-status">Trạng thái máy</Label>
+                                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                                      <SelectTrigger id="edit-status" className="bg-input-background border-border">
+                                        <SelectValue placeholder="Chọn trạng thái" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="available">Máy trống</SelectItem>
+                                        <SelectItem value="in_use">Đang cho thuê</SelectItem>
+                                        <SelectItem value="maintenance">Bảo trì</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Button onClick={() => { void handleUpdate("single"); }} className="w-full bg-gradient-to-r from-primary to-accent">
+                                      Cập Nhật máy này
+                                    </Button>
+                                    {detectTier(editingComputer?.specName ?? "") && (
+                                      <Button variant="outline" onClick={() => { void handleUpdate("plan"); }} className="w-full border-primary text-foreground hover:bg-primary/10">
+                                        Chỉnh toàn bộ máy trong {String(detectTier(editingComputer?.specName ?? "")).toUpperCase()}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+
+                            <Button variant="outline" size="sm" onClick={() => handleDelete(computer.pcId)} className="border-destructive text-destructive hover:bg-destructive/10">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </Card>
+                      ))
+                    )}
                   </div>
                 </Card>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        ))}
+        )}
       </div>
 
       {selectedIds.length > 0 && (
@@ -827,8 +857,8 @@ export function ComputerList() {
         </div>
       )}
 
-      {!isLoading && visibleComputers.length === 0 && computers.length > 0 && (
-        <Card className="p-12 border-border text-center">
+      {!isLoading && loadError === null && visibleComputers.length === 0 && computers.length > 0 && (
+        <Card className="p-12 border-border text-center bg-card/60">
           <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">Không tìm thấy máy nào</h3>
           <p className="text-muted-foreground">
@@ -840,18 +870,6 @@ export function ComputerList() {
       {!isLoading && totalPages > 1 && (
         <div className="pt-2">
           <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
-        </div>
-      )}
-
-      {selectedIds.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button
-            onClick={() => setIsBulkDialogOpen(true)}
-            className="shadow-2xl bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-          >
-            <Settings2 className="w-4 h-4 mr-2" />
-            Chỉnh sửa ({selectedIds.length})
-          </Button>
         </div>
       )}
     </div>
