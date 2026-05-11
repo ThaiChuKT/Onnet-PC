@@ -66,13 +66,16 @@ public class PaypalService {
 	}
 
 	@Transactional
-	public PaypalOrderResponse createOrder(String email, BigDecimal amount) {
+	public PaypalOrderResponse createOrder(String email, BigDecimal amount, String redirectTo) {
 		Wallet wallet = findWalletByEmail(email);
 		BigDecimal normalizedAmount = normalizeAmount(amount);
 		String accessToken = fetchAccessToken();
 
-		String returnUrl = paypalConfig.getFrontendBaseUrl() + "/wallet?paypalStatus=success";
-		String cancelUrl = paypalConfig.getFrontendBaseUrl() + "/wallet?paypalStatus=cancel";
+		String redirectSuffix = redirectTo == null || redirectTo.isBlank()
+			? ""
+			: "&redirect=" + urlEncode(redirectTo);
+		String returnUrl = paypalConfig.getFrontendBaseUrl() + "/wallet?paypalStatus=success" + redirectSuffix;
+		String cancelUrl = paypalConfig.getFrontendBaseUrl() + "/wallet?paypalStatus=cancel" + redirectSuffix;
 
 		ObjectNode payload = objectMapper.createObjectNode();
 		payload.put("intent", "CAPTURE");

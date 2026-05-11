@@ -173,7 +173,7 @@ public class SessionLifecycleService {
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(session.getBooking().getId(), user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
         boolean hasRemainingTime = booking.getEndTime() != null && now.isBefore(booking.getEndTime());
-        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.completed);
+        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.expired);
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
@@ -223,7 +223,7 @@ public class SessionLifecycleService {
                 BookingStatus.paid.name()
             ).orElse(null);
             if (booking != null) {
-                booking.setStatus(BookingStatus.completed);
+                booking.setStatus(BookingStatus.expired);
                 booking.setUpdatedAt(now);
                 bookingRepository.save(booking);
             }

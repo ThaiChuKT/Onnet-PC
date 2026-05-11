@@ -21,7 +21,6 @@ import {
 import {
   Calendar,
   Clock,
-  DollarSign,
   Play,
   Square,
   Loader2,
@@ -140,7 +139,7 @@ const statusConfig = {
     label: "Waiting for machine",
     className: "bg-orange-500/20 text-orange-400 border-orange-500/50",
   },
-  completed: {
+  expired: {
     label: "Expired",
     className: "bg-secondary/20 text-secondary border-secondary/50",
   },
@@ -150,6 +149,11 @@ const statusConfig = {
   },
 };
 
+const normalizeBookingStatus = (value?: string | null) => {
+  const normalized = (value ?? "").toLowerCase();
+  return normalized === "completed" ? "expired" : normalized;
+};
+
 const POLL_MS = 15_000;
 
 export function RentalHistory() {
@@ -157,7 +161,7 @@ export function RentalHistory() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "paid" | "active" | "completed"
+    "all" | "paid" | "active" | "expired"
   >("all");
   const [showCancelled, setShowCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -245,33 +249,12 @@ export function RentalHistory() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [loadData]);
 
-  const completedCount = useMemo(
-    () =>
-      items.filter((i) => (i.status ?? "").toLowerCase() === "completed")
-        .length,
-    [items],
-  );
-  const pendingCount = useMemo(
-    () =>
-      items.filter((i) => (i.status ?? "").toLowerCase() === "pending").length,
-    [items],
-  );
-  const totalSpent = useMemo(
-    () =>
-      items
-        .filter((i) =>
-          ["active", "paid", "completed"].includes(
-            (i.status ?? "").toLowerCase(),
-          ),
-        )
-        .reduce((sum, i) => sum + Number(i.totalPrice ?? 0), 0),
-    [items],
-  );
 
   const visibleItems = useMemo(() => {
     return items.filter((item) => {
-      const status = (item.status ?? "").toLowerCase();
+      const status = normalizeBookingStatus(item.status);
       if ((!isAdmin || !showCancelled) && status === "cancelled") return false;
+      if (status === "pending") return false;
       if (statusFilter === "all") return true;
       if (statusFilter === "active") {
         return status === "active" || activeBookingId === item.bookingId;
@@ -366,7 +349,7 @@ export function RentalHistory() {
           b.bookingId === (res.bookingId ?? bookingId)
             ? {
                 ...b,
-                status: "completed",
+                status: "expired",
               }
             : b,
         ),
@@ -460,98 +443,17 @@ export function RentalHistory() {
           My
           <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             {" "}
-            bookings
+            transactions
           </span>
         </h1>
         <p className="text-muted-foreground">
-          Pay pending orders from your wallet, start sessions, and track rental
-          periods
+          Track active sessions, renewals, and past subscriptions in one place.
         </p>
-      </div>
-
-      {pendingCount > 0 && !isLoading && !loadError && (
-        <Card className="p-6 border-border mb-6 bg-gradient-to-br from-primary/10 via-card to-accent/5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="bg-primary/20 p-3 rounded-lg shrink-0">
-                <Wallet className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold mb-1">Payment required</h2>
-                <p className="text-sm text-muted-foreground">
-                  You have{" "}
-                  <span className="text-foreground font-semibold">
-                    {pendingCount}
-                  </span>{" "}
-                  order(s) waiting for payment. Funds are taken from your
-                  wallet.{" "}
-                  <Link
-                    to="/account/top-up"
-                    className="text-primary hover:underline font-medium"
-                  >
-                    Top up
-                  </Link>{" "}
-                  if needed.
-                </p>
-              </div>
-            </div>
-            <div className="sm:text-right shrink-0">
-              <p className="text-xs text-muted-foreground mb-1">
-                Wallet balance
-              </p>
-              <p className="text-2xl font-bold text-primary">
-                {walletBalance === null ? "—" : formatUsd(walletBalance)}
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 border-border bg-card/50">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/20 p-3 rounded-lg">
-              <Calendar className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total orders</p>
-              <p className="text-2xl font-bold">{items.length}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-border bg-card/50">
-          <div className="flex items-center gap-3">
-            <div className="bg-accent/20 p-3 rounded-lg">
-              <DollarSign className="w-5 h-5 text-accent" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total spent</p>
-              <p className="text-2xl font-bold text-accent">
-                {formatUsd(totalSpent)}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-border bg-card/50">
-          <div className="flex items-center gap-3">
-            <div className="bg-secondary/20 p-3 rounded-lg">
-              <Clock className="w-5 h-5 text-secondary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Expired</p>
-              <p className="text-2xl font-bold text-secondary">
-                {completedCount}
-              </p>
-            </div>
-          </div>
-        </Card>
       </div>
 
       <Card className="p-4 border-border mb-4 bg-card/40">
         <div className="flex flex-wrap items-center gap-2">
-          {["all", "pending", "paid", "active", "completed"].map((key) => {
+          {["all", "paid", "active", "expired"].map((key) => {
             const active = statusFilter === key;
             return (
               <Button
@@ -561,7 +463,7 @@ export function RentalHistory() {
                 size="sm"
                 onClick={() =>
                   setStatusFilter(
-                    key as "all" | "pending" | "paid" | "active" | "completed",
+                    key as "all" | "paid" | "active" | "expired",
                   )
                 }
                 className={
@@ -864,7 +766,7 @@ export function RentalHistory() {
         )}
 
         {visibleItems.map((rental) => {
-          const key = (rental.status ?? "").toLowerCase();
+          const key = normalizeBookingStatus(rental.status);
           const isQueued = !!rental.queued;
           const cfg = isQueued
             ? statusConfig.waiting
@@ -888,7 +790,7 @@ export function RentalHistory() {
           const isActive =
             key === "active" || activeBookingId === rental.bookingId;
           const isPaid = key === "paid" && !isActive;
-          const isCompleted = key === "completed";
+          const isExpired = key === "expired";
           const total = Number(rental.totalPrice ?? 0);
           const insufficient =
             isPending &&
@@ -1058,7 +960,7 @@ export function RentalHistory() {
                     </div>
                   )}
 
-                  {isCompleted && (
+                  {isExpired && (
                     <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
                       <Button
                         onClick={() => handleOpenRenew(rental)}
@@ -1117,7 +1019,7 @@ export function RentalHistory() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
             <Calendar className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-xl font-bold mb-2">No bookings yet</h3>
+          <h3 className="text-xl font-bold mb-2">No transactions yet</h3>
           <p className="text-muted-foreground">
             Choose a subscription plan on the home page to get started.
           </p>

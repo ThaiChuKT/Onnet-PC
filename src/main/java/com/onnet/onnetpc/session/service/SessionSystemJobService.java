@@ -48,7 +48,7 @@ public class SessionSystemJobService {
         );
         if (paidBooking.isPresent()) {
             Booking booking = paidBooking.get();
-            booking.setStatus(BookingStatus.completed);
+            booking.setStatus(BookingStatus.expired);
             booking.setUpdatedAt(now);
             bookingRepository.save(booking);
         }

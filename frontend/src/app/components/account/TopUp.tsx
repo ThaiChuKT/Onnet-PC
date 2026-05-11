@@ -4,6 +4,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Wallet, CreditCard, DollarSign, Check } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
 import { formatUsd } from "../../lib/formatUsd";
@@ -15,6 +16,7 @@ export function TopUp() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     let cancelled = false;
@@ -46,10 +48,11 @@ export function TopUp() {
 
     setIsSubmitting(true);
     try {
+      const redirectTo = searchParams.get("redirect") ?? undefined;
       const res = await apiPost<
         { paymentProvider: string; status: string; message: string; orderId: string | null; approvalUrl: string | null },
-        { amount: number }
-      >("/wallet/top-up", { amount: parsed });
+        { amount: number; redirectTo?: string }
+      >("/wallet/top-up", { amount: parsed, redirectTo });
 
       if (res.approvalUrl) {
         toast.message(res.message || "Complete payment in PayPal", {

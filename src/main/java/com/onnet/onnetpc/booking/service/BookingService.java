@@ -164,7 +164,7 @@ public class BookingService {
                     merged.getEndTime(),
                     merged.getTotalPrice(),
                     currentBalance,
-                    merged.getStatus().name(),
+                    normalizeStatus(merged.getStatus()),
                     "You already have a pending " + pricing.spec().getSpecName()
                         + " order. Added this rental to that same unpaid order."
                         + " Complete one wallet payment to activate all merged time"
@@ -208,7 +208,7 @@ public class BookingService {
             endTime,
             pricing.totalPrice(),
             currentBalance,
-            savedBooking.getStatus().name(),
+            normalizeStatus(savedBooking.getStatus()),
             hasPaidSubscription
                 ? "You already have an active paid " + pricing.spec().getSpecName()
                     + " subscription. A new pending extension order was created; pay with wallet to add more time."
@@ -379,7 +379,7 @@ public class BookingService {
 
                 return new BookingPaymentResponse(
                     booking.getId(),
-                    booking.getStatus().name(),
+                    normalizeStatus(booking.getStatus()),
                     newBalance,
                     "Payment received. Time has been added to your existing active package.",
                     paidTarget.getId()
@@ -395,7 +395,7 @@ public class BookingService {
 
         return new BookingPaymentResponse(
             booking.getId(),
-            booking.getStatus().name(),
+            normalizeStatus(booking.getStatus()),
             newBalance,
             "Payment successful. Your package is now active.",
             null
@@ -431,8 +431,8 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
 
-        if (booking.getStatus() != BookingStatus.completed) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Only completed bookings can be reviewed");
+        if (booking.getStatus() != BookingStatus.expired && booking.getStatus() != BookingStatus.completed) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Only expired bookings can be reviewed");
         }
 
         if (booking.getPc() == null) {
@@ -470,7 +470,7 @@ public class BookingService {
             booking.getStartTime(),
             booking.getEndTime(),
             booking.getTotalPrice(),
-            booking.getStatus() == null ? null : booking.getStatus().name()
+            normalizeStatus(booking.getStatus())
         );
     }
 
@@ -606,10 +606,20 @@ public class BookingService {
             booking.getStartTime(),
             booking.getEndTime(),
             booking.getTotalPrice(),
-            booking.getStatus() == null ? null : booking.getStatus().name(),
+            normalizeStatus(booking.getStatus()),
             remainingMinutes,
             pendingExpiresAt,
             booking.getCreatedAt()
         );
+    }
+
+    private String normalizeStatus(BookingStatus status) {
+        if (status == null) {
+            return null;
+        }
+        if (status == BookingStatus.completed) {
+            return BookingStatus.expired.name();
+        }
+        return status.name();
     }
 }

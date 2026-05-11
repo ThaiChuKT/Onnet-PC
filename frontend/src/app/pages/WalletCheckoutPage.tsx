@@ -3,7 +3,7 @@ import { Footer } from "../components/Footer";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Check,
   CreditCard,
@@ -50,10 +50,20 @@ function initialView(searchParams: URLSearchParams): ViewState {
 
 export function WalletCheckoutPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [view, setView] = useState<ViewState>(() => initialView(searchParams));
 
   const paypalStatus = searchParams.get("paypalStatus");
   const orderId = searchParams.get("token");
+  const redirectParam = searchParams.get("redirect");
+  const safeRedirect = redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+    ? redirectParam
+    : null;
+  const redirectLabel = safeRedirect?.includes("/cart")
+    ? "Back to cart"
+    : safeRedirect?.includes("/transactions")
+      ? "Back to transactions"
+      : "Continue";
 
   useEffect(() => {
     if (paypalStatus !== "success" || !orderId?.trim()) return;
@@ -83,6 +93,14 @@ export function WalletCheckoutPage() {
       cancelled = true;
     };
   }, [paypalStatus, orderId]);
+
+  useEffect(() => {
+    if (view.kind !== "success" || !safeRedirect) return;
+    const timeout = window.setTimeout(() => {
+      navigate(safeRedirect, { replace: true });
+    }, 1500);
+    return () => window.clearTimeout(timeout);
+  }, [navigate, safeRedirect, view.kind]);
 
   const title = (
     <h1 className="text-3xl font-bold mb-2">
@@ -138,19 +156,25 @@ export function WalletCheckoutPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
+                {safeRedirect && (
+                  <Button
+                    asChild
+                    className="flex-1 h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                  >
+                    <Link to={safeRedirect}>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      {redirectLabel}
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   asChild
-                  className="flex-1 h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                  variant={safeRedirect ? "outline" : "default"}
+                  className={`flex-1 h-12 ${safeRedirect ? "border-border" : "bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"}`}
                 >
                   <Link to="/account/top-up">
                     <CreditCard className="w-4 h-4 mr-2" />
                     Top up again
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="flex-1 h-12 border-border">
-                  <Link to="/account">
-                    Account
-                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
                 </Button>
               </div>

@@ -1,6 +1,8 @@
 import { createBrowserRouter } from "react-router";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { PackageFoldersPage } from "./pages/PackageFoldersPage";
 import { ComputerDetailPage } from "./pages/ComputerDetailPage";
 import { PackagePricingPage } from "./pages/PackagePricingPage";
@@ -13,6 +15,7 @@ import { AdminFAQPage } from "./pages/AdminFAQPage";
 import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
+import { Cart } from "./components/account/Cart";
 import { TopUp } from "./components/account/TopUp";
 import { TopUpBills } from "./components/account/TopUpBills";
 import { ComputerList } from "./components/dashboard/ComputerList";
@@ -34,6 +37,14 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: LoginPage,
+  },
+  {
+    path: "/forgot-password",
+    Component: ForgotPasswordPage,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPasswordPage,
   },
   {
     path: "/verify-email",
@@ -98,6 +109,14 @@ export const router = createBrowserRouter([
       {
         path: "change-password",
         Component: ChangePassword,
+      },
+      {
+        path: "cart",
+        Component: Cart,
+      },
+      {
+        path: "transactions",
+        Component: RentalHistory,
       },
       {
         path: "rental-history",

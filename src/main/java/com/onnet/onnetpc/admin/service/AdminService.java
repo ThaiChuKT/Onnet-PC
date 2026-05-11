@@ -199,7 +199,7 @@ public class AdminService {
         Booking booking = bookingRepository.findById(session.getBooking().getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
         boolean hasRemainingTime = booking.getEndTime() != null && now.isBefore(booking.getEndTime());
-        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.completed);
+        booking.setStatus(hasRemainingTime ? BookingStatus.paid : BookingStatus.expired);
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
@@ -380,6 +380,12 @@ public class AdminService {
             return bookingRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toAdminBooking);
         }
         BookingStatus bookingStatus = parseBookingStatus(status);
+        if (bookingStatus == BookingStatus.expired) {
+            return bookingRepository.findByStatusInOrderByCreatedAtDesc(
+                List.of(BookingStatus.expired, BookingStatus.completed),
+                pageable
+            ).map(this::toAdminBooking);
+        }
         return bookingRepository.findByStatusOrderByCreatedAtDesc(bookingStatus, pageable).map(this::toAdminBooking);
     }
 
@@ -514,7 +520,7 @@ public class AdminService {
             booking.getStartTime(),
             booking.getEndTime(),
             booking.getTotalPrice(),
-            booking.getStatus() == null ? null : booking.getStatus().name(),
+            normalizeBookingStatus(booking.getStatus()),
             booking.getCreatedAt(),
             planName,
             durationDays
@@ -599,7 +605,11 @@ public class AdminService {
 
     private BookingStatus parseBookingStatus(String value) {
         try {
-            return BookingStatus.valueOf(value.trim().toLowerCase());
+            String normalized = value.trim().toLowerCase();
+            if ("completed".equals(normalized)) {
+                return BookingStatus.expired;
+            }
+            return BookingStatus.valueOf(normalized);
         } catch (Exception ex) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid booking status");
         }
@@ -611,5 +621,15 @@ public class AdminService {
         } catch (Exception ex) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid review status");
         }
+    }
+
+    private String normalizeBookingStatus(BookingStatus status) {
+        if (status == null) {
+            return null;
+        }
+        if (status == BookingStatus.completed) {
+            return BookingStatus.expired.name();
+        }
+        return status.name();
     }
 }

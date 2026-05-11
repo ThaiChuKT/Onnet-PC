@@ -1,12 +1,17 @@
 package com.onnet.onnetpc.auth.service;
 
 import com.onnet.onnetpc.auth.EmailVerificationToken;
+import com.onnet.onnetpc.auth.PasswordResetToken;
+import com.onnet.onnetpc.auth.PasswordPolicy;
 import com.onnet.onnetpc.auth.dto.AuthResponse;
 import com.onnet.onnetpc.auth.dto.LoginRequest;
 import com.onnet.onnetpc.auth.dto.RegisterRequest;
 import com.onnet.onnetpc.auth.dto.RegisterResponse;
 import com.onnet.onnetpc.auth.dto.VerifyEmailCodeRequest;
+import com.onnet.onnetpc.auth.dto.ForgotPasswordRequest;
+import com.onnet.onnetpc.auth.dto.ResetPasswordRequest;
 import com.onnet.onnetpc.auth.repository.EmailVerificationTokenRepository;
+import com.onnet.onnetpc.auth.repository.PasswordResetTokenRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.common.security.JwtService;
 import com.onnet.onnetpc.users.User;
@@ -37,6 +42,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final EmailVerificationTokenRepository tokenRepository;
+    private final PasswordResetTokenRepository resetTokenRepository;
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -47,6 +53,7 @@ public class AuthService {
     public AuthService(
         UserRepository userRepository,
         EmailVerificationTokenRepository tokenRepository,
+        PasswordResetTokenRepository resetTokenRepository,
         WalletRepository walletRepository,
         PasswordEncoder passwordEncoder,
         JwtService jwtService,
@@ -56,6 +63,7 @@ public class AuthService {
     ) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
+        this.resetTokenRepository = resetTokenRepository;
         this.walletRepository = walletRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -121,6 +129,60 @@ public class AuthService {
             email,
             registerMessage
         );
+    }
+
+    @Transactional
+    public void requestPasswordReset(ForgotPasswordRequest request) {
+        String email = request.email().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) return; // do not reveal existence
+
+        tokenRepository.deleteByUserId(user.getId());
+        String code = generateVerificationCode();
+        PasswordResetToken token = new PasswordResetToken();
+        token.setUser(user);
+        token.setToken(code);
+        token.setExpiresAt(Instant.now().plusSeconds(verificationCodeExpiryMinutes * 60));
+        resetTokenRepository.deleteByUserId(user.getId());
+        resetTokenRepository.save(token);
+
+        sendVerificationCodeEmail(email, code);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = request.email().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Account not found"));
+
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "New password confirmation does not match");
+        }
+
+
+        PasswordResetToken token = resetTokenRepository.findTopByUserIdOrderByCreatedAtDesc(user.getId())
+            .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Reset code not found"));
+
+        if (!token.getToken().equals(request.code())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid reset code");
+        }
+
+        if (token.getUsedAt() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Reset token already used");
+        }
+
+        if (token.getExpiresAt().isBefore(Instant.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Reset token has expired");
+        }
+
+        PasswordPolicy.validate(request.newPassword());
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        token.setUsedAt(Instant.now());
+        resetTokenRepository.save(token);
     }
 
     @Transactional(readOnly = true)

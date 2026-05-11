@@ -5,6 +5,8 @@ import com.onnet.onnetpc.auth.dto.LoginRequest;
 import com.onnet.onnetpc.auth.dto.RegisterRequest;
 import com.onnet.onnetpc.auth.dto.RegisterResponse;
 import com.onnet.onnetpc.auth.dto.VerifyEmailCodeRequest;
+import com.onnet.onnetpc.auth.dto.ForgotPasswordRequest;
+import com.onnet.onnetpc.auth.dto.ResetPasswordRequest;
 import com.onnet.onnetpc.auth.service.AuthService;
 import com.onnet.onnetpc.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -37,5 +39,17 @@ public class AuthController {
 	public ApiResponse<String> verifyEmail(@Valid @RequestBody VerifyEmailCodeRequest request) {
 		authService.verifyEmail(request);
 		return ApiResponse.success("Email verified successfully");
+	}
+
+	@PostMapping("/forgot-password")
+	public ApiResponse<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+		authService.requestPasswordReset(request);
+		return ApiResponse.success("If the account exists, a reset code was sent to the email");
+	}
+
+	@PostMapping("/reset-password")
+	public ApiResponse<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		authService.resetPassword(request);
+		return ApiResponse.success("Password reset successfully");
 	}
 }

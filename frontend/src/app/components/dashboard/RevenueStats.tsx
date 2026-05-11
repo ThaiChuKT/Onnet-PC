@@ -54,7 +54,7 @@ type RevenueMonth = {
 
 type DetailMode = "topup" | "bookingRevenue" | "bookingOrders";
 
-const PAID_BOOKING_STATUSES = new Set(["paid", "completed"]);
+const PAID_BOOKING_STATUSES = new Set(["paid", "expired", "completed"]);
 
 function getMonthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

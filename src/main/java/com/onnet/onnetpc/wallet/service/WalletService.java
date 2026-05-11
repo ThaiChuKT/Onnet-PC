@@ -57,7 +57,8 @@ public class WalletService {
 
     @Transactional
     public TopUpResponse createTopUp(String email, TopUpRequest request) {
-        PaypalOrderResponse order = paypalService.createOrder(email, request.amount());
+        String redirectTo = normalizeRedirect(request.redirectTo());
+        PaypalOrderResponse order = paypalService.createOrder(email, request.amount(), redirectTo);
         return new TopUpResponse(
             "paypal",
             order.status(),
@@ -78,5 +79,19 @@ public class WalletService {
 
         return walletRepository.findByUserId(user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
+    }
+
+    private String normalizeRedirect(String redirectTo) {
+        if (redirectTo == null) {
+            return null;
+        }
+        String trimmed = redirectTo.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            return null;
+        }
+        return trimmed;
     }
 }

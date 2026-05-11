@@ -116,8 +116,8 @@ export function Packages() {
         rentalUnit: selectedPeriod,
         quantity: 1,
       });
-      toast.success(res.message || "Order created. Pay in My bookings, then start your session.");
-      navigate("/account/rental-history");
+      toast.success(res.message || "Order created. Review it in your cart.");
+      navigate(`/account/cart?bookingId=${res.bookingId}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create subscription order");
     } finally {

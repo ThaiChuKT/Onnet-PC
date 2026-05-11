@@ -58,7 +58,7 @@ const statusConfig: Record<
     className: "bg-accent/20 text-accent border-accent/50",
     icon: CheckCircle,
   },
-  completed: {
+  expired: {
     label: "Expired",
     className: "bg-blue-500/20 text-blue-500 border-blue-500/50",
     icon: CheckCircle,
@@ -68,6 +68,11 @@ const statusConfig: Record<
     className: "bg-destructive/20 text-destructive border-destructive/50",
     icon: XCircle,
   },
+};
+
+const normalizeBookingStatus = (value?: string | null) => {
+  const normalized = (value ?? "").toLowerCase();
+  return normalized === "completed" ? "expired" : normalized;
 };
 
 export function OrderManagement() {
@@ -146,9 +151,9 @@ export function OrderManagement() {
   const filteredOrders = useMemo(() => {
     const selectedStatus = statusFilter.toLowerCase();
     return currentOrders.filter((o) => {
-      const rawStatus = (o.status ?? "").toLowerCase();
-      const isPaid = rawStatus === "active" || rawStatus === "completed";
-      const isExpired = rawStatus === "completed";
+      const rawStatus = normalizeBookingStatus(o.status);
+      const isPaid = rawStatus === "active" || rawStatus === "expired";
+      const isExpired = rawStatus === "expired";
       const statusHit =
         selectedStatus === "all" ||
         rawStatus === selectedStatus ||
@@ -160,11 +165,11 @@ export function OrderManagement() {
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
-    const pending = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "pending").length;
-    const active = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "active").length;
-    const completed = filteredOrders.filter((o) => (o.status ?? "").toLowerCase() === "completed").length;
+    const pending = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "pending").length;
+    const active = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "active").length;
+    const completed = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "expired").length;
     const totalRevenue = filteredOrders
-      .filter((o) => ["active", "completed"].includes((o.status ?? "").toLowerCase()))
+      .filter((o) => ["active", "expired"].includes(normalizeBookingStatus(o.status)))
       .reduce((sum, o) => sum + Number(o.totalPrice ?? 0), 0);
     return { total, pending, active, completed, totalRevenue };
   }, [filteredOrders]);
@@ -189,10 +194,9 @@ export function OrderManagement() {
             <SelectItem value="all">Tất cả</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="expired">Expired</SelectItem>
           </SelectContent>
         </Select>
         <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -272,7 +276,7 @@ export function OrderManagement() {
         )}
 
         {filteredOrders.map((order) => {
-          const key = (order.status ?? "").toLowerCase();
+          const key = normalizeBookingStatus(order.status);
           const cfg = statusConfig[key] ?? {
             label: order.status ?? "N/A",
             className: "bg-muted text-muted-foreground border-border",
@@ -362,8 +366,8 @@ export function OrderManagement() {
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Trạng thái</p>
-                              <Badge className={(statusConfig[(selectedOrder.status ?? "").toLowerCase()]?.className) ?? "bg-muted text-muted-foreground border-border"}>
-                                {selectedOrder.status}
+                              <Badge className={(statusConfig[normalizeBookingStatus(selectedOrder.status)]?.className) ?? "bg-muted text-muted-foreground border-border"}>
+                                {statusConfig[normalizeBookingStatus(selectedOrder.status)]?.label ?? selectedOrder.status}
                               </Badge>
                             </div>
                           </div>
@@ -399,8 +403,8 @@ export function OrderManagement() {
                             <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "active")} className="bg-accent hover:bg-accent/90">
                               Active
                             </Button>
-                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "completed")} className="bg-blue-500 hover:bg-blue-600">
-                              Completed
+                            <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "expired")} className="bg-blue-500 hover:bg-blue-600">
+                              Expired
                             </Button>
                             <Button onClick={() => handleStatusChange(selectedOrder.bookingId, "cancelled")} variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
                               Cancelled

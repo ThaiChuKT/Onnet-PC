@@ -30,7 +30,9 @@ public class PaypalController {
 		Authentication authentication,
 		@Valid @RequestBody CreatePaypalOrderRequest request
 	) {
-		return ApiResponse.success(paypalService.createOrder(authentication.getName(), request.amount()));
+		return ApiResponse.success(
+			paypalService.createOrder(authentication.getName(), request.amount(), request.redirectTo())
+		);
 	}
 
 	@PostMapping("/orders/{orderId}/capture")
@@ -47,6 +49,6 @@ public class PaypalController {
 		return ApiResponse.success(Map.of("status", "ok"));
 	}
 
-	public record CreatePaypalOrderRequest(@NotNull @DecimalMin("1.0") BigDecimal amount) {
+	public record CreatePaypalOrderRequest(@NotNull @DecimalMin("1.0") BigDecimal amount, String redirectTo) {
 	}
 }
