@@ -498,15 +498,7 @@ export function ComputerList() {
                         {tierPackage.specIds.length} spec link{tierPackage.specIds.length === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <Badge
-                      className={
-                        tierPackage.active
-                          ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
-                          : "bg-muted text-muted-foreground border-border"
-                      }
-                    >
-                      {tierPackage.active ? "Active" : "Inactive"}
-                    </Badge>
+
                   </div>
 
 

@@ -238,9 +238,7 @@ export function InvoiceManagement() {
                       <Badge className="bg-primary/15 text-primary border-primary/40">
                         Top-up
                       </Badge>
-                      <Badge className="bg-muted text-muted-foreground border-border">
-                        {item.rawStatus}
-                      </Badge>
+
                     </div>
                     <p className="text-sm text-muted-foreground">
                       <Link to={`/dashboard/accounts/${item.userId ?? ""}`} className="text-primary hover:underline">
