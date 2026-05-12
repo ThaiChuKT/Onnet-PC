@@ -2,8 +2,7 @@ import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
 import { Features } from "../components/Features";
 import { Footer } from "../components/Footer";
-import { Button } from "../components/ui/button";
-import { Link } from "react-router";
+// removed unused Button and Link imports
 
 export function HomePage() {
   return (

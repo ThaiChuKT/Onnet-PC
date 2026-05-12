@@ -27,6 +27,9 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.onnet.onnetpc.moonlight.service.MoonlightService;
+import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
+import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
 
 @Service
 public class SessionLifecycleService {
@@ -38,6 +41,8 @@ public class SessionLifecycleService {
     private final SessionQueueRepository sessionQueueRepository;
     private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
     private final MembershipTierRepository membershipTierRepository;
+    private final MoonlightService moonlightService;
+    private final SunshineHostRepository sunshineHostRepository;
 
     public SessionLifecycleService(
         UserRepository userRepository,
@@ -46,7 +51,9 @@ public class SessionLifecycleService {
         SessionRepository sessionRepository,
         SessionQueueRepository sessionQueueRepository,
         MembershipTierSpecMappingRepository tierSpecMappingRepository,
-        MembershipTierRepository membershipTierRepository
+        MembershipTierRepository membershipTierRepository,
+        MoonlightService moonlightService,
+        SunshineHostRepository sunshineHostRepository
     ) {
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
@@ -55,8 +62,11 @@ public class SessionLifecycleService {
         this.sessionQueueRepository = sessionQueueRepository;
         this.tierSpecMappingRepository = tierSpecMappingRepository;
         this.membershipTierRepository = membershipTierRepository;
+        this.moonlightService = moonlightService;
+        this.sunshineHostRepository = sunshineHostRepository;
     }
 
+    
     @Transactional
     public StartSessionResponse startSession(String email, Long bookingId) {
         // Ensure overdue active sessions are closed so stale machines can be reused.
@@ -126,6 +136,29 @@ public class SessionLifecycleService {
         session.setTotalCost(booking.getTotalPrice());
         session.setStatus("active");
         Session saved = sessionRepository.save(session);
+
+        // Best-effort: if this PC has a linked Sunshine host, attempt to start a STREAM
+        try {
+            if (pc != null && pc.getId() != null) {
+                sunshineHostRepository.findByPcId(pc.getId()).ifPresent(host -> {
+                    try {
+                        MoonlightCommandRequest req = new MoonlightCommandRequest(
+                            "STREAM",
+                            null,
+                            "Desktop",
+                            "1080p",
+                            60,
+                            8000,
+                            true
+                        );
+                        moonlightService.runUserLaunch(user.getEmail(), host.getId(), req);
+                    } catch (Exception ex) {
+                        // ignore errors from best-effort launch
+                    }
+                });
+            }
+        } catch (Exception ignored) {
+        }
 
         return toStartResponse(saved, "Session started successfully");
     }

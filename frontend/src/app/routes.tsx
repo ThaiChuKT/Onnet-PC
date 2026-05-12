@@ -26,6 +26,7 @@ import { RevenueStats } from "./components/dashboard/RevenueStats";
 import { OrderManagement } from "./components/dashboard/OrderManagement";
 import { InvoiceManagement } from "./components/dashboard/InvoiceManagement";
 import { SessionManagement } from "./components/dashboard/SessionManagement";
+import { SunshineManagement } from "./components/dashboard/SunshineManagement";
 import { AccountDetailPage } from "./pages/AccountDetailPage";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { AdminRoute } from "./auth/AdminRoute";
@@ -185,6 +186,10 @@ export const router = createBrowserRouter([
       {
         path: "sessions",
         Component: SessionManagement,
+      },
+      {
+        path: "sunshine",
+        Component: SunshineManagement,
       },
     ],
   },

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Cpu, MapPin, Monitor, Search, Sparkles, HardDrive } from "lucide-react";
+import { ArrowLeft, Cpu, Monitor, Search, Sparkles, HardDrive } from "lucide-react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { Card } from "../components/ui/card";

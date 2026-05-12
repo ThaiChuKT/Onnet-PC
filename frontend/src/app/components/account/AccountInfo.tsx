@@ -2,7 +2,7 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { User, Mail, Phone, Eye, EyeOff, Edit2, Lock } from "lucide-react";
+import { User, Mail, Phone, Edit2, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { apiPatch } from "../../api/http";
@@ -10,7 +10,6 @@ import { toast } from "sonner";
 
 export function AccountInfo() {
   const { user, refreshMe } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -111,8 +110,8 @@ export function AccountInfo() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
-                  value="••••••••••••"
+                    type="password"
+                    value="••••••••••••"
                   disabled
                   className="bg-input-background border-border pr-10"
                 />
