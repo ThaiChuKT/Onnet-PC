@@ -42,7 +42,7 @@ export function Hero() {
               asChild
             >
               <Link to="/packages">
-                View plans
+                Discover all offers
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
@@ -70,8 +70,8 @@ export function Hero() {
                   <Shield className="w-6 h-6 text-accent" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold">Warranty & care</div>
-                  <div className="text-xs text-muted-foreground">Technical support</div>
+                  <div className="text-sm font-bold">Flexible terms</div>
+                  <div className="text-xs text-muted-foreground">Pick what fits your budget</div>
                 </div>
               </div>
             </div>
