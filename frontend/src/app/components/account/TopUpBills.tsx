@@ -134,7 +134,7 @@ export function TopUpBills() {
                   PayPal order: {tx.referenceId ?? "-"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Created: {tx.createdAt ? new Date(tx.createdAt).toLocaleString("vi-VN") : "-"}
+                  Created: {tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-US") : "-"}
                 </p>
               </div>
 

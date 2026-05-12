@@ -65,7 +65,7 @@ function createRecentMonths(count: number): MonthSeed[] {
   const seeds: MonthSeed[] = [];
   for (let i = count - 1; i >= 0; i -= 1) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = d.toLocaleDateString("vi-VN", { month: "short" }).replace("thg", "T").replace(" ", "");
+    const month = d.toLocaleDateString("en-US", { month: "short" });
     seeds.push({ key: getMonthKey(d), month });
   }
   return seeds;
@@ -132,7 +132,7 @@ export function RevenueStats() {
       const seeds: MonthSeed[] = [];
       const current = new Date(start.getFullYear(), start.getMonth(), 1);
       while (current <= end) {
-        const month = current.toLocaleDateString("vi-VN", { month: "short" }).replace("thg", "T").replace(" ", "");
+        const month = current.toLocaleDateString("en-US", { month: "short" });
         seeds.push({ key: getMonthKey(current), month });
         current.setMonth(current.getMonth() + 1);
       }
@@ -277,7 +277,7 @@ export function RevenueStats() {
   const totalCustomers = bookingMonthlyData.reduce((sum, item) => sum + item.customers, 0);
   const currentMonth =
     bookingMonthlyData[bookingMonthlyData.length - 1] ?? {
-      month: "T0",
+      month: "M0",
       key: "",
       revenue: 0,
       orders: 0,
@@ -286,7 +286,7 @@ export function RevenueStats() {
   const previousMonth =
     topUpMonthlyData[topUpMonthlyData.length - 2] ??
     topUpMonthlyData[topUpMonthlyData.length - 1] ?? {
-      month: "T0",
+      month: "M0",
       key: "",
       revenue: 0,
     };
@@ -384,7 +384,7 @@ export function RevenueStats() {
     if (!value) return "-";
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString("vi-VN");
+    return d.toLocaleString("en-US");
   };
 
   useEffect(() => {
@@ -406,39 +406,39 @@ export function RevenueStats() {
     <div>
       {isLoading && (
         <Card className="p-6 border-border mb-6">
-          <p className="text-muted-foreground">Đang tải dữ liệu doanh thu...</p>
+          <p className="text-muted-foreground">Loading revenue data...</p>
         </Card>
       )}
 
       <div className="grid md:grid-cols-4 gap-3 mb-6">
         <Select value={monthWindow} onValueChange={setMonthWindow} disabled={!!startDate || !!endDate}>
           <SelectTrigger className="bg-input-background border-border">
-            <SelectValue placeholder="Khoảng thời gian" />
+            <SelectValue placeholder="Time range" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="12">12 tháng gần nhất</SelectItem>
-            <SelectItem value="6">6 tháng gần nhất</SelectItem>
-            <SelectItem value="3">3 tháng gần nhất</SelectItem>
+            <SelectItem value="12">Last 12 months</SelectItem>
+            <SelectItem value="6">Last 6 months</SelectItem>
+            <SelectItem value="3">Last 3 months</SelectItem>
           </SelectContent>
         </Select>
         <Input
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          placeholder="Từ ngày"
+          placeholder="From date"
           className="bg-input-background border-border"
         />
         <Input
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
-          placeholder="Đến ngày"
+          placeholder="To date"
           className="bg-input-background border-border"
         />
         <Input
           value={categoryQuery}
           onChange={(e) => setCategoryQuery(e.target.value)}
-          placeholder="Lọc phân khúc theo tên..."
+          placeholder="Filter segments by name..."
           className="bg-input-background border-border"
         />
       </div>
@@ -454,13 +454,13 @@ export function RevenueStats() {
               <TrendingUp className="w-5 h-5 text-accent" />
             </div>
             <p className="text-sm text-muted-foreground mb-1">
-              Doanh thu từ nạp ví 
+              Wallet top-up revenue
             </p>
             <p className="text-3xl font-bold text-primary mb-1">
               {formatUsd(topUpRevenue)}
             </p>
             <p className="text-xs text-accent">
-              +{growthRate.toFixed(1)}% top up so với tháng trước
+              +{growthRate.toFixed(1)}% top up compared with last month
             </p>
           </Card>
         </Link>
@@ -472,10 +472,10 @@ export function RevenueStats() {
                 <Calendar className="w-6 h-6 text-accent" />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-1">Tổng Đơn Hàng</p>
+            <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
             <p className="text-3xl font-bold mb-1">{totalOrders}</p>
             <p className="text-xs text-muted-foreground">
-              Trung bình {(totalOrders / Math.max(bookingMonthlyData.length, 1)).toFixed(0)} đơn/tháng
+              Average {(totalOrders / Math.max(bookingMonthlyData.length, 1)).toFixed(0)} orders/month
             </p>
           </Card>
         </Link>
@@ -487,12 +487,12 @@ export function RevenueStats() {
                 <DollarSign className="w-6 h-6 text-secondary" />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-1">Doanh thu từ khách đặt máy</p>
+            <p className="text-sm text-muted-foreground mb-1">Machine booking revenue</p>
             <p className="text-3xl font-bold text-secondary mb-1">
               {formatUsd(bookingRevenue)}
             </p>
             <p className="text-xs text-muted-foreground">
-              Tổng doanh thu phát sinh từ đơn thuê máy (không gồm nạp ví)
+              Total revenue from machine rentals, excluding wallet top-ups
             </p>
           </Card>
         </Link>
@@ -504,10 +504,10 @@ export function RevenueStats() {
                 <Users className="w-6 h-6 text-primary" />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-1">Khách Hàng</p>
+            <p className="text-sm text-muted-foreground mb-1">Customers</p>
             <p className="text-3xl font-bold mb-1">{totalCustomers}</p>
             <p className="text-xs text-muted-foreground">
-              Tháng hiện tại: {currentMonth.customers} khách hàng
+              Current month: {currentMonth.customers} customers
             </p>
           </Card>
         </Link>
@@ -517,16 +517,16 @@ export function RevenueStats() {
         <Card className="p-6 border-border">
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-2">
-              Biểu Đồ
+              Chart
               <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 {" "}
                 Top Up
               </span>
             </h2>
             <p className="text-muted-foreground text-sm">
-              Theo dõi doanh thu top up theo từng tháng
+              Track top-up revenue by month
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Nhấn vào điểm trên biểu đồ để xem chi tiết tháng.</p>
+            <p className="text-xs text-muted-foreground mt-1">Click a chart point to view month details.</p>
           </div>
 
           <ResponsiveContainer width="100%" height={340}>
@@ -580,16 +580,16 @@ export function RevenueStats() {
         <Card className="p-6 border-border">
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-2">
-              Biểu Đồ
+              Chart
               <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 {" "}
                 Booking
               </span>
             </h2>
             <p className="text-muted-foreground text-sm">
-              Theo dõi doanh thu booking theo từng tháng
+              Track booking revenue by month
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Nhấn vào điểm trên biểu đồ để xem chi tiết tháng.</p>
+            <p className="text-xs text-muted-foreground mt-1">Click a chart point to view month details.</p>
           </div>
 
           <ResponsiveContainer width="100%" height={340}>
@@ -645,16 +645,16 @@ export function RevenueStats() {
       <Card className="p-6 border-border mb-6">
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-2">
-            Biểu Đồ
+            Chart
             <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               {" "}
-              Đơn Hàng & Khách Hàng
+              Orders & Customers
             </span>
           </h2>
           <p className="text-muted-foreground text-sm">
-            So sánh số lượng đơn hàng và khách hàng theo tháng
+            Compare order and customer counts by month
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Nhấn vào cột để xem chi tiết booking của tháng.</p>
+          <p className="text-xs text-muted-foreground mt-1">Click a bar to view booking details for the month.</p>
         </div>
 
         <ResponsiveContainer width="100%" height={400}>
@@ -690,7 +690,7 @@ export function RevenueStats() {
             <Bar
               key="orders-bar"
               dataKey="orders"
-              name="Đơn hàng"
+              name="Orders"
               fill="#ff6b35"
               shape={makeClickableBarShape("bookingOrders", "#ff6b35")}
               radius={[8, 8, 0, 0]}
@@ -698,7 +698,7 @@ export function RevenueStats() {
             <Bar
               key="customers-bar"
               dataKey="customers"
-              name="Khách hàng"
+              name="Customers"
               fill="#4ade80"
               shape={makeClickableBarShape("bookingOrders", "#4ade80")}
               radius={[8, 8, 0, 0]}
@@ -711,11 +711,11 @@ export function RevenueStats() {
         <Card className="p-6 border-border mb-6">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-xl font-bold">Chi tiết tháng {selectedMonthLabel}</h3>
+              <h3 className="text-xl font-bold">Details for {selectedMonthLabel}</h3>
               <p className="text-sm text-muted-foreground">
-                {detailMode === "topup" && "Danh sách giao dịch top up"}
-                {detailMode === "bookingRevenue" && "Danh sách booking theo doanh thu"}
-                {detailMode === "bookingOrders" && "Danh sách booking từ biểu đồ đơn hàng"}
+                {detailMode === "topup" && "Top-up transaction list"}
+                {detailMode === "bookingRevenue" && "Bookings by revenue"}
+                {detailMode === "bookingOrders" && "Bookings from the orders chart"}
               </p>
             </div>
             <button
@@ -723,20 +723,20 @@ export function RevenueStats() {
               onClick={clearDetails}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              Đóng chi tiết
+              Close details
             </button>
           </div>
 
           {detailMode === "topup" ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Số giao dịch: {selectedMonthTopUpDetails.length}</span>
+                <span className="text-sm text-muted-foreground">Transactions: {selectedMonthTopUpDetails.length}</span>
                 <Link to="/dashboard/invoices" className="text-sm text-primary hover:underline">
-                  Xem đầy đủ trong Invoices
+                  View full list in Invoices
                 </Link>
               </div>
               {selectedMonthTopUpDetails.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Không có giao dịch top up trong tháng này.</p>
+                <p className="text-sm text-muted-foreground">No top-up transactions this month.</p>
               ) : (
                 <div className="space-y-2">
                   {selectedMonthTopUpDetails.slice(0, 20).map((item) => (
@@ -754,13 +754,13 @@ export function RevenueStats() {
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Số booking: {selectedMonthBookingDetails.length}</span>
+                <span className="text-sm text-muted-foreground">Bookings: {selectedMonthBookingDetails.length}</span>
                 <Link to="/dashboard/orders" className="text-sm text-primary hover:underline">
-                  Xem đầy đủ trong Orders
+                  View full list in Orders
                 </Link>
               </div>
               {selectedMonthBookingDetails.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Không có booking phù hợp trong tháng này.</p>
+                <p className="text-sm text-muted-foreground">No matching bookings this month.</p>
               ) : (
                 <div className="space-y-2">
                   {selectedMonthBookingDetails.slice(0, 20).map((item) => (
@@ -785,14 +785,14 @@ export function RevenueStats() {
       <Card className="p-6 border-border mb-6">
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-2">
-              Doanh Thu
+              Revenue
               <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 {" "}
-                Theo Phân Khúc
+                By Segment
               </span>
             </h2>
             <p className="text-muted-foreground text-sm">
-              Phân tích doanh thu theo từng loại máy
+              Analyze revenue by machine type
             </p>
           </div>
 
@@ -800,21 +800,21 @@ export function RevenueStats() {
             <Input
               value={categoryQuery}
               onChange={(e) => setCategoryQuery(e.target.value)}
-              placeholder="Tìm kiếm phân khúc..."
+              placeholder="Search segments..."
               className="bg-input-background border-border"
             />
             <Input
               type="number"
               value={categoryRevenueMin}
               onChange={(e) => setCategoryRevenueMin(e.target.value)}
-              placeholder="Doanh thu tối thiểu..."
+              placeholder="Minimum revenue..."
               className="bg-input-background border-border"
             />
             <Input
               type="number"
               value={categoryRevenueMax}
               onChange={(e) => setCategoryRevenueMax(e.target.value)}
-              placeholder="Doanh thu tối đa..."
+              placeholder="Maximum revenue..."
               className="bg-input-background border-border"
             />
             <button
@@ -828,7 +828,7 @@ export function RevenueStats() {
               }}
               className="px-4 py-2 bg-muted text-muted-foreground hover:bg-muted/80 rounded-md transition-colors text-sm"
             >
-              Xóa bộ lọc
+              Clear filters
             </button>
           </div>
 
@@ -837,14 +837,14 @@ export function RevenueStats() {
               type="number"
               value={categoryUsersMin}
               onChange={(e) => setCategoryUsersMin(e.target.value)}
-              placeholder="Số khách hàng tối thiểu..."
+              placeholder="Minimum customers..."
               className="bg-input-background border-border"
             />
             <Input
               type="number"
               value={categoryUsersMax}
               onChange={(e) => setCategoryUsersMax(e.target.value)}
-              placeholder="Số khách hàng tối đa..."
+              placeholder="Maximum customers..."
               className="bg-input-background border-border"
             />
           </div>
@@ -862,7 +862,7 @@ export function RevenueStats() {
                     <div className="flex-1">
                       <h4 className="font-bold">{category.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {formatUsd(category.revenue)} • {category.users} khách • {category.count} lượt
+                        {formatUsd(category.revenue)} • {category.users} customers • {category.count} orders
                       </p>
                     </div>
                   </div>
@@ -877,14 +877,14 @@ export function RevenueStats() {
             ))}
 
             {filteredCategoryData.length === 0 && (
-              <p className="text-sm text-muted-foreground">Không có phân khúc phù hợp với bộ lọc.</p>
+              <p className="text-sm text-muted-foreground">No segments match the filters.</p>
             )}
           </div>
 
           <div className="mt-6 pt-6 border-t border-border">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">
-                Tổng doanh thu phân khúc:
+                Total segment revenue:
               </span>
               <span className="text-2xl font-bold text-primary">
                 {formatUsd(selectedCategoryRevenue)}

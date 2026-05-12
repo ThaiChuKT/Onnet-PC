@@ -14,6 +14,7 @@ import {
 } from "../ui/select";
 import { Activity, Power, Search } from "lucide-react";
 import { formatUsd } from "../../lib/formatUsd";
+import { toEnglishMessage } from "../../lib/englishMessage";
 
 function formatDuration(startTime: string, endTime?: string | null): string {
   const start = new Date(startTime).getTime();
@@ -140,7 +141,7 @@ export function SessionManagement() {
       const response = await apiPost<EndSessionResponse>(
         `/admin/sessions/${sessionId}/force-end`,
       );
-      toast.success(response.message || "Session force-ended");
+      toast.success(toEnglishMessage(response.message, "Session force-ended"));
       await loadSessions();
     } catch (e) {
       toast.error(
@@ -209,7 +210,7 @@ export function SessionManagement() {
             const isActive = status === "active";
             const lastUsedLabel =
               !isActive && item.endTime
-                ? new Date(item.endTime).toLocaleString("vi-VN")
+                ? new Date(item.endTime).toLocaleString("en-US")
                 : "-";
             const activeDuration = isActive
               ? formatDuration(item.startTime, new Date(nowTick).toISOString())
@@ -250,13 +251,13 @@ export function SessionManagement() {
                       <p>
                         Started:{" "}
                         {item.startTime
-                          ? new Date(item.startTime).toLocaleString("vi-VN")
+                          ? new Date(item.startTime).toLocaleString("en-US")
                           : "-"}
                       </p>
                       <p>
                         Ended:{" "}
                         {item.endTime
-                          ? new Date(item.endTime).toLocaleString("vi-VN")
+                          ? new Date(item.endTime).toLocaleString("en-US")
                           : "-"}
                       </p>
                     </div>

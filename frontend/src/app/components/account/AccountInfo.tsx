@@ -81,7 +81,7 @@ export function AccountInfo() {
             </div>
             <div>
               <h3 className="font-bold text-lg">{formData.fullName || "—"}</h3>
-              <p className="text-sm text-muted-foreground">Thành viên từ 01/2026</p>
+              <p className="text-sm text-muted-foreground">Member since 01/2026</p>
             </div>
           </div>
 
@@ -91,7 +91,7 @@ export function AccountInfo() {
             <div className="space-y-2">
               <Label htmlFor="fullName" className="flex items-center gap-2">
                 <User className="w-4 h-4 text-primary" />
-                Họ và Tên
+                Full Name
               </Label>
               <Input
                 id="fullName"
@@ -106,7 +106,7 @@ export function AccountInfo() {
             <div className="space-y-2">
               <Label htmlFor="password" className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-primary" />
-                Mật Khẩu
+                Password
               </Label>
               <div className="relative">
                 <Input
@@ -129,7 +129,7 @@ export function AccountInfo() {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Sử dụng mục "Đổi Mật Khẩu" để thay đổi mật khẩu
+                Use the "Change Password" section to update your password
               </p>
             </div>
 
@@ -138,7 +138,7 @@ export function AccountInfo() {
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" />
                 Email
-                <span className="text-xs text-accent">(Bắt buộc)</span>
+                <span className="text-xs text-accent">(Required)</span>
               </Label>
               <Input
                 id="email"
@@ -153,7 +153,7 @@ export function AccountInfo() {
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-primary" />
-                Số Điện Thoại
+                Phone Number
               </Label>
               <Input
                 id="phone"
@@ -174,14 +174,14 @@ export function AccountInfo() {
                 disabled={isSaving}
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
-                {isSaving ? "Đang lưu..." : "Lưu Thay Đổi"}
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
               <Button
                 onClick={() => setIsEditing(false)}
                 variant="outline"
                 className="border-border"
               >
-                Hủy
+                Cancel
               </Button>
             </div>
           )}

@@ -36,7 +36,7 @@ const initialMessage: Message = {
 };
 
 const aiResponses: { [key: string]: string } = {
-  "chơi game": `For gaming, our subscription tiers map to these typical builds:
+  gaming: `For gaming, our subscription tiers map to these typical builds:
 
 **Basic** — esports & lighter titles (1080p high FPS)
 **Pro** — AAA at high/ultra 1440p
@@ -48,11 +48,11 @@ Exact hardware is assigned from the pool when you start a session. Tell me which
 
 Ask in My bookings after paying — Start session assigns a machine from the pool.`,
 
-  "làm việc": `For office and productivity, **Basic** covers browser, Office, video calls. Choose **Pro** if you run heavy multitasking, CAD, or large Photoshop files.`,
+  work: `For office and productivity, **Basic** covers browser, Office, video calls. Choose **Pro** if you run heavy multitasking, CAD, or large Photoshop files.`,
 
   render: `For Premiere, Blender, or 3D, pick **Ultra** for maximum GPU/CPU/RAM headroom. Long jobs are cheaper on monthly/yearly plans — check the Plans section on the home page.`,
 
-  giá: `Published prices are on the home page (weekly / monthly / yearly). They’re shown in USD and updated there.
+  pricing: `Published prices are on the home page (weekly / monthly / yearly). They’re shown in USD and updated there.
 
 Rough orientation (verify on **Plans**):
 • Basic — entry tier
@@ -102,22 +102,19 @@ export function AIChatPage() {
 
     if (
       lowerMessage.includes("game") ||
-      lowerMessage.includes("chơi") ||
       lowerMessage.includes("aaa")
     ) {
-      return aiResponses["chơi game"];
+      return aiResponses["gaming"];
     } else if (
       lowerMessage.includes("stream") ||
       lowerMessage.includes("live")
     ) {
       return aiResponses["streaming"];
     } else if (
-      lowerMessage.includes("làm việc") ||
-      lowerMessage.includes("văn phòng") ||
       lowerMessage.includes("office") ||
       lowerMessage.includes("work")
     ) {
-      return aiResponses["làm việc"];
+      return aiResponses["work"];
     } else if (
       lowerMessage.includes("render") ||
       lowerMessage.includes("video") ||
@@ -126,14 +123,11 @@ export function AIChatPage() {
     ) {
       return aiResponses["render"];
     } else if (
-      lowerMessage.includes("giá") ||
-      lowerMessage.includes("bao nhiêu") ||
-      lowerMessage.includes("tiền") ||
       lowerMessage.includes("price") ||
       lowerMessage.includes("cost") ||
       lowerMessage.includes("how much")
     ) {
-      return aiResponses["giá"];
+      return aiResponses["pricing"];
     } else {
       return aiResponses["default"];
     }

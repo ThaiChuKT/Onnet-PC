@@ -16,6 +16,7 @@ import { useNavigate } from "react-router";
 import { Folder, Search, Pencil, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
 
 type AdminPackageItemResponse = {
   planId: number;
@@ -182,7 +183,7 @@ export function ComputersPage() {
                       <div className="grid gap-2 text-sm text-muted-foreground">
                         <p>Plan ID: <span className="text-foreground font-medium">{pkg.planId}</span></p>
                         <p>Max hours/day: <span className="text-foreground font-medium">{pkg.maxHoursPerDay ?? "—"}</span></p>
-                        <p>Price: <span className="text-primary font-bold">{pkg.price.toLocaleString("vi-VN")} ₫</span></p>
+                        <p>Price: <span className="text-primary font-bold">{formatUsd(Number(pkg.price ?? 0))}</span></p>
                       </div>
 
                       <div className="flex flex-wrap gap-2 mt-4">

@@ -16,6 +16,7 @@ import { useNavigate } from "react-router";
 import { Folder, Search, Pencil, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 import { apiGet } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
 
 type AdminPackageItemResponse = {
   planId: number;
@@ -219,9 +220,9 @@ export function PackageFoldersPage() {
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
                         <p>Specs linked: {pkg.specIds.length}</p>
-                        <p>Yearly: {yearly ? `${Number(yearly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
-                        <p>Monthly: {monthly ? `${Number(monthly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
-                        <p>Weekly: {weekly ? `${Number(weekly.price ?? 0).toLocaleString("vi-VN")}đ` : "-"}</p>
+                        <p>Yearly: {yearly ? formatUsd(Number(yearly.price ?? 0)) : "-"}</p>
+                        <p>Monthly: {monthly ? formatUsd(Number(monthly.price ?? 0)) : "-"}</p>
+                        <p>Weekly: {weekly ? formatUsd(Number(weekly.price ?? 0)) : "-"}</p>
                       </div>
                     </div>
 

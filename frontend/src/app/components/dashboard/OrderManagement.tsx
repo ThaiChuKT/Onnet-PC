@@ -180,7 +180,7 @@ export function OrderManagement() {
         <div className="relative md:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm theo mã đơn, email, cấu hình..."
+            placeholder="Search by order ID, email, configuration..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
@@ -188,10 +188,10 @@ export function OrderManagement() {
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="bg-input-background border-border">
-            <SelectValue placeholder="Trạng thái đơn" />
+            <SelectValue placeholder="Order status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
@@ -299,7 +299,7 @@ export function OrderManagement() {
 
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                     <div>
-                      <span className="text-muted-foreground">Khách:</span>{" "}
+                      <span className="text-muted-foreground">Customer:</span>{" "}
                       <Link to={`/dashboard/accounts/${order.userId ?? ""}`} className="font-medium text-primary hover:underline">
                         {order.userFullName || order.userEmail}
                       </Link>
@@ -317,21 +317,21 @@ export function OrderManagement() {
                       <span className="font-medium">{order.pcId ?? "—"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Giá:</span>{" "}
+                      <span className="text-muted-foreground">Price:</span>{" "}
                       <span className="font-bold text-primary">
                         {formatUsd(Number(order.totalPrice ?? 0))}
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Bắt đầu:</span>{" "}
+                      <span className="text-muted-foreground">Start:</span>{" "}
                       <span className="font-medium">
-                        {order.startTime ? new Date(order.startTime).toLocaleString("vi-VN") : "—"}
+                        {order.startTime ? new Date(order.startTime).toLocaleString("en-US") : "—"}
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Kết thúc:</span>{" "}
+                      <span className="text-muted-foreground">End:</span>{" "}
                       <span className="font-medium">
-                        {order.endTime ? new Date(order.endTime).toLocaleString("vi-VN") : "—"}
+                        {order.endTime ? new Date(order.endTime).toLocaleString("en-US") : "—"}
                       </span>
                     </div>
                   </div>
@@ -350,22 +350,22 @@ export function OrderManagement() {
                         className="border-primary text-foreground hover:bg-primary/10"
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        Chi tiết
+                        Details
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="bg-card border-border max-w-2xl">
                       <DialogHeader>
-                        <DialogTitle>Chi Tiết Đơn</DialogTitle>
+                        <DialogTitle>Order Details</DialogTitle>
                       </DialogHeader>
                       {selectedOrder && (
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
                             <div>
-                              <p className="text-sm text-muted-foreground">Mã đơn</p>
+                              <p className="text-sm text-muted-foreground">Order ID</p>
                               <p className="font-bold">#{selectedOrder.bookingId}</p>
                             </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">Trạng thái</p>
+                              <p className="text-sm text-muted-foreground">Status</p>
                               <Badge className={(statusConfig[normalizeBookingStatus(selectedOrder.status)]?.className) ?? "bg-muted text-muted-foreground border-border"}>
                                 {statusConfig[normalizeBookingStatus(selectedOrder.status)]?.label ?? selectedOrder.status}
                               </Badge>
@@ -389,7 +389,7 @@ export function OrderManagement() {
 
                           <div className="p-4 bg-primary/10 rounded-lg">
                             <div className="flex justify-between items-center">
-                              <span className="font-bold">Tổng tiền:</span>
+                              <span className="font-bold">Total:</span>
                               <span className="text-2xl font-bold text-primary">
                                 {formatUsd(Number(selectedOrder.totalPrice ?? 0))}
                               </span>
@@ -424,8 +424,8 @@ export function OrderManagement() {
       {!isLoading && filteredOrders.length === 0 && (
         <Card className="p-12 border-border text-center">
           <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-xl font-bold mb-2">Chưa có đơn nào</h3>
-          <p className="text-muted-foreground">Không có dữ liệu phù hợp với bộ lọc hiện tại</p>
+          <h3 className="text-xl font-bold mb-2">No orders yet</h3>
+          <p className="text-muted-foreground">No data matches the current filters</p>
         </Card>
       )}
 

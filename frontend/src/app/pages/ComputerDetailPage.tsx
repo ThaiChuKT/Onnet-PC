@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { apiGet, apiPatch } from "../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../lib/formatUsd";
 
 type SubscriptionPlanPriceResponse = {
   id: number;
@@ -304,7 +305,7 @@ export function ComputerDetailPage() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {Number(plan.price ?? 0).toLocaleString("vi-VN")}đ
+                          {formatUsd(Number(plan.price ?? 0))}
                         </p>
                       </div>
                     ))

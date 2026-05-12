@@ -153,16 +153,16 @@ export function InvoiceManagement() {
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo mã bill, email, nội dung..."
+            placeholder="Search by bill code, email, content..."
             className="pl-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger>
-            <SelectValue placeholder="Trạng thái" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả trạng thái</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="unpaid">Unpaid</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
@@ -253,7 +253,7 @@ export function InvoiceManagement() {
                     <p className="text-xs text-muted-foreground mt-1">
                       Created:{" "}
                       {item.createdAt
-                        ? new Date(item.createdAt).toLocaleString("vi-VN")
+                        ? new Date(item.createdAt).toLocaleString("en-US")
                         : "-"}
                     </p>
                   </div>
@@ -274,7 +274,7 @@ export function InvoiceManagement() {
           <ReceiptText className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
           <p className="font-medium">No invoices found</p>
           <p className="text-sm text-muted-foreground">
-            Thử thay đổi bộ lọc của tab Invoices.
+            Try changing the filters in the Invoices tab.
           </p>
         </Card>
       )}

@@ -14,7 +14,13 @@ import { Monitor, Plus, Edit, Trash2, Search, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { formatUsd } from "../../lib/formatUsd";
 import { ListPagination } from "./ListPagination";
 
@@ -59,15 +65,31 @@ type UpdatePcRequest = Partial<CreatePcRequest>;
 function getStatusMeta(status: string) {
   const normalized = (status ?? "").toLowerCase();
   if (normalized === "available") {
-    return { label: "Máy Trống", className: "bg-accent/20 text-accent border-accent/50" };
+    return {
+      label: "Available",
+      className: "bg-accent/20 text-accent border-accent/50",
+    };
   }
-  if (normalized === "in_use" || normalized === "in-use" || normalized === "rented") {
-    return { label: "Đang cho thuê", className: "bg-secondary/20 text-secondary border-secondary/50" };
+  if (
+    normalized === "in_use" ||
+    normalized === "in-use" ||
+    normalized === "rented"
+  ) {
+    return {
+      label: "In Use",
+      className: "bg-secondary/20 text-secondary border-secondary/50",
+    };
   }
   if (normalized === "maintenance") {
-    return { label: "Bảo trì", className: "bg-muted/20 text-muted-foreground border-border" };
+    return {
+      label: "Maintenance",
+      className: "bg-muted/20 text-muted-foreground border-border",
+    };
   }
-  return { label: status || "Không rõ", className: "bg-muted/20 text-muted-foreground border-border" };
+  return {
+    label: status || "Unknown",
+    className: "bg-muted/20 text-muted-foreground border-border",
+  };
 }
 
 function detectTier(text: string) {
@@ -81,7 +103,12 @@ function detectTier(text: string) {
 function getStatusDotClass(status: string) {
   const normalized = (status ?? "").toLowerCase();
   if (normalized === "available") return "bg-emerald-500";
-  if (normalized === "in_use" || normalized === "in-use" || normalized === "rented") return "bg-blue-500";
+  if (
+    normalized === "in_use" ||
+    normalized === "in-use" ||
+    normalized === "rented"
+  )
+    return "bg-blue-500";
   if (normalized === "maintenance") return "bg-yellow-500";
   return "bg-red-500";
 }
@@ -123,7 +150,8 @@ export function ComputerList() {
         pc.gpu.toLowerCase().includes(q) ||
         pc.location.toLowerCase().includes(q) ||
         normalized.includes(q);
-      const matchesStatus = selectedStatus === "all" || normalized === selectedStatus;
+      const matchesStatus =
+        selectedStatus === "all" || normalized === selectedStatus;
       return matchesSearch && matchesStatus;
     });
   }, [computers, searchTerm, statusFilter]);
@@ -132,7 +160,10 @@ export function ComputerList() {
     return filteredComputers.slice(page * pageSize, page * pageSize + pageSize);
   }, [filteredComputers, page]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredComputers.length / pageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredComputers.length / pageSize),
+  );
 
   useEffect(() => {
     setPage(0);
@@ -142,11 +173,15 @@ export function ComputerList() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const response = await apiGet<PageResponse<Computer>>("/admin/pcs", { page: 0, size: 200 });
+      const response = await apiGet<PageResponse<Computer>>("/admin/pcs", {
+        page: 0,
+        size: 200,
+      });
       setComputers(response.content ?? []);
     } catch (e) {
       console.error("ComputerList.loadComputers error:", e);
-      const message = e instanceof Error ? e.message : "Không thể tải danh sách máy";
+      const message =
+        e instanceof Error ? e.message : "Unable to load computer list";
       setLoadError(message);
       toast.error(message);
     } finally {
@@ -170,16 +205,25 @@ export function ComputerList() {
 
   const stats = {
     total: computers.length,
-    available: computers.filter((pc) => (pc.status ?? "").toLowerCase() === "available").length,
-    inUse: computers.filter((pc) => (pc.status ?? "").toLowerCase() === "in_use" || (pc.status ?? "").toLowerCase() === "in-use" || (pc.status ?? "").toLowerCase() === "rented").length,
-    maintenance: computers.filter((pc) => (pc.status ?? "").toLowerCase() === "maintenance").length,
+    available: computers.filter(
+      (pc) => (pc.status ?? "").toLowerCase() === "available",
+    ).length,
+    inUse: computers.filter(
+      (pc) =>
+        (pc.status ?? "").toLowerCase() === "in_use" ||
+        (pc.status ?? "").toLowerCase() === "in-use" ||
+        (pc.status ?? "").toLowerCase() === "rented",
+    ).length,
+    maintenance: computers.filter(
+      (pc) => (pc.status ?? "").toLowerCase() === "maintenance",
+    ).length,
   };
 
   const handleAdd = async () => {
     try {
       if (addMode === "machine") {
         if (!selectedSpecId) {
-          toast.error("Vui lòng chọn gói (plan)");
+          toast.error("Please select a plan");
           return;
         }
         const q = Number(quantity) || 1;
@@ -190,7 +234,7 @@ export function ComputerList() {
             status: "available",
           });
         }
-        toast.success(`Đã thêm ${q} máy thành công`);
+        toast.success(`Successfully added ${q} computers`);
       } else {
         const payload: CreatePcRequest = {
           specName: formData.specName,
@@ -203,7 +247,7 @@ export function ComputerList() {
           status: formData.status,
         };
         await apiPost<Computer, CreatePcRequest>("/admin/pcs", payload);
-        toast.success("Tạo gói và máy mẫu thành công");
+        toast.success("Successfully created package and sample computer");
       }
 
       setFormData({
@@ -220,7 +264,7 @@ export function ComputerList() {
       setIsAddDialogOpen(false);
       await loadComputers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể tạo máy");
+      toast.error(e instanceof Error ? e.message : "Unable to create computer");
     }
   };
 
@@ -252,45 +296,59 @@ export function ComputerList() {
 
       const targetComputers =
         scope === "plan"
-          ? computers.filter((pc) => detectTier(pc.specName) === detectTier(editingComputer.specName))
+          ? computers.filter(
+              (pc) =>
+                detectTier(pc.specName) ===
+                detectTier(editingComputer.specName),
+            )
           : [editingComputer];
 
       for (const targetComputer of targetComputers) {
         // eslint-disable-next-line no-await-in-loop
-        await apiPatch<Computer, UpdatePcRequest>(`/admin/pcs/${targetComputer.pcId}`, payload);
+        await apiPatch<Computer, UpdatePcRequest>(
+          `/admin/pcs/${targetComputer.pcId}`,
+          payload,
+        );
       }
 
-      toast.success("Cập nhật máy thành công");
+      toast.success("Computer updated successfully");
       setEditingComputer(null);
       await loadComputers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể cập nhật máy");
+      toast.error(e instanceof Error ? e.message : "Unable to update computer");
     }
   };
 
   const handleDelete = async (pcId: number) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa máy này?")) return;
+    if (!confirm("Are you sure you want to delete this computer?")) return;
     try {
       await apiDelete<string>(`/admin/pcs/${pcId}`);
-      toast.success("Đã xóa máy");
+      toast.success("Computer deleted");
       await loadComputers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể xóa máy");
+      toast.error(e instanceof Error ? e.message : "Unable to delete computer");
     }
   };
 
   const handleToggleLock = async (computer: Computer) => {
     try {
       if ((computer.status ?? "").toLowerCase() === "maintenance") {
-        await apiPatch<Computer, UpdatePcRequest>(`/admin/pcs/${computer.pcId}`, { status: "available" });
-        toast.success("Đã mở khóa máy");
+        await apiPatch<Computer, UpdatePcRequest>(
+          `/admin/pcs/${computer.pcId}`,
+          { status: "available" },
+        );
+        toast.success("Computer unlocked");
       } else {
         await apiPost<Computer>(`/admin/pcs/${computer.pcId}/lock`);
-        toast.success("Đã khóa máy và kết thúc phiên đang hoạt động");
+        toast.success("Computer locked and active session ended");
       }
       await loadComputers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể thay đổi trạng thái khóa máy");
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : "Unable to change computer lock status",
+      );
     }
   };
 
@@ -303,7 +361,7 @@ export function ComputerList() {
               <Monitor className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tổng số máy</p>
+              <p className="text-sm text-muted-foreground">Total Computers</p>
               <p className="text-2xl font-bold">{stats.total}</p>
             </div>
           </div>
@@ -315,8 +373,12 @@ export function ComputerList() {
               <Power className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Máy trống</p>
-              <p className="text-2xl font-bold text-accent">{stats.available}</p>
+              <p className="text-sm text-muted-foreground">
+                Available Computers
+              </p>
+              <p className="text-2xl font-bold text-accent">
+                {stats.available}
+              </p>
             </div>
           </div>
         </Card>
@@ -327,7 +389,7 @@ export function ComputerList() {
               <Monitor className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Đang cho thuê</p>
+              <p className="text-sm text-muted-foreground">In use</p>
               <p className="text-2xl font-bold text-secondary">{stats.inUse}</p>
             </div>
           </div>
@@ -339,8 +401,10 @@ export function ComputerList() {
               <Monitor className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Bảo trì</p>
-              <p className="text-2xl font-bold text-muted-foreground">{stats.maintenance}</p>
+              <p className="text-sm text-muted-foreground">Maintenance</p>
+              <p className="text-2xl font-bold text-muted-foreground">
+                {stats.maintenance}
+              </p>
             </div>
           </div>
         </Card>
@@ -350,7 +414,7 @@ export function ComputerList() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm theo tên, ID, CPU, GPU..."
+            placeholder="Search by name, ID, CPU, GPU..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
@@ -359,13 +423,13 @@ export function ComputerList() {
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[220px] bg-input-background border-border">
-            <SelectValue placeholder="Trạng thái" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả trạng thái</SelectItem>
-            <SelectItem value="available">Máy trống</SelectItem>
-            <SelectItem value="in_use">Đang cho thuê</SelectItem>
-            <SelectItem value="maintenance">Bảo trì</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="available">Available</SelectItem>
+            <SelectItem value="in_use">In use</SelectItem>
+            <SelectItem value="maintenance">Maintenance</SelectItem>
           </SelectContent>
         </Select>
 
@@ -373,12 +437,12 @@ export function ComputerList() {
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
               <Plus className="w-4 h-4 mr-2" />
-              Thêm Mới
+              Add New
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle>Thêm Mới</DialogTitle>
+              <DialogTitle>Add New</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex gap-2">
@@ -387,39 +451,48 @@ export function ComputerList() {
                   onClick={() => setAddMode("machine")}
                   className={`px-3 py-2 rounded ${addMode === "machine" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
                 >
-                  Thêm Máy
+                  Add Computer
                 </button>
                 <button
                   type="button"
                   onClick={() => setAddMode("package")}
                   className={`px-3 py-2 rounded ${addMode === "package" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
                 >
-                  Thêm Gói
+                  Add Package
                 </button>
               </div>
 
               {addMode === "machine" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Chọn Gói (Plan)</Label>
-                    <Select value={String(selectedSpecId)} onValueChange={(val) => setSelectedSpecId(Number(val))}>
+                    <Label>Select Plan</Label>
+                    <Select
+                      value={String(selectedSpecId)}
+                      onValueChange={(val) => setSelectedSpecId(Number(val))}
+                    >
                       <SelectTrigger className="bg-input-background border-border">
-                        <SelectValue placeholder="Chọn gói để thêm máy" />
+                        <SelectValue placeholder="Select package to add computer" />
                       </SelectTrigger>
                       <SelectContent>
                         {specOptions.map((s) => (
-                          <SelectItem key={s.specId} value={String(s.specId)}>{s.specName} (#{s.specId})</SelectItem>
+                          <SelectItem key={s.specId} value={String(s.specId)}>
+                            {s.specName} (#{s.specId})
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Số lượng máy cần thêm</Label>
+                    <Label>Number of computers to add</Label>
                     <Input
                       type="number"
                       min={1}
                       value={quantity}
-                      onChange={(e) => setQuantity(e.target.value ? Number(e.target.value) : "")}
+                      onChange={(e) =>
+                        setQuantity(
+                          e.target.value ? Number(e.target.value) : "",
+                        )
+                      }
                       className="bg-input-background border-border"
                     />
                   </div>
@@ -429,52 +502,119 @@ export function ComputerList() {
               {addMode === "package" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Thêm Gói mới</Label>
+                    <Label>Add New Package</Label>
                     <Input
-                      placeholder="Tên gói (Spec name)"
+                      placeholder="Package name (spec name)"
                       value={formData.specName}
-                      onChange={(e) => setFormData({ ...formData, specName: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, specName: e.target.value })
+                      }
                       className="bg-input-background border-border"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cpu">CPU</Label>
-                    <Input id="cpu" value={formData.cpu} onChange={(e) => setFormData({ ...formData, cpu: e.target.value })} className="bg-input-background border-border" />
+                    <Input
+                      id="cpu"
+                      value={formData.cpu}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cpu: e.target.value })
+                      }
+                      className="bg-input-background border-border"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gpu">GPU</Label>
-                    <Input id="gpu" value={formData.gpu} onChange={(e) => setFormData({ ...formData, gpu: e.target.value })} className="bg-input-background border-border" />
+                    <Input
+                      id="gpu"
+                      value={formData.gpu}
+                      onChange={(e) =>
+                        setFormData({ ...formData, gpu: e.target.value })
+                      }
+                      className="bg-input-background border-border"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="ram">RAM (GB)</Label>
-                    <Input id="ram" type="number" value={formData.ram} onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                    <Input
+                      id="ram"
+                      type="number"
+                      value={formData.ram}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          ram: Math.max(
+                            1,
+                            Math.floor(Number(e.target.value) || 1),
+                          ),
+                        })
+                      }
+                      className="bg-input-background border-border"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="storage">Storage (GB)</Label>
-                    <Input id="storage" type="number" value={formData.storage} onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                    <Input
+                      id="storage"
+                      type="number"
+                      value={formData.storage}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          storage: Math.max(
+                            1,
+                            Math.floor(Number(e.target.value) || 1),
+                          ),
+                        })
+                      }
+                      className="bg-input-background border-border"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="operatingSystem">Hệ điều hành</Label>
-                    <Input id="operatingSystem" value={formData.operatingSystem} onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })} className="bg-input-background border-border" />
+                    <Label htmlFor="operatingSystem">Operating System</Label>
+                    <Input
+                      id="operatingSystem"
+                      value={formData.operatingSystem}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          operatingSystem: e.target.value,
+                        })
+                      }
+                      className="bg-input-background border-border"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="status">Trạng thái</Label>
-                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                      <SelectTrigger id="status" className="bg-input-background border-border">
-                        <SelectValue placeholder="Chọn trạng thái" />
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, status: value })
+                      }
+                    >
+                      <SelectTrigger
+                        id="status"
+                        className="bg-input-background border-border"
+                      >
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="available">Máy trống</SelectItem>
-                        <SelectItem value="in_use">Đang cho thuê</SelectItem>
-                        <SelectItem value="maintenance">Bảo trì</SelectItem>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="in_use">In use</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </>
               )}
 
-              <Button onClick={() => { void handleAdd(); }} className="w-full bg-gradient-to-r from-primary to-accent">
-                Lưu
+              <Button
+                onClick={() => {
+                  void handleAdd();
+                }}
+                className="w-full bg-gradient-to-r from-primary to-accent"
+              >
+                Save
               </Button>
             </div>
           </DialogContent>
@@ -485,56 +625,84 @@ export function ComputerList() {
         {isLoading && (
           <Card className="p-12 border-border text-center bg-card/60">
             <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Đang tải danh sách máy...</p>
+            <p className="text-muted-foreground">Loading computer list...</p>
           </Card>
         )}
 
         {loadError && !isLoading && (
           <Card className="p-8 border-destructive/40 bg-destructive/5 text-center">
-            <p className="font-semibold text-destructive mb-2">Không tải được danh sách máy</p>
+            <p className="font-semibold text-destructive mb-2">
+              Failed to load computer list
+            </p>
             <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
             <Button variant="outline" onClick={() => void loadComputers()}>
-              Thử lại
+              Retry
             </Button>
           </Card>
         )}
 
-        {!isLoading && loadError === null && visibleComputers.length === 0 && computers.length === 0 && (
-          <Card className="p-12 border-border text-center bg-card/60">
-            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Không tìm thấy máy nào.</p>
-          </Card>
-        )}
+        {!isLoading &&
+          loadError === null &&
+          visibleComputers.length === 0 &&
+          computers.length === 0 && (
+            <Card className="p-12 border-border text-center bg-card/60">
+              <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No computers found.</p>
+            </Card>
+          )}
 
-        {!isLoading && loadError === null && visibleComputers.length === 0 && computers.length > 0 && (
-          <Card className="p-12 border-border text-center bg-card/60">
-            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2">Không tìm thấy máy nào</h3>
-            <p className="text-muted-foreground">Thử tìm kiếm với từ khóa khác hoặc thêm máy mới</p>
-          </Card>
-        )}
+        {!isLoading &&
+          loadError === null &&
+          visibleComputers.length === 0 &&
+          computers.length > 0 && (
+            <Card className="p-12 border-border text-center bg-card/60">
+              <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-2">No computers found</h3>
+              <p className="text-muted-foreground">
+                Try searching with different keywords or add a new computer
+              </p>
+            </Card>
+          )}
 
         {!isLoading && loadError === null && visibleComputers.length > 0 && (
           <div className="grid gap-4 xl:grid-cols-2">
             {visibleComputers.map((computer) => (
-              <Card key={computer.pcId} className="border-border bg-card/60 p-4 shadow-sm">
+              <Card
+                key={computer.pcId}
+                className="border-border bg-card/60 p-4 shadow-sm"
+              >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-bold">PC #{computer.pcId}</h3>
-                    <p className="text-xs text-muted-foreground">{computer.location || computer.specName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {computer.location || computer.specName}
+                    </p>
                   </div>
-                  <Badge className={getStatusMeta(computer.status).className}>{getStatusMeta(computer.status).label}</Badge>
+                  <Badge className={getStatusMeta(computer.status).className}>
+                    {getStatusMeta(computer.status).label}
+                  </Badge>
                 </div>
 
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${getStatusDotClass(computer.status)}`} />
-                      <p className="font-semibold truncate">{computer.specName}</p>
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${getStatusDotClass(computer.status)}`}
+                      />
+                      <p className="font-semibold truncate">
+                        {computer.specName}
+                      </p>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground">{computer.cpu} • {computer.gpu}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{computer.ram}GB RAM • {computer.storage}GB • {computer.operatingSystem || "OS N/A"}</p>
-                    <p className="mt-2 text-sm font-semibold text-primary">{formatUsd(Number(computer.pricePerHour))}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {computer.cpu} • {computer.gpu}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {computer.ram}GB RAM • {computer.storage}GB •{" "}
+                      {computer.operatingSystem || "OS N/A"}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-primary">
+                      {formatUsd(Number(computer.pricePerHour))}
+                    </p>
                   </div>
                 </div>
 
@@ -543,17 +711,28 @@ export function ComputerList() {
                     variant="outline"
                     size="sm"
                     onClick={() => void handleToggleLock(computer)}
-                    className={(computer.status ?? "").toLowerCase() === "maintenance" ? "border-accent text-accent hover:bg-accent/10" : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"}
+                    className={
+                      (computer.status ?? "").toLowerCase() === "maintenance"
+                        ? "border-accent text-accent hover:bg-accent/10"
+                        : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"
+                    }
                   >
-                    {(computer.status ?? "").toLowerCase() === "maintenance" ? "Mở khóa" : "Khóa"}
+                    {(computer.status ?? "").toLowerCase() === "maintenance"
+                      ? "Unlock"
+                      : "Lock"}
                   </Button>
 
-                  <Dialog open={editingComputer?.pcId === computer.pcId} onOpenChange={(open) => !open && setEditingComputer(null)}>
+                  <Dialog
+                    open={editingComputer?.pcId === computer.pcId}
+                    onOpenChange={(open) => !open && setEditingComputer(null)}
+                  >
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={(computer.status ?? "").toLowerCase() !== "available"}
+                        disabled={
+                          (computer.status ?? "").toLowerCase() !== "available"
+                        }
                         onClick={() => handleEdit(computer)}
                         className="border-primary text-foreground hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -562,53 +741,145 @@ export function ComputerList() {
                     </DialogTrigger>
                     <DialogContent className="bg-card border-border">
                       <DialogHeader>
-                        <DialogTitle>Chỉnh Sửa Máy</DialogTitle>
+                        <DialogTitle>Edit Computer</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="edit-specName">Tên cấu hình (Spec)</Label>
-                          <Input id="edit-specName" value={formData.specName} onChange={(e) => setFormData({ ...formData, specName: e.target.value })} className="bg-input-background border-border" />
+                          <Label htmlFor="edit-specName">
+                            Configuration Name (Spec)
+                          </Label>
+                          <Input
+                            id="edit-specName"
+                            value={formData.specName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                specName: e.target.value,
+                              })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-cpu">CPU</Label>
-                          <Input id="edit-cpu" value={formData.cpu} onChange={(e) => setFormData({ ...formData, cpu: e.target.value })} className="bg-input-background border-border" />
+                          <Input
+                            id="edit-cpu"
+                            value={formData.cpu}
+                            onChange={(e) =>
+                              setFormData({ ...formData, cpu: e.target.value })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-gpu">GPU</Label>
-                          <Input id="edit-gpu" value={formData.gpu} onChange={(e) => setFormData({ ...formData, gpu: e.target.value })} className="bg-input-background border-border" />
+                          <Input
+                            id="edit-gpu"
+                            value={formData.gpu}
+                            onChange={(e) =>
+                              setFormData({ ...formData, gpu: e.target.value })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-ram">RAM (GB)</Label>
-                          <Input id="edit-ram" type="number" value={formData.ram} onChange={(e) => setFormData({ ...formData, ram: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                          <Input
+                            id="edit-ram"
+                            type="number"
+                            value={formData.ram}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                ram: Math.max(
+                                  1,
+                                  Math.floor(Number(e.target.value) || 1),
+                                ),
+                              })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-storage">Storage (GB)</Label>
-                          <Input id="edit-storage" type="number" value={formData.storage} onChange={(e) => setFormData({ ...formData, storage: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className="bg-input-background border-border" />
+                          <Input
+                            id="edit-storage"
+                            type="number"
+                            value={formData.storage}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                storage: Math.max(
+                                  1,
+                                  Math.floor(Number(e.target.value) || 1),
+                                ),
+                              })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="edit-operatingSystem">Hệ điều hành</Label>
-                          <Input id="edit-operatingSystem" value={formData.operatingSystem} onChange={(e) => setFormData({ ...formData, operatingSystem: e.target.value })} className="bg-input-background border-border" />
+                          <Label htmlFor="edit-operatingSystem">
+                            Operating System
+                          </Label>
+                          <Input
+                            id="edit-operatingSystem"
+                            value={formData.operatingSystem}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                operatingSystem: e.target.value,
+                              })
+                            }
+                            className="bg-input-background border-border"
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="edit-status">Trạng thái máy</Label>
-                          <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                            <SelectTrigger id="edit-status" className="bg-input-background border-border">
-                              <SelectValue placeholder="Chọn trạng thái" />
+                          <Label htmlFor="edit-status">Computer Status</Label>
+                          <Select
+                            value={formData.status}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, status: value })
+                            }
+                          >
+                            <SelectTrigger
+                              id="edit-status"
+                              className="bg-input-background border-border"
+                            >
+                              <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="available">Máy trống</SelectItem>
-                              <SelectItem value="in_use">Đang cho thuê</SelectItem>
-                              <SelectItem value="maintenance">Bảo trì</SelectItem>
+                              <SelectItem value="available">
+                                Available
+                              </SelectItem>
+                              <SelectItem value="in_use">In use</SelectItem>
+                              <SelectItem value="maintenance">
+                                Maintenance
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Button onClick={() => { void handleUpdate("single"); }} className="w-full bg-gradient-to-r from-primary to-accent">
-                            Cập Nhật máy này
+                          <Button
+                            onClick={() => {
+                              void handleUpdate("single");
+                            }}
+                            className="w-full bg-gradient-to-r from-primary to-accent"
+                          >
+                            Update This Computer
                           </Button>
                           {detectTier(editingComputer?.specName ?? "") && (
-                            <Button variant="outline" onClick={() => { void handleUpdate("plan"); }} className="w-full border-primary text-foreground hover:bg-primary/10">
-                              Chỉnh toàn bộ máy trong {String(detectTier(editingComputer?.specName ?? "")).toUpperCase()}
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                void handleUpdate("plan");
+                              }}
+                              className="w-full border-primary text-foreground hover:bg-primary/10"
+                            >
+                              Edit all computers in{" "}
+                              {String(
+                                detectTier(editingComputer?.specName ?? ""),
+                              ).toUpperCase()}
                             </Button>
                           )}
                         </div>
@@ -616,7 +887,12 @@ export function ComputerList() {
                     </DialogContent>
                   </Dialog>
 
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(computer.pcId)} className="border-destructive text-destructive hover:bg-destructive/10">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(computer.pcId)}
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -628,7 +904,11 @@ export function ComputerList() {
 
       {!isLoading && totalPages > 1 && (
         <div className="pt-2">
-          <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

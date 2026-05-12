@@ -92,7 +92,7 @@ export function AccountList() {
       setPage(page.number ?? nextPage);
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Không thể tải danh sách tài khoản",
+        e instanceof Error ? e.message : "Unable to load account list",
       );
     } finally {
       setIsLoading(false);
@@ -145,11 +145,11 @@ export function AccountList() {
           active: !user.active,
         },
       );
-      toast.success("Cập nhật trạng thái thành công");
+      toast.success("Status updated successfully");
       await loadUsers(searchTerm.trim() || undefined);
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Không thể cập nhật trạng thái",
+        e instanceof Error ? e.message : "Unable to update status",
       );
     }
   };
@@ -174,7 +174,7 @@ export function AccountList() {
       setBookingsByUserId((prev) => ({ ...prev, [user.id]: rows ?? [] }));
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Không thể tải lịch sử subscriptions",
+        e instanceof Error ? e.message : "Unable to load subscription history",
       );
     } finally {
       setLoadingBookingsUserId(null);
@@ -184,13 +184,13 @@ export function AccountList() {
   void handleToggleBookings;
 
   const handleDelete = async (user: AdminUserItemResponse) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa tài khoản này?")) return;
+    if (!confirm("Are you sure you want to delete this account?")) return;
     try {
       await apiDelete<string>(`/admin/users/${user.id}`);
-      toast.success("Đã xóa tài khoản");
+      toast.success("Account deleted");
       await loadUsers(searchTerm.trim() || undefined);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không thể xóa tài khoản");
+      toast.error(e instanceof Error ? e.message : "Unable to delete account");
     }
   };
 
@@ -236,7 +236,7 @@ export function AccountList() {
               <User className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tổng tài khoản</p>
+              <p className="text-sm text-muted-foreground">Total accounts</p>
               <p className="text-2xl font-bold">{stats.total}</p>
             </div>
           </div>
@@ -274,7 +274,7 @@ export function AccountList() {
               <CheckCircle className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Đang hoạt động</p>
+              <p className="text-sm text-muted-foreground">Active</p>
               <p className="text-2xl font-bold text-accent">{stats.active}</p>
             </div>
           </div>
@@ -285,7 +285,7 @@ export function AccountList() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm theo tên, email, phone..."
+            placeholder="Search by name, email, phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
@@ -293,10 +293,10 @@ export function AccountList() {
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[220px] bg-input-background border-border">
-            <SelectValue placeholder="Lọc tài khoản" />
+            <SelectValue placeholder="Filter accounts" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả tài khoản</SelectItem>
+            <SelectItem value="all">All accounts</SelectItem>
             <SelectItem value="active-user">Active</SelectItem>
             <SelectItem value="inactive-user">Inactive</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
@@ -310,7 +310,7 @@ export function AccountList() {
           <Card className="p-12 border-border text-center">
             <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">
-              Đang tải danh sách tài khoản...
+              Loading account list...
             </p>
           </Card>
         )}
@@ -364,7 +364,7 @@ export function AccountList() {
                         <span className="font-medium ml-2">{u.subscriptionSpecName}</span>
                         {u.subscriptionEndTime && (
                           <span className="text-xs text-muted-foreground ml-2">
-                            • expires {new Date(u.subscriptionEndTime).toLocaleString("vi-VN")}
+                            • expires {new Date(u.subscriptionEndTime).toLocaleString("en-US")}
                           </span>
                         )}
                       </p>
@@ -378,7 +378,7 @@ export function AccountList() {
                     <span className="font-medium">{u.id}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">SĐT:</span>
+                    <span className="text-muted-foreground">Phone:</span>
                     <span className="font-medium">{u.phone}</span>
                   </div>
                 </div>
@@ -490,7 +490,7 @@ export function AccountList() {
                               <div>
                                 <span className="text-muted-foreground">Start:</span>
                                 <p className="font-medium">
-                                  {new Date(b.startTime).toLocaleString("vi-VN", {
+                                  {new Date(b.startTime).toLocaleString("en-US", {
                                     year: "numeric",
                                     month: "2-digit",
                                     day: "2-digit",
@@ -501,7 +501,7 @@ export function AccountList() {
                                 <span className="text-muted-foreground">End:</span>
                                 <p className="font-medium">
                                   {b.endTime
-                                    ? new Date(b.endTime).toLocaleString("vi-VN", {
+                                    ? new Date(b.endTime).toLocaleString("en-US", {
                                         year: "numeric",
                                         month: "2-digit",
                                         day: "2-digit",
@@ -531,9 +531,9 @@ export function AccountList() {
         <Card className="p-12 border-border text-center">
           <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">
-            Không tìm thấy tài khoản nào
+            No accounts found
           </h3>
-          <p className="text-muted-foreground">Thử tìm kiếm với từ khóa khác</p>
+          <p className="text-muted-foreground">Try searching with a different keyword</p>
         </Card>
       )}
 

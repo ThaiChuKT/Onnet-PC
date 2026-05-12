@@ -1,6 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { clearAccessToken, getAccessToken } from "./authStorage";
 import { ApiError, type ApiResponse } from "./types";
+import { toEnglishMessage } from "../lib/englishMessage";
 
 const baseURL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8080/api/v1";
 
@@ -38,15 +39,17 @@ http.interceptors.response.use(
 function messageFromAxiosError(err: AxiosError<unknown>): string {
   const maybeData = err.response?.data as { message?: unknown } | undefined;
   const apiMessage = maybeData?.message;
-  if (typeof apiMessage === "string" && apiMessage.trim()) return apiMessage;
-  if (err.message) return err.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return toEnglishMessage(apiMessage);
+  }
+  if (err.message) return toEnglishMessage(err.message);
   return "Request failed";
 }
 
 export async function apiGet<T>(path: string, params?: Record<string, unknown>): Promise<T> {
   try {
     const res = await http.get<ApiResponse<T>>(path, { params });
-    if (!res.data.success) throw new ApiError(res.data.message ?? "Request failed", { status: res.status });
+    if (!res.data.success) throw new ApiError(toEnglishMessage(res.data.message), { status: res.status });
     return res.data.data as T;
   } catch (e) {
     if (axios.isAxiosError(e)) throw new ApiError(messageFromAxiosError(e), { status: e.response?.status });
@@ -57,7 +60,7 @@ export async function apiGet<T>(path: string, params?: Record<string, unknown>):
 export async function apiPost<T, B = unknown>(path: string, body?: B): Promise<T> {
   try {
     const res = await http.post<ApiResponse<T>>(path, body);
-    if (!res.data.success) throw new ApiError(res.data.message ?? "Request failed", { status: res.status });
+    if (!res.data.success) throw new ApiError(toEnglishMessage(res.data.message), { status: res.status });
     return res.data.data as T;
   } catch (e) {
     if (axios.isAxiosError(e)) throw new ApiError(messageFromAxiosError(e), { status: e.response?.status });
@@ -68,7 +71,7 @@ export async function apiPost<T, B = unknown>(path: string, body?: B): Promise<T
 export async function apiPatch<T, B = unknown>(path: string, body?: B): Promise<T> {
   try {
     const res = await http.patch<ApiResponse<T>>(path, body);
-    if (!res.data.success) throw new ApiError(res.data.message ?? "Request failed", { status: res.status });
+    if (!res.data.success) throw new ApiError(toEnglishMessage(res.data.message), { status: res.status });
     return res.data.data as T;
   } catch (e) {
     if (axios.isAxiosError(e)) throw new ApiError(messageFromAxiosError(e), { status: e.response?.status });
@@ -79,7 +82,7 @@ export async function apiPatch<T, B = unknown>(path: string, body?: B): Promise<
 export async function apiDelete<T>(path: string): Promise<T> {
   try {
     const res = await http.delete<ApiResponse<T>>(path);
-    if (!res.data.success) throw new ApiError(res.data.message ?? "Request failed", { status: res.status });
+    if (!res.data.success) throw new ApiError(toEnglishMessage(res.data.message), { status: res.status });
     return res.data.data as T;
   } catch (e) {
     if (axios.isAxiosError(e)) throw new ApiError(messageFromAxiosError(e), { status: e.response?.status });

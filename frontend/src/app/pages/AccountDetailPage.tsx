@@ -192,7 +192,7 @@ export function AccountDetailPage() {
                 </div>
                 <div className="text-sm lg:text-right">
                   <p className="font-semibold text-primary">{formatUsd(Number(invoice.amount ?? 0))}</p>
-                  <p className="text-muted-foreground">{new Date(invoice.createdAt).toLocaleString("vi-VN")}</p>
+                  <p className="text-muted-foreground">{new Date(invoice.createdAt).toLocaleString("en-US")}</p>
                 </div>
               </div>
             </Card>

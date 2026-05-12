@@ -62,9 +62,9 @@ export function ChangePassword() {
         <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 mb-6 flex items-start gap-3">
           <Shield className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-bold text-sm mb-1">Bảo mật tài khoản</h4>
+            <h4 className="font-bold text-sm mb-1">Account security</h4>
             <p className="text-xs text-muted-foreground">
-              Mật khẩu mới nên có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
+              Your new password should have at least 8 characters, including uppercase letters, lowercase letters, numbers, and special characters.
             </p>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function ChangePassword() {
           <div className="space-y-2">
             <Label htmlFor="current-password" className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              Mật Khẩu Hiện Tại
+              Current Password
             </Label>
             <div className="relative">
               <Input
@@ -82,7 +82,7 @@ export function ChangePassword() {
                 type={showPasswords.current ? "text" : "password"}
                 value={formData.currentPassword}
                 onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                placeholder="Nhập mật khẩu hiện tại"
+                placeholder="Enter your current password"
                 className="bg-input-background border-border pr-10"
                 required
               />
@@ -104,7 +104,7 @@ export function ChangePassword() {
           <div className="space-y-2">
             <Label htmlFor="new-password" className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              Mật Khẩu Mới
+              New Password
             </Label>
             <div className="relative">
               <Input
@@ -112,7 +112,7 @@ export function ChangePassword() {
                 type={showPasswords.new ? "text" : "password"}
                 value={formData.newPassword}
                 onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                placeholder="Nhập mật khẩu mới"
+                placeholder="Enter your new password"
                 className="bg-input-background border-border pr-10"
                 required
               />
@@ -134,7 +134,7 @@ export function ChangePassword() {
           <div className="space-y-2">
             <Label htmlFor="confirm-password" className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              Xác Nhận Mật Khẩu Mới
+              Confirm New Password
             </Label>
             <div className="relative">
               <Input
@@ -142,7 +142,7 @@ export function ChangePassword() {
                 type={showPasswords.confirm ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="Nhập lại mật khẩu mới"
+                placeholder="Re-enter your new password"
                 className="bg-input-background border-border pr-10"
                 required
               />
@@ -167,7 +167,7 @@ export function ChangePassword() {
               disabled={isSubmitting}
               className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
             >
-              {isSubmitting ? "Đang xử lý..." : "Đổi Mật Khẩu"}
+              {isSubmitting ? "Processing..." : "Change Password"}
             </Button>
             <Button
               type="button"
@@ -175,7 +175,7 @@ export function ChangePassword() {
               className="border-border"
               onClick={() => setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" })}
             >
-              Đặt Lại
+              Reset
             </Button>
           </div>
         </form>
