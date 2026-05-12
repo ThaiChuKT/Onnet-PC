@@ -8,6 +8,9 @@ import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.memberships.MembershipTier;
 import com.onnet.onnetpc.memberships.MembershipTierRepository;
 import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
+import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
+import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
+import com.onnet.onnetpc.moonlight.service.MoonlightService;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcStatus;
 import com.onnet.onnetpc.pcs.repository.PcRepository;
@@ -27,9 +30,8 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.onnet.onnetpc.moonlight.service.MoonlightService;
-import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
-import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class SessionLifecycleService {
@@ -137,28 +139,7 @@ public class SessionLifecycleService {
         session.setStatus("active");
         Session saved = sessionRepository.save(session);
 
-        // Best-effort: if this PC has a linked Sunshine host, attempt to start a STREAM
-        try {
-            if (pc != null && pc.getId() != null) {
-                sunshineHostRepository.findByPcId(pc.getId()).ifPresent(host -> {
-                    try {
-                        MoonlightCommandRequest req = new MoonlightCommandRequest(
-                            "STREAM",
-                            null,
-                            "Desktop",
-                            "1080p",
-                            60,
-                            8000,
-                            true
-                        );
-                        moonlightService.runUserLaunch(user.getEmail(), host.getId(), req);
-                    } catch (Exception ex) {
-                        // ignore errors from best-effort launch
-                    }
-                });
-            }
-        } catch (Exception ignored) {
-        }
+        startMoonlightAfterCommit(user.getEmail(), pc.getId());
 
         return toStartResponse(saved, "Session started successfully");
     }
@@ -446,6 +427,44 @@ public class SessionLifecycleService {
                 sessionQueueRepository.save(row);
             }
             position++;
+        }
+    }
+
+    private void startMoonlightAfterCommit(String email, Long pcId) {
+        Runnable launch = () -> launchMoonlightForPc(email, pcId);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    launch.run();
+                }
+            });
+            return;
+        }
+
+        launch.run();
+    }
+
+    private void launchMoonlightForPc(String email, Long pcId) {
+        if (pcId == null) {
+            return;
+        }
+
+        try {
+            sunshineHostRepository.findByPcId(pcId).ifPresent(host -> {
+                MoonlightCommandRequest request = new MoonlightCommandRequest(
+                    "STREAM",
+                    null,
+                    "Desktop",
+                    "1080p",
+                    60,
+                    8000,
+                    true
+                );
+                moonlightService.startUserStreamOnServer(email, host.getId(), request);
+            });
+        } catch (Exception ignored) {
+            // Session start must not fail if Moonlight cannot be launched.
         }
     }
 

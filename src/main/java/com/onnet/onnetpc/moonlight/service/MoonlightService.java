@@ -132,7 +132,29 @@ public class MoonlightService {
             request.resolution(),
             request.fps(),
             request.bitrateKbps(),
-            request.executeOnServer()
+            // User launches are client-owned; the backend must not occupy the Sunshine stream.
+            false
+        );
+
+        return runCommand(hostId, requester, normalized);
+    }
+
+    @Transactional
+    public MoonlightCommandResponse startUserStreamOnServer(
+        String requesterEmail,
+        Long hostId,
+        MoonlightCommandRequest request
+    ) {
+        User requester = findUserByEmail(requesterEmail);
+
+        MoonlightCommandRequest normalized = new MoonlightCommandRequest(
+            "STREAM",
+            null,
+            request.appName(),
+            request.resolution(),
+            request.fps(),
+            request.bitrateKbps(),
+            true
         );
 
         return runCommand(hostId, requester, normalized);
@@ -190,13 +212,17 @@ public class MoonlightService {
             );
         }
 
-        CommandExecutionResult result = executeCommand(command);
-        log.setStatus(result.success() ? "SUCCESS" : "FAILED");
+        CommandExecutionResult result = "STREAM".equals(action)
+            ? startStreamingCommand(command)
+            : executeCommand(command);
+        log.setStatus(result.success() ? ("STREAM".equals(action) ? "STARTED" : "SUCCESS") : "FAILED");
         log.setOutputText(result.output());
         log.setFinishedAt(Instant.now());
         moonlightCommandLogRepository.save(log);
 
-        String message = result.success() ? "Moonlight command executed successfully." : "Moonlight command failed.";
+        String message = result.success()
+            ? ("STREAM".equals(action) ? "Moonlight stream started." : "Moonlight command executed successfully.")
+            : "Moonlight command failed.";
         return toCommandResponse(log, true, message);
     }
 
@@ -270,6 +296,18 @@ public class MoonlightService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return new CommandExecutionResult(false, "Command interrupted: " + e.getMessage());
+        }
+    }
+
+    private CommandExecutionResult startStreamingCommand(List<String> command) {
+        try {
+            Process process = new ProcessBuilder(command)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+            return new CommandExecutionResult(true, "Started Moonlight stream process pid=" + process.pid());
+        } catch (IOException e) {
+            return new CommandExecutionResult(false, "Failed to start moonlight stream: " + e.getMessage());
         }
     }
 
