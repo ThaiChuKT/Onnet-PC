@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Check, Cpu, Gamepad2, Zap, Clock, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { apiPost } from "../api/http";
 import { toast } from "sonner";
@@ -304,6 +304,10 @@ export function Packages() {
                     ) : (
                       "Add to cart"
                     )}
+                  </Button>
+
+                  <Button asChild variant="ghost" className="w-full mt-2 text-primary hover:text-primary">
+                    <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
                   </Button>
                 </div>
               </Card>

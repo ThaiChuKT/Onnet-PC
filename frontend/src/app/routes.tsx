@@ -7,6 +7,7 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { PackageFoldersPage } from "./pages/PackageFoldersPage";
 import { ComputerDetailPage } from "./pages/ComputerDetailPage";
 import { PackagePricingPage } from "./pages/PackagePricingPage";
+import { PackageDetailsPage } from "./pages/PackageDetailsPage.tsx";
 import { AIChatPage } from "./pages/AIChatPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -62,6 +63,10 @@ export const router = createBrowserRouter([
   {
     path: "/packages",
     Component: PackagesPage,
+  },
+  {
+    path: "/packages/:tier",
+    Component: PackageDetailsPage,
   },
   {
     path: "/computers/:id",
