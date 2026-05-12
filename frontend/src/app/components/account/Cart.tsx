@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Card } from "../ui/card";
-import { Badge } from "../ui/badge";
+// Badge removed: not used in this component
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Checkbox } from "../ui/checkbox";
@@ -28,7 +28,6 @@ import {
   Minus,
   Plus,
   ShoppingCart,
-  ReceiptText,
   Wallet,
   XCircle,
 } from "lucide-react";
@@ -91,6 +90,13 @@ type TopUpResponse = {
   approvalUrl: string | null;
 };
 
+type BookingDraftState = {
+  planOptions: SubscriptionPlanPriceResponse[];
+  selectedPlanId: number | null;
+  quantity: number;
+  originalQuantity: number;
+};
+
 const normalizeBookingStatus = (value?: string | null) => {
   const normalized = (value ?? "").toLowerCase();
   return normalized === "completed" ? "expired" : normalized;
@@ -98,7 +104,7 @@ const normalizeBookingStatus = (value?: string | null) => {
 
 export function Cart() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
-  const [planOptions, setPlanOptions] = useState<SubscriptionPlanPriceResponse[]>([]);
+  const [bookingDrafts, setBookingDrafts] = useState<Record<number, BookingDraftState>>({});
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,10 +113,7 @@ export function Cart() {
   const [payingBookingId, setPayingBookingId] = useState<number | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<number | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [quantity, setQuantity] = useState(1);
-  const [originalQuantity, setOriginalQuantity] = useState(1);
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-  const [reviewReceipt, setReviewReceipt] = useState(true);
+  const [receiveEmail, setReceiveEmail] = useState(true);
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [isTopUpSubmitting, setIsTopUpSubmitting] = useState(false);
@@ -146,6 +149,52 @@ export function Cart() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildDrafts = async () => {
+      const entries = await Promise.all(
+        items.map(async (item) => {
+          if (!item.specId) {
+            return [item.bookingId, { planOptions: [], selectedPlanId: null, quantity: 1, originalQuantity: 1 }] as const;
+          }
+
+          try {
+            const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${item.specId}/plans`);
+            const matchedPlan =
+              plans.find((plan) => {
+                const unitPrice = Number(plan.price ?? 0);
+                if (!unitPrice) return false;
+                const inferred = Number(item.totalPrice ?? 0) / unitPrice;
+                return Number.isFinite(inferred) && Math.abs(inferred - Math.round(inferred)) < 0.01;
+              }) ?? plans[0] ?? null;
+            const inferredQuantity = matchedPlan
+              ? Math.max(1, Math.round(Number(item.totalPrice ?? 0) / Number(matchedPlan.price ?? 1)))
+              : 1;
+            return [item.bookingId, {
+              planOptions: plans,
+              selectedPlanId: matchedPlan?.id ?? null,
+              quantity: inferredQuantity,
+              originalQuantity: inferredQuantity,
+            }] as const;
+          } catch {
+            return [item.bookingId, { planOptions: [], selectedPlanId: null, quantity: 1, originalQuantity: 1 }] as const;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setBookingDrafts(Object.fromEntries(entries));
+      }
+    };
+
+    void buildDrafts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
   const focusedBookingId = useMemo(() => {
     const bookingId = searchParams.get("bookingId");
     if (!bookingId) return null;
@@ -159,60 +208,14 @@ export function Cart() {
     return fromQuery ?? items[0] ?? null;
   }, [focusedBookingId, items]);
 
-  const selectedPlan = useMemo(
-    () => planOptions.find((plan) => plan.id === selectedPlanId) ?? planOptions[0] ?? null,
-    [planOptions, selectedPlanId],
+  const focusedDraft = focusedBooking ? bookingDrafts[focusedBooking.bookingId] ?? null : null;
+  const focusedPlan = useMemo(
+    () => focusedDraft?.planOptions.find((plan) => plan.id === focusedDraft.selectedPlanId) ?? focusedDraft?.planOptions[0] ?? null,
+    [focusedDraft],
   );
-
-  const previewQuantity = Math.max(1, Math.floor(quantity || 1));
-  const previewDays = selectedPlan ? selectedPlan.durationDays * previewQuantity : 0;
-  const previewTotal = selectedPlan ? Number(selectedPlan.price ?? 0) * previewQuantity : Number(focusedBooking?.totalPrice ?? 0);
-
-  useEffect(() => {
-    if (!focusedBooking?.specId) {
-      setPlanOptions([]);
-      setSelectedPlanId(null);
-      setQuantity(1);
-      setOriginalQuantity(1);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const plans = await apiGet<SubscriptionPlanPriceResponse[]>(
-          `/pcs/specs/${focusedBooking.specId}/plans`,
-        );
-        if (cancelled) return;
-        setPlanOptions(plans);
-
-        const matchedPlan = plans.find((plan) => {
-          const unitPrice = Number(plan.price ?? 0);
-          if (!unitPrice) return false;
-          const inferred = Number(focusedBooking.totalPrice ?? 0) / unitPrice;
-          return Number.isFinite(inferred) && Math.abs(inferred - Math.round(inferred)) < 0.01;
-        }) ?? plans[0] ?? null;
-
-        setSelectedPlanId(matchedPlan?.id ?? null);
-        const inferredQuantity = matchedPlan
-          ? Math.max(1, Math.round(Number(focusedBooking.totalPrice ?? 0) / Number(matchedPlan.price ?? 1)))
-          : 1;
-        setOriginalQuantity(inferredQuantity);
-        setQuantity(inferredQuantity);
-      } catch {
-        if (!cancelled) {
-          setPlanOptions([]);
-          setSelectedPlanId(null);
-          setOriginalQuantity(1);
-          setQuantity(1);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [focusedBooking?.bookingId, focusedBooking?.specId, focusedBooking?.totalPrice]);
+  const previewQuantity = Math.max(1, Math.floor(focusedDraft?.quantity || 1));
+  const previewDays = focusedPlan ? focusedPlan.durationDays * previewQuantity : 0;
+  const previewTotal = focusedPlan ? Number(focusedPlan.price ?? 0) * previewQuantity : Number(focusedBooking?.totalPrice ?? 0);
 
   useEffect(() => {
     if (focusedBookingId === null) return;
@@ -225,7 +228,7 @@ export function Cart() {
   const handleConfirmPay = async () => {
     if (!confirmBooking || payingBookingId !== null) return;
     const isFocusedOrder = focusedBooking?.bookingId === confirmBooking.bookingId;
-    const price = isFocusedOrder && selectedPlan ? Number(selectedPlan.price ?? 0) * previewQuantity : Number(confirmBooking.totalPrice ?? 0);
+    const price = isFocusedOrder && focusedPlan ? Number(focusedPlan.price ?? 0) * previewQuantity : Number(confirmBooking.totalPrice ?? 0);
     if (walletBalance !== null && price > walletBalance) {
       toast.error("Not enough wallet balance");
       setShowTopUp(true);
@@ -235,12 +238,12 @@ export function Cart() {
     let id = confirmBooking.bookingId;
     setCheckoutBusy(true);
     try {
-      if (isFocusedOrder && focusedBooking?.specId && selectedPlan && previewQuantity !== originalQuantity) {
+      if (isFocusedOrder && focusedBooking?.specId && focusedPlan && previewQuantity !== (focusedDraft?.originalQuantity ?? previewQuantity)) {
         const created = await apiPost<BookingResponseDto, { specId: number; planId: number; quantity: number }>(
           "/bookings/subscription",
           {
             specId: focusedBooking.specId,
-            planId: selectedPlan.id,
+            planId: focusedPlan.id,
             quantity: previewQuantity,
           },
         );
@@ -318,7 +321,7 @@ export function Cart() {
     [items],
   );
 
-  const canShowFocusedSummary = !!focusedBooking && !!selectedPlan;
+  const canShowFocusedSummary = !!focusedBooking && !!focusedPlan;
 
   return (
     <div>
@@ -396,98 +399,134 @@ export function Cart() {
                   </div>
                 </Card>
 
-                <Card className="p-0 border-border overflow-hidden">
-                  <div className="border-b border-border px-5 py-4 bg-muted/20">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Product information</p>
-                        <h3 className="text-2xl font-bold">{focusedBooking?.specName}</h3>
-                      </div>
-                      <Button type="button" variant="link" className="px-0 text-primary">
-                        Change the product
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="p-5 space-y-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-lg border border-border bg-background p-4">
-                        <p className="text-sm text-muted-foreground mb-2">Quantity</p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setQuantity((current) => Math.max(1, current - 1))}
-                            className="border-border"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={quantity}
-                            onChange={(e) => {
-                              const next = Number(e.target.value);
-                              setQuantity(Number.isFinite(next) && next > 0 ? Math.floor(next) : 1);
-                            }}
-                            className="h-10 w-24 text-center text-lg font-semibold"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setQuantity((current) => current + 1)}
-                            className="border-border"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
+                {items.map((item) => {
+                  const draft = bookingDrafts[item.bookingId];
+                  const itemPlan = draft?.planOptions.find((plan) => plan.id === draft.selectedPlanId) ?? draft?.planOptions[0] ?? null;
+                  const itemQuantity = Math.max(1, Math.floor(draft?.quantity || 1));
+                  const itemPreviewDays = itemPlan ? itemPlan.durationDays * itemQuantity : 0;
+                  const itemTotal = itemPlan ? Number(itemPlan.price ?? 0) * itemQuantity : Number(item.totalPrice ?? 0);
+                  return (
+                    <Card key={item.bookingId} className="p-0 border-border overflow-hidden">
+                      <div className="border-b border-border px-5 py-4 bg-muted/20">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Product information</p>
+                            <h3 className="text-2xl font-bold">{item.specName}</h3>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Button type="button" variant="link" className="px-0 text-primary">
+                              Change the product
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setCancelBookingTarget(item)}
+                              disabled={cancellingBookingId !== null}
+                              className="border-border"
+                            >
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="rounded-lg border border-border bg-background p-4 space-y-2 text-sm">
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Days per unit</span>
-                          <span className="font-semibold">{selectedPlan?.durationDays ?? "—"} days</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Total days</span>
-                          <span className="font-semibold text-primary">{previewDays} days</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Plan</span>
-                          <span className="font-semibold">{selectedPlan?.planName ?? "—"}</span>
-                        </div>
-                      </div>
-                    </div>
+                      <div className="p-5 space-y-5">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-lg border border-border bg-background p-4">
+                            <p className="text-sm text-muted-foreground mb-2">Quantity</p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() =>
+                                  setBookingDrafts((current) => ({
+                                    ...current,
+                                    [item.bookingId]: {
+                                      ...(current[item.bookingId] ?? {
+                                        planOptions: draft?.planOptions ?? [],
+                                        selectedPlanId: itemPlan?.id ?? null,
+                                        quantity: 1,
+                                        originalQuantity: 1,
+                                      }),
+                                      quantity: Math.max(1, itemQuantity - 1),
+                                    },
+                                  }))
+                                }
+                                className="border-border"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={itemQuantity}
+                                onChange={(e) => {
+                                  const next = Number(e.target.value);
+                                  setBookingDrafts((current) => ({
+                                    ...current,
+                                    [item.bookingId]: {
+                                      ...(current[item.bookingId] ?? {
+                                        planOptions: draft?.planOptions ?? [],
+                                        selectedPlanId: itemPlan?.id ?? null,
+                                        quantity: 1,
+                                        originalQuantity: 1,
+                                      }),
+                                      quantity: Number.isFinite(next) && next > 0 ? Math.floor(next) : 1,
+                                    },
+                                  }));
+                                }}
+                                className="h-10 w-24 text-center text-lg font-semibold"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() =>
+                                  setBookingDrafts((current) => ({
+                                    ...current,
+                                    [item.bookingId]: {
+                                      ...(current[item.bookingId] ?? {
+                                        planOptions: draft?.planOptions ?? [],
+                                        selectedPlanId: itemPlan?.id ?? null,
+                                        quantity: 1,
+                                        originalQuantity: 1,
+                                      }),
+                                      quantity: itemQuantity + 1,
+                                    },
+                                  }))
+                                }
+                                className="border-border"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
 
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
-                      <div className="flex items-center justify-between gap-4 mb-3">
-                        <span className="font-semibold flex items-center gap-2">
-                          <ReceiptText className="w-4 h-4" />
-                          Review receipt
-                        </span>
-                        <Checkbox checked={reviewReceipt} onCheckedChange={(checked) => setReviewReceipt(checked === true)} />
-                      </div>
-                      {reviewReceipt && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-muted-foreground">Quantity</span>
-                            <span className="font-medium">{previewQuantity}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-muted-foreground">Period</span>
-                            <span className="font-medium capitalize">{selectedPlan?.planName ?? "Selected plan"}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-muted-foreground">Amount</span>
-                            <span className="font-medium">{formatUsd(previewTotal)}</span>
+                          <div className="rounded-lg border border-border bg-background p-4 space-y-2 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Days per unit</span>
+                              <span className="font-semibold">{itemPlan?.durationDays ?? "—"} days</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Total days</span>
+                              <span className="font-semibold text-primary">{itemPreviewDays} days</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Amount</span>
+                              <span className="font-semibold">{formatUsd(itemTotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">Plan</span>
+                              <span className="font-semibold">{itemPlan?.planName ?? "—"}</span>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
 
               <Card className="p-5 border-border bg-card/70 lg:sticky lg:top-6">
@@ -511,7 +550,7 @@ export function Cart() {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Unit price</span>
-                    <span className="font-medium">{selectedPlan ? formatUsd(Number(selectedPlan.price ?? 0)) : "—"}</span>
+                    <span className="font-medium">{focusedPlan ? formatUsd(Number(focusedPlan.price ?? 0)) : "—"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Preview days</span>
@@ -551,6 +590,11 @@ export function Cart() {
                   >
                     Top up wallet
                   </Button>
+
+                  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+                    <Checkbox checked={receiveEmail} onCheckedChange={(checked) => setReceiveEmail(checked === true)} />
+                    <span>Receive email receipt</span>
+                  </div>
                 </div>
               </Card>
             </div>
@@ -577,61 +621,7 @@ export function Cart() {
             </Card>
           )}
 
-          {items.map((item) => {
-            const total = Number(item.totalPrice ?? 0);
-            return (
-              <Card key={item.bookingId} className="p-6 border-border">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-xl font-bold">{item.specName}</h3>
-                      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/50">
-                        Pending payment
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Order #{item.bookingId}
-                    </p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Amount</p>
-                      <p className="text-2xl font-bold text-emerald-500">
-                        {formatUsd(total)}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => setConfirmBooking(item)}
-                      disabled={payingBookingId !== null}
-                      className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                    >
-                      {payingBookingId === item.bookingId ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Processing…
-                        </>
-                      ) : (
-                        <>
-                          <Wallet className="w-4 h-4 mr-2" />
-                          Pay with wallet
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setCancelBookingTarget(item)}
-                      disabled={cancellingBookingId !== null}
-                      className="border-border"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+
         </div>
       )}
 
