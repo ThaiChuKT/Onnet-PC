@@ -468,7 +468,7 @@ export function Cart() {
                                     },
                                   }));
                                 }}
-                                className="h-10 w-24 text-center text-lg font-semibold"
+                                className="h-10 w-24 px-0 text-center text-lg font-semibold leading-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                               />
                               <Button
                                 type="button"
