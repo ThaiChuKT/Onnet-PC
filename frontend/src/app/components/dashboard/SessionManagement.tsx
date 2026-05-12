@@ -247,7 +247,7 @@ export function SessionManagement() {
                         Machine: #{item.pcId}{" "}
                         {item.pcLocation ? `- ${item.pcLocation}` : ""}
                       </p>
-                      <p>Cost: {formatUsd(Number(item.totalCost ?? 0))}</p>
+                      <p>Cost: <span className="text-money font-semibold">{formatUsd(Number(item.totalCost ?? 0))}</span></p>
                       <p>
                         Started:{" "}
                         {item.startTime

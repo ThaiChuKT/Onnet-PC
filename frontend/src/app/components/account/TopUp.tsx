@@ -115,7 +115,7 @@ export function TopUp() {
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
               <Wallet className="w-4 h-4 text-primary" />
               <span className="text-sm text-muted-foreground">Balance</span>
-              <span className="font-bold text-primary">
+              <span className="font-bold text-money">
                 {balance === null ? "—" : formatUsd(balance)}
               </span>
             </div>
@@ -134,7 +134,7 @@ export function TopUp() {
               />
               <p className="text-sm text-muted-foreground">
                 Checkout total:{" "}
-                <span className="font-bold text-green-600 dark:text-green-400">
+                <span className="font-bold text-money">
                   ${amountInUSD} USD
                 </span>
               </p>
@@ -159,7 +159,7 @@ export function TopUp() {
           </span>
           Top-up notes
         </h4>
-        <ul className="grid gap-1.5 text-sm text-muted-foreground md:grid-cols-3">
+        <ul className="grid gap-2 text-base text-white">
           <li className="flex gap-2">
             <span className="text-primary">•</span>
             <span>Settlement usually appears within 5–15 minutes after PayPal approves.</span>

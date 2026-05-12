@@ -220,9 +220,9 @@ export function PackageFoldersPage() {
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
                         <p>Specs linked: {pkg.specIds.length}</p>
-                        <p>Yearly: {yearly ? formatUsd(Number(yearly.price ?? 0)) : "-"}</p>
-                        <p>Monthly: {monthly ? formatUsd(Number(monthly.price ?? 0)) : "-"}</p>
-                        <p>Weekly: {weekly ? formatUsd(Number(weekly.price ?? 0)) : "-"}</p>
+                        <p>Yearly: <span className="text-money font-semibold">{yearly ? formatUsd(Number(yearly.price ?? 0)) : "-"}</span></p>
+                        <p>Monthly: <span className="text-money font-semibold">{monthly ? formatUsd(Number(monthly.price ?? 0)) : "-"}</span></p>
+                        <p>Weekly: <span className="text-money font-semibold">{weekly ? formatUsd(Number(weekly.price ?? 0)) : "-"}</span></p>
                       </div>
                     </div>
 

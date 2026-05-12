@@ -31,7 +31,7 @@ const menuItems = [
   },
   {
     path: "/account/transactions",
-    label: "Transactions",
+    label: "History",
     icon: History,
   },
 ];

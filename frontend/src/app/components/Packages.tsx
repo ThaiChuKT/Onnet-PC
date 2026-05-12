@@ -250,7 +250,7 @@ export function Packages() {
                 <div className="p-6">
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1 flex-wrap">
-                      <span className="text-4xl font-bold text-primary">
+                      <span className="text-4xl font-bold text-money">
                         {formatUsd(currentPricing.amountUsd)}
                       </span>
                       <span className="text-muted-foreground">
@@ -331,7 +331,7 @@ export function Packages() {
             <div className="hidden sm:block w-px h-12 bg-border"></div>
             <div className="text-sm text-muted-foreground">
               Security deposit:{" "}
-              <span className="text-primary font-bold">
+              <span className="text-money font-bold">
                 {formatUsd(vndToUsd(500_000))}
               </span>{" "}
               — refunded

@@ -16,6 +16,7 @@
   --muted-foreground: #a3a3a3;
   --accent: #ff6b35;
   --accent-foreground: #ffffff;
+  --money: #22c55e;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 69, 0, 0.2);
@@ -56,6 +57,7 @@
   --muted-foreground: #a3a3a3;
   --accent: #ff6b35;
   --accent-foreground: #ffffff;
+  --money: #22c55e;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 69, 0, 0.2);
@@ -93,6 +95,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-money: var(--money);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);

@@ -456,7 +456,7 @@ export function RevenueStats() {
             <p className="text-sm text-muted-foreground mb-1">
               Wallet top-up revenue
             </p>
-            <p className="text-3xl font-bold text-primary mb-1">
+            <p className="text-3xl font-bold text-money mb-1">
               {formatUsd(topUpRevenue)}
             </p>
             <p className="text-xs text-accent">
@@ -488,7 +488,7 @@ export function RevenueStats() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-1">Machine booking revenue</p>
-            <p className="text-3xl font-bold text-secondary mb-1">
+            <p className="text-3xl font-bold text-money mb-1">
               {formatUsd(bookingRevenue)}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -545,7 +545,7 @@ export function RevenueStats() {
               />
               <YAxis
                 key="topup-yaxis"
-                stroke="#888"
+                stroke="#22c55e"
                 style={{ fontSize: "12px" }}
                 tickFormatter={(value) => formatUsdCompact(Number(value))}
               />
@@ -557,6 +557,7 @@ export function RevenueStats() {
                   borderRadius: "8px",
                   color: "#fff",
                 }}
+                itemStyle={{ color: "#22c55e" }}
                 formatter={(value: unknown) => [
                   formatUsd(Number(value ?? 0)),
                   "Top up",
@@ -608,7 +609,7 @@ export function RevenueStats() {
               />
               <YAxis
                 key="booking-yaxis"
-                stroke="#888"
+                stroke="#22c55e"
                 style={{ fontSize: "12px" }}
                 tickFormatter={(value) => formatUsdCompact(Number(value))}
               />
@@ -620,6 +621,7 @@ export function RevenueStats() {
                   borderRadius: "8px",
                   color: "#fff",
                 }}
+                itemStyle={{ color: "#22c55e" }}
                 formatter={(value: unknown) => [
                   formatUsd(Number(value ?? 0)),
                   "Booking",
@@ -745,7 +747,7 @@ export function RevenueStats() {
                         <p className="font-medium">Top up #{item.transactionId}</p>
                         <p className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
                       </div>
-                      <p className="font-semibold text-primary">{formatUsd(Number(item.amount ?? 0))}</p>
+                      <p className="font-semibold text-money">{formatUsd(Number(item.amount ?? 0))}</p>
                     </div>
                   ))}
                 </div>
@@ -771,7 +773,7 @@ export function RevenueStats() {
                           {item.specName || "Unknown spec"} | {String(item.status || "").toUpperCase()} | {formatDateTime(item.createdAt)}
                         </p>
                       </div>
-                      <p className="font-semibold text-secondary">{formatUsd(Number(item.totalPrice ?? 0))}</p>
+                      <p className="font-semibold text-money">{formatUsd(Number(item.totalPrice ?? 0))}</p>
                     </div>
                   ))}
                 </div>
@@ -862,7 +864,7 @@ export function RevenueStats() {
                     <div className="flex-1">
                       <h4 className="font-bold">{category.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {formatUsd(category.revenue)} • {category.users} customers • {category.count} orders
+                        <span className="text-money font-semibold">{formatUsd(category.revenue)}</span> • {category.users} customers • {category.count} orders
                       </p>
                     </div>
                   </div>
@@ -886,7 +888,7 @@ export function RevenueStats() {
               <span className="text-muted-foreground">
                 Total segment revenue:
               </span>
-              <span className="text-2xl font-bold text-primary">
+              <span className="text-2xl font-bold text-money">
                 {formatUsd(selectedCategoryRevenue)}
               </span>
             </div>

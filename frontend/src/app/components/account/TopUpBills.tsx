@@ -107,7 +107,7 @@ export function TopUpBills() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Total top-up in current filter</p>
-            <p className="text-2xl font-bold text-primary">${totalTopUp.toLocaleString("en-US")}</p>
+            <p className="text-2xl font-bold text-money">${totalTopUp.toLocaleString("en-US")}</p>
           </div>
           <Wallet className="w-8 h-8 text-primary" />
         </div>
@@ -127,7 +127,7 @@ export function TopUpBills() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-bold">TOPUP-#{tx.id}</h3>
-                  <Badge className="bg-accent/20 text-accent border-accent/40">Paid</Badge>
+                  {/* <Badge className="bg-accent/20 text-accent border-accent/40">Paid</Badge> */}
                 </div>
                 <p className="text-sm text-muted-foreground">{tx.note || "Wallet top-up"}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -140,7 +140,7 @@ export function TopUpBills() {
 
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Amount</p>
-                <p className="text-xl font-bold text-primary">${Number(tx.amount ?? 0).toLocaleString("en-US")}</p>
+                <p className="text-xl font-bold text-money">${Number(tx.amount ?? 0).toLocaleString("en-US")}</p>
               </div>
             </div>
           </Card>

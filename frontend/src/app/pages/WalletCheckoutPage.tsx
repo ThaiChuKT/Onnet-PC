@@ -147,7 +147,7 @@ export function WalletCheckoutPage() {
                   <Wallet className="w-5 h-5 text-primary" />
                   <span className="text-sm text-muted-foreground">Current balance</span>
                 </div>
-                <p className="text-3xl font-bold text-primary">
+                <p className="text-3xl font-bold text-money">
                   {formatUsd(Number(view.data.balance))}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">

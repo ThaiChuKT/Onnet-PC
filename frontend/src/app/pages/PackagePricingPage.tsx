@@ -198,6 +198,7 @@ export function PackagePricingPage() {
 										min={1}
 										value={yearlyPrice}
 										onChange={(e) => handleSyncedChange("yearly", Number(e.target.value) || 1)}
+										className="text-money font-semibold"
 									/>
 								</div>
 
@@ -208,6 +209,7 @@ export function PackagePricingPage() {
 										min={1}
 										value={monthlyPrice}
 										onChange={(e) => handleSyncedChange("monthly", Number(e.target.value) || 1)}
+										className="text-money font-semibold"
 									/>
 								</div>
 
@@ -218,6 +220,7 @@ export function PackagePricingPage() {
 										min={1}
 										value={weeklyPrice}
 										onChange={(e) => handleSyncedChange("weekly", Number(e.target.value) || 1)}
+										className="text-money font-semibold"
 									/>
 								</div>
 

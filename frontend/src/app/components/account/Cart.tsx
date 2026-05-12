@@ -393,8 +393,8 @@ export function Cart() {
       {!isLoading && !loadError && items.length > 0 && (
         <div className="space-y-4">
           {canShowFocusedSummary ? (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-              <div className="space-y-4">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+              <div className="space-y-6">
                 <Card className="p-5 border-border bg-card/50">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -452,7 +452,7 @@ export function Cart() {
                       </div>
 
                       <div className="p-5 space-y-5">
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-6 sm:grid-cols-2">
                           <div className="rounded-lg border border-border bg-background p-4">
                             <p className="text-sm text-muted-foreground mb-2">Quantity</p>
                             <div className="flex items-center gap-2">
@@ -535,7 +535,7 @@ export function Cart() {
                             </div>
                             <div className="flex items-center justify-between gap-4">
                               <span className="text-muted-foreground">Amount</span>
-                              <span className="font-semibold">{formatUsd(itemTotal)}</span>
+                              <span className="font-semibold text-money">{formatUsd(itemTotal)}</span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
                               <span className="text-muted-foreground">Plan</span>
@@ -553,11 +553,11 @@ export function Cart() {
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Amount of payment</p>
-                    <p className="text-3xl font-bold text-rose-500">{formatUsd(previewTotal)}</p>
+                    <p className="text-3xl font-bold text-money">{formatUsd(previewTotal)}</p>
                   </div>
                   <div className="text-right text-sm text-muted-foreground">
                     <p>Wallet balance</p>
-                    <p className="font-semibold text-foreground">
+                    <p className="font-semibold text-money">
                       {walletBalance === null ? "—" : formatUsd(walletBalance)}
                     </p>
                   </div>
@@ -570,7 +570,7 @@ export function Cart() {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Unit price</span>
-                    <span className="font-medium">{focusedPlan ? formatUsd(Number(focusedPlan.price ?? 0)) : "—"}</span>
+                    <span className="font-medium text-money">{focusedPlan ? formatUsd(Number(focusedPlan.price ?? 0)) : "—"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Preview days</span>
@@ -627,13 +627,13 @@ export function Cart() {
                 </div>
                 <div className="sm:text-right">
                   <p className="text-sm text-muted-foreground">Total due</p>
-                  <p className="text-2xl font-bold text-emerald-500">
+                  <p className="text-2xl font-bold text-money">
                     {formatUsd(totalDue)}
                   </p>
                 </div>
                 <div className="sm:text-right">
                   <p className="text-sm text-muted-foreground">Wallet balance</p>
-                  <p className="text-2xl font-bold text-emerald-500">
+                  <p className="text-2xl font-bold text-money">
                     {walletBalance === null ? "—" : formatUsd(walletBalance)}
                   </p>
                 </div>
@@ -670,7 +670,7 @@ export function Cart() {
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
-                    <span className="font-bold text-emerald-500">
+                    <span className="font-bold text-money">
                       {formatUsd(focusedBooking?.bookingId === confirmBooking?.bookingId ? previewTotal : Number(confirmBooking?.totalPrice ?? 0))}
                     </span>
                   </div>
@@ -688,7 +688,7 @@ export function Cart() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Current balance</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-money">
                       {walletBalance === null ? "—" : formatUsd(walletBalance)}
                     </span>
                   </div>
@@ -701,7 +701,11 @@ export function Cart() {
             <Button
               onClick={handleConfirmPay}
               disabled={payingBookingId !== null}
-              className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+              className="text-white hover:opacity-90"
+              style={{
+                background:
+                  "radial-gradient(circle farthest-corner at 10% 20%, rgba(0,51,102,1) 0%, rgba(0,102,204,1) 49.5%, rgba(0,191,255,1) 90%)",
+              }}
             >
               {payingBookingId !== null ? (
                 <>
@@ -758,7 +762,7 @@ export function Cart() {
               value={topUpAmount}
               onChange={(e) => setTopUpAmount(e.target.value)}
               placeholder="Amount in USD"
-              className="h-11"
+              className="h-11 text-money font-semibold"
             />
             <div className="grid grid-cols-3 gap-2">
               {quickAmounts.map((value) => (
@@ -767,7 +771,7 @@ export function Cart() {
                   type="button"
                   variant="outline"
                   onClick={() => setTopUpAmount(String(value))}
-                  className="border-border"
+                  className="border-border text-money"
                 >
                   ${value}
                 </Button>

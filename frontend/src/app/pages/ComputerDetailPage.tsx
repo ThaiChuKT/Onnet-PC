@@ -304,7 +304,7 @@ export function ComputerDetailPage() {
                             {plan.durationDays} days
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-money font-semibold mt-1">
                           {formatUsd(Number(plan.price ?? 0))}
                         </p>
                       </div>

@@ -511,7 +511,7 @@ export function AccountList() {
                               </div>
                               <div className="sm:text-right">
                                 <span className="text-muted-foreground">Price:</span>
-                                <p className="font-medium text-primary">
+                                <p className="font-medium text-money">
                                   {formatUsd(Number(b.totalPrice ?? 0))}
                                 </p>
                               </div>

@@ -200,7 +200,7 @@ export function InvoiceManagement() {
         </Card>
         <Card className="p-4 border-border bg-gradient-to-br from-primary/10 to-accent/10">
           <p className="text-sm text-muted-foreground">Total bill value</p>
-          <p className="text-xl font-bold text-primary">
+          <p className="text-xl font-bold text-money">
             {formatUsd(stats.totalAmount)}
           </p>
         </Card>
@@ -256,7 +256,7 @@ export function InvoiceManagement() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="inline-flex items-center gap-2 text-primary font-bold text-lg">
+                    <div className="inline-flex items-center gap-2 text-money font-bold text-lg">
                       <Wallet className="w-4 h-4" />
                       {formatUsd(Number(item.amount ?? 0))}
                     </div>

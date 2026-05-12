@@ -318,7 +318,7 @@ export function OrderManagement() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Price:</span>{" "}
-                      <span className="font-bold text-primary">
+                      <span className="font-bold text-money">
                         {formatUsd(Number(order.totalPrice ?? 0))}
                       </span>
                     </div>
@@ -390,7 +390,7 @@ export function OrderManagement() {
                           <div className="p-4 bg-primary/10 rounded-lg">
                             <div className="flex justify-between items-center">
                               <span className="font-bold">Total:</span>
-                              <span className="text-2xl font-bold text-primary">
+                              <span className="text-2xl font-bold text-money">
                                 {formatUsd(Number(selectedOrder.totalPrice ?? 0))}
                               </span>
                             </div>

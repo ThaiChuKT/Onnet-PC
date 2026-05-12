@@ -97,12 +97,12 @@ export function Header() {
               >
                 Plans
               </Link>
-              <a
+              {/* <a
                 href="/#features"
                 className="text-foreground hover:text-primary transition-colors"
               >
                 Features
-              </a>
+              </a> */}
               <a
                 href="/faq"
                 className="text-foreground hover:text-primary transition-colors"
@@ -123,7 +123,7 @@ export function Header() {
                     <span className="text-xs text-muted-foreground">
                       Balance
                     </span>
-                    <span className="text-sm font-bold text-primary">
+                    <span className="text-sm font-bold text-money">
                       {balance === null ? "—" : formatUsd(balance)}
                     </span>
                   </div>

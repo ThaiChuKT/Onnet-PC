@@ -534,7 +534,7 @@ export function RentalHistory() {
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
-                    <span className="font-bold text-primary">
+                    <span className="font-bold text-money">
                       {formatUsd(price)}
                     </span>
                   </div>
@@ -542,7 +542,7 @@ export function RentalHistory() {
                     <span className="text-muted-foreground">
                       Current balance
                     </span>
-                    <span className="font-medium">
+                    <span className="font-medium text-money">
                       {walletBalance === null ? "—" : formatUsd(walletBalance)}
                     </span>
                   </div>
@@ -551,7 +551,7 @@ export function RentalHistory() {
                       <span className="text-muted-foreground">
                         Balance after payment
                       </span>
-                      <span className="font-bold text-foreground">
+                      <span className="font-bold text-money">
                         {formatUsd(balanceAfter)}
                       </span>
                     </div>
@@ -694,7 +694,7 @@ export function RentalHistory() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-primary">
+                          <p className="font-bold text-money">
                             {formatUsd(Number(plan.price ?? 0))}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -860,7 +860,7 @@ export function RentalHistory() {
 
                 <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-end gap-3 lg:min-w-[200px]">
                   <div className="flex flex-col items-end gap-1">
-                    <div className="text-2xl font-bold text-primary">
+                    <div className="text-2xl font-bold text-money">
                       {formatUsd(total)}
                     </div>
                   </div>

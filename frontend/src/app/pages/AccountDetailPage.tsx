@@ -168,7 +168,7 @@ export function AccountDetailPage() {
                   <p className="text-sm text-muted-foreground">{order.planName || order.specName}</p>
                 </div>
                 <div className="text-sm lg:text-right">
-                  <p className="font-semibold text-primary">{formatUsd(Number(order.totalPrice ?? 0))}</p>
+                  <p className="font-semibold text-money">{formatUsd(Number(order.totalPrice ?? 0))}</p>
                   <p className="text-muted-foreground">{order.status}</p>
                 </div>
               </div>
@@ -191,7 +191,7 @@ export function AccountDetailPage() {
                   <p className="text-sm text-muted-foreground">{invoice.note || invoice.type}</p>
                 </div>
                 <div className="text-sm lg:text-right">
-                  <p className="font-semibold text-primary">{formatUsd(Number(invoice.amount ?? 0))}</p>
+                  <p className="font-semibold text-money">{formatUsd(Number(invoice.amount ?? 0))}</p>
                   <p className="text-muted-foreground">{new Date(invoice.createdAt).toLocaleString("en-US")}</p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ export function AccountDetailPage() {
                   <p className="text-sm text-muted-foreground">{booking.durationDays ? `${booking.durationDays} days` : "Custom duration"}</p>
                 </div>
                 <div className="text-sm lg:text-right">
-                  <p className="font-semibold text-primary">{formatUsd(Number(booking.totalPrice ?? 0))}</p>
+                  <p className="font-semibold text-money">{formatUsd(Number(booking.totalPrice ?? 0))}</p>
                   <p className="text-muted-foreground">{booking.status}</p>
                 </div>
               </div>
