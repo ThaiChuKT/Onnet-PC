@@ -9,6 +9,7 @@ import { ComputerDetailPage } from "./pages/ComputerDetailPage";
 import { PackagePricingPage } from "./pages/PackagePricingPage";
 import { PackageDetailsPage } from "./pages/PackageDetailsPage.tsx";
 import { AIChatPage } from "./pages/AIChatPage";
+import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EmailVerificationPage } from "./pages/EmailVerificationPage";
@@ -17,7 +18,6 @@ import { AdminFAQPage } from "./pages/AdminFAQPage";
 import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
-import { Cart } from "./components/account/Cart";
 import { TopUp } from "./components/account/TopUp";
 import { TopUpBills } from "./components/account/TopUpBills";
 import { ComputerList } from "./components/dashboard/ComputerList";
@@ -89,6 +89,14 @@ export const router = createBrowserRouter([
     Component: AIChatPage,
   },
   {
+    path: "/checkout",
+    element: (
+      <ProtectedRoute>
+        <CheckoutPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/wallet",
     element: (
       <ProtectedRoute>
@@ -119,10 +127,6 @@ export const router = createBrowserRouter([
       {
         path: "change-password",
         Component: ChangePassword,
-      },
-      {
-        path: "cart",
-        Component: Cart,
       },
       {
         path: "transactions",
@@ -189,4 +193,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-

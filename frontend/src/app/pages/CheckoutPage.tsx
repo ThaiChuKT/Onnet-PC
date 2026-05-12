@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
-import { Card } from "../ui/card";
-// Badge removed: not used in this component
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Checkbox } from "../ui/checkbox";
+import { Link, useLocation, useNavigate } from "react-router";
+import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
+import { Card } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Checkbox } from "../components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -13,14 +14,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../ui/alert-dialog";
+} from "../components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../ui/dialog";
+} from "../components/ui/dialog";
 import {
   AlertTriangle,
   CreditCard,
@@ -31,9 +32,9 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
-import { apiGet, apiPost } from "../../api/http";
+import { apiGet, apiPost } from "../api/http";
 import { toast } from "sonner";
-import { formatUsd } from "../../lib/formatUsd";
+import { formatUsd } from "../lib/formatUsd";
 
 const quickAmounts = [5, 10, 20, 50, 100];
 
@@ -103,7 +104,7 @@ const normalizeBookingStatus = (value?: string | null) => {
   return normalized === "completed" ? "expired" : normalized;
 };
 
-export function Cart() {
+export function CheckoutPage() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, BookingDraftState>>({});
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -118,7 +119,9 @@ export function Cart() {
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [isTopUpSubmitting, setIsTopUpSubmitting] = useState(false);
-  const [searchParams] = useSearchParams();
+  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -138,7 +141,7 @@ export function Cart() {
       setItems(pending);
       if (wallet) setWalletBalance(Number(wallet.balance));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not load cart";
+      const msg = e instanceof Error ? e.message : "Could not load checkout";
       setLoadError(msg);
       toast.error(msg);
     } finally {
@@ -163,12 +166,10 @@ export function Cart() {
           try {
             const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${item.specId}/plans`);
             
-            // Priority: Use planId from backend if available (new behavior)
             let matchedPlan = item.planId 
               ? plans.find(p => p.id === item.planId)
               : null;
             
-            // Fallback: Infer from price if planId not available (legacy behavior)
             if (!matchedPlan) {
               let bestScore = Infinity;
               
@@ -180,7 +181,6 @@ export function Cart() {
                 const roundedQty = Math.max(1, Math.round(inferred));
                 const distanceFromWhole = Math.abs(inferred - roundedQty);
                 const distanceFromOne = Math.abs(roundedQty - 1);
-                // Heavily penalize non-1 quantities, then prefer clean divisions
                 const score = distanceFromOne * 100 + distanceFromWhole * 10;
                 
                 if (score < bestScore) {
@@ -220,11 +220,11 @@ export function Cart() {
   }, [items]);
 
   const focusedBookingId = useMemo(() => {
-    const bookingId = searchParams.get("bookingId");
+    const bookingId = location.state?.bookingId;
     if (!bookingId) return null;
     const focusId = Number(bookingId);
     return Number.isFinite(focusId) ? focusId : null;
-  }, [searchParams]);
+  }, [location.state]);
 
   const focusedBooking = useMemo(() => {
     if (items.length === 0) return null;
@@ -272,7 +272,6 @@ export function Cart() {
       const res = await apiPost<BookingPaymentResponse>(`/bookings/${id}/pay-wallet`);
       setWalletBalance(Number(res.walletBalance));
       toast.success(res.message || "Payment completed from your wallet");
-      window.dispatchEvent(new Event("cartUpdated"));
       setConfirmBooking(null);
       await loadData();
     } catch (e) {
@@ -290,7 +289,6 @@ export function Cart() {
     try {
       await apiPost<BookingResponseDto>(`/bookings/${id}/cancel`);
       toast.success("Order cancelled");
-      window.dispatchEvent(new Event("cartUpdated"));
       setCancelBookingTarget(null);
       await loadData();
     } catch (e) {
@@ -314,7 +312,7 @@ export function Cart() {
         "/wallet/top-up",
         {
           amount: parsed,
-          redirectTo: "/account/cart",
+          redirectTo: "/checkout",
         },
       );
       if (res.approvalUrl) {
@@ -333,73 +331,82 @@ export function Cart() {
     }
   };
 
-  const pendingCount = items.length;
-  const totalDue = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.totalPrice ?? 0), 0),
-    [items],
-  );
+  const handleConfirmReturn = async () => {
+    if (focusedBooking && cancellingBookingId === null) {
+      setCancellingBookingId(focusedBooking.bookingId);
+      try {
+        await apiPost<BookingResponseDto>(`/bookings/${focusedBooking.bookingId}/cancel`);
+        toast.success("Order cancelled");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not cancel order");
+      } finally {
+        setCancellingBookingId(null);
+        setShowReturnConfirm(false);
+        navigate("/packages");
+      }
+    } else {
+      setShowReturnConfirm(false);
+      navigate("/packages");
+    }
+  };
 
   const canShowFocusedSummary = !!focusedBooking && !!focusedPlan;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            Secure
-            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              {" "}
-              Checkout
-            </span>
-          </h1>
-          <p className="text-muted-foreground">
-            Review your order and complete payment to activate your Cloud PC.
-          </p>
-        </div>
-          <Button
-            asChild
-            variant="outline"
-            className="border-border"
-          >
-            <Link to="/packages">Return to plans</Link>
-          </Button>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 pt-24 pb-12 bg-muted/30">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">
+                Secure
+                <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                  {" "}
+                  Checkout
+                </span>
+              </h1>
+              <p className="text-muted-foreground">
+                Review your order and complete payment to activate your Cloud PC.
+              </p>
+            </div>
+            <Button variant="outline" className="border-border" onClick={() => setShowReturnConfirm(true)}>
+              Return to plans
+            </Button>
+          </div>
 
-      {isLoading && (
-        <Card className="p-10 border-border text-center">
-          <CheckoutIcon className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading checkout…</p>
-        </Card>
-      )}
+          {isLoading && (
+            <Card className="p-10 border-border text-center">
+              <CheckoutIcon className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-muted-foreground">Loading checkout…</p>
+            </Card>
+          )}
 
-      {!isLoading && loadError && (
-        <Card className="p-10 border-border text-center">
-          <CheckoutIcon className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground">{loadError}</p>
-        </Card>
-      )}
+          {!isLoading && loadError && (
+            <Card className="p-10 border-border text-center">
+              <CheckoutIcon className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-muted-foreground">{loadError}</p>
+            </Card>
+          )}
 
-      {!isLoading && !loadError && items.length === 0 && (
-        <Card className="p-12 border-border text-center">
-          <CheckoutIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-xl font-bold mb-2">No pending orders</h3>
-          <p className="text-muted-foreground mb-4">
-            Choose a subscription tier to get started.
-          </p>
-          <Button asChild className="bg-gradient-to-r from-primary to-accent">
-            <a href="/#packages" className="text-white hover:opacity-90">
-              Browse packages
-            </a>
-          </Button>
-        </Card>
-      )}
+          {!isLoading && !loadError && items.length === 0 && (
+            <Card className="p-12 border-border text-center">
+              <CheckoutIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-2">No pending orders</h3>
+              <p className="text-muted-foreground mb-4">
+                Choose a subscription tier to get started.
+              </p>
+              <Button asChild className="bg-gradient-to-r from-primary to-accent">
+                <Link to="/packages" className="text-white hover:opacity-90">
+                  Browse packages
+                </Link>
+              </Button>
+            </Card>
+          )}
 
-      {!isLoading && !loadError && items.length > 0 && (
-        <div className="space-y-4">
-          {canShowFocusedSummary ? (
+          {!isLoading && !loadError && items.length > 0 && canShowFocusedSummary && (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
               <div className="space-y-6">
-                {/* CHỈ RENDER 1 ĐƠN HÀNG (FOCUSED BOOKING) THAY VÌ MAP TOÀN BỘ ITEMS */}
                 {[focusedBooking].filter((b): b is BookingHistoryItemResponse => b !== null).map((item) => {
                   const draft = bookingDrafts[item.bookingId];
                   const itemPlan = draft?.planOptions.find((plan) => plan.id === draft.selectedPlanId) ?? draft?.planOptions[0] ?? null;
@@ -419,7 +426,7 @@ export function Cart() {
                             variant="outline"
                             onClick={() => setCancelBookingTarget(item)}
                             disabled={cancellingBookingId !== null}
-                            className="border-border"
+                            className="border-border hover:bg-destructive/10 hover:text-destructive"
                           >
                             <XCircle className="w-4 h-4 mr-2" />
                             Cancel
@@ -525,7 +532,7 @@ export function Cart() {
                 })}
               </div>
 
-              <Card className="p-5 border-border bg-card/70 lg:sticky lg:top-6">
+              <Card className="p-5 border-border bg-card/70 lg:sticky lg:top-24">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Amount of payment</p>
@@ -552,7 +559,7 @@ export function Cart() {
 
                 {walletBalance !== null && previewTotal > walletBalance ? (
                   <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 mb-4 text-sm">
-                    <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">The points are not enough</p>
+                    <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">Insufficient balance</p>
                     <p className="text-muted-foreground">Top up your wallet before you finalize the purchase.</p>
                   </div>
                 ) : null}
@@ -590,32 +597,10 @@ export function Cart() {
                 </div>
               </Card>
             </div>
-          ) : (
-            <Card className="p-5 border-border bg-card/50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending orders</p>
-                  <p className="text-2xl font-bold">{pendingCount}</p>
-                </div>
-                <div className="sm:text-right">
-                  <p className="text-sm text-muted-foreground">Total due</p>
-                  <p className="text-2xl font-bold text-money">
-                    {formatUsd(totalDue)}
-                  </p>
-                </div>
-                <div className="sm:text-right">
-                  <p className="text-sm text-muted-foreground">Wallet balance</p>
-                  <p className="text-2xl font-bold text-money">
-                    {walletBalance === null ? "—" : formatUsd(walletBalance)}
-                  </p>
-                </div>
-              </div>
-            </Card>
           )}
-
-
         </div>
-      )}
+      </main>
+      <Footer />
 
       <AlertDialog
         open={!!confirmBooking}
@@ -629,17 +614,17 @@ export function Cart() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-left">
-                <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground">
                   <AlertTriangle className="w-5 h-5 shrink-0 text-destructive mt-0.5" />
                   <div>
                     <strong>Non-refundable:</strong> Payments are non-refundable once completed.
                   </div>
                 </div>
-                <p>
+                <p className="text-foreground">
                   You are paying order <strong>#{confirmBooking?.bookingId}</strong>
                   {" "}for <strong>{confirmBooking?.specName}</strong>.
                 </p>
-                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm text-foreground">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
                     <span className="font-bold text-red-500 text-money">
@@ -673,11 +658,7 @@ export function Cart() {
             <Button
               onClick={handleConfirmPay}
               disabled={payingBookingId !== null}
-              className="text-white hover:opacity-90"
-              style={{
-                background:
-                  "radial-gradient(circle farthest-corner at 10% 20%, rgba(0,51,102,1) 0%, rgba(0,102,204,1) 49.5%, rgba(0,191,255,1) 90%)",
-              }}
+              className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
             >
               {payingBookingId !== null ? (
                 <>
@@ -702,7 +683,7 @@ export function Cart() {
               <XCircle className="w-5 h-5 text-destructive" />
               Cancel this order?
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-foreground">
               The order will be cancelled and no wallet funds will be charged.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -734,7 +715,7 @@ export function Cart() {
               value={topUpAmount}
               onChange={(e) => setTopUpAmount(e.target.value)}
               placeholder="Amount in USD"
-              className="h-11 text-money font-semibold"
+              className="h-11 text-money font-semibold bg-input-background"
             />
             <div className="grid grid-cols-3 gap-2">
               {quickAmounts.map((value) => (
@@ -761,6 +742,33 @@ export function Cart() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showReturnConfirm}
+        onOpenChange={(open) => !open && setShowReturnConfirm(false)}
+      >
+        <AlertDialogContent className="border-border bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Return to plans?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground">
+              This will cancel your current pending order. Are you sure you want to go back?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="border-border">Keep order</AlertDialogCancel>
+            <Button
+              onClick={handleConfirmReturn}
+              disabled={cancellingBookingId !== null}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancellingBookingId !== null ? "Cancelling…" : "Cancel & Return"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

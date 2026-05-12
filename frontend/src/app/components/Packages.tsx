@@ -97,7 +97,6 @@ const packages = [
 export function Packages() {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
   const [isSubmittingTier, setIsSubmittingTier] = useState<string | null>(null);
-  const [isAddingToCart, setIsAddingToCart] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
@@ -117,37 +116,13 @@ export function Packages() {
         rentalUnit: selectedPeriod,
         quantity: 1,
       });
-      toast.success(res.message || "Order created. Review it in your cart.");
-      navigate(`/account/cart?bookingId=${res.bookingId}`);
+      // Đổi câu thông báo sang hướng dẫn thanh toán
+      toast.success("Order created. Please complete your payment.");
+      navigate("/checkout", { state: { bookingId: res.bookingId } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create subscription order");
     } finally {
       setIsSubmittingTier(null);
-    }
-  };
-
-  const handleAddToCart = async (tierName: string) => {
-    if (isAddingToCart !== null) return;
-
-    if (!isAuthenticated) {
-      toast.message("Sign in to add to cart");
-      navigate("/login", { replace: false, state: { from: "/" } });
-      return;
-    }
-
-    setIsAddingToCart(tierName);
-    try {
-      await apiPost<RentMachineResponse>("/bookings/rent", {
-        tierName,
-        rentalUnit: selectedPeriod,
-        quantity: 1,
-      });
-      toast.success("Item added to cart");
-      window.dispatchEvent(new Event("cartUpdated"));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not add to cart");
-    } finally {
-      setIsAddingToCart(null);
     }
   };
 
@@ -295,23 +270,6 @@ export function Packages() {
                     )}
                   </Button>
 
-                  <Button
-                    onClick={() => handleAddToCart(pkg.tierName)}
-                    disabled={isAddingToCart !== null}
-                    variant="outline"
-                    className="w-full border-border"
-                  >
-                    {isAddingToCart === pkg.tierName ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Adding…
-                      </>
-                    ) : (
-                      "Add to cart"
-                    )}
-                  </Button>
-
-                  
                 </div>
               </Card>
             );

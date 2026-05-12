@@ -1,4 +1,4 @@
-import { Monitor, Menu, User, Wallet, LogOut, ShoppingCart } from "lucide-react";
+import { Monitor, Menu, User, Wallet, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
@@ -12,7 +12,6 @@ export function Header() {
   const navigate = useNavigate();
   const { isAuthenticated, isAdmin, user, logout } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
-  const [cartCount, setCartCount] = useState<number>(0);
 
   const refreshWallet = useCallback(async () => {
     if (!isAuthenticated) {
@@ -45,45 +44,6 @@ export function Header() {
     logout();
     navigate("/");
   };
-
-  const refreshCartCount = useCallback(async () => {
-    if (!isAuthenticated) {
-      setCartCount(0);
-      return;
-    }
-    try {
-      const response = await apiGet<{ content: Array<{ status: string }> }>(
-        "/bookings/my",
-        { page: 0, size: 50 }
-      );
-      const pending = (response.content ?? []).filter(
-        (item) => (item.status ?? "").toLowerCase() === "pending"
-      );
-      setCartCount(pending.length);
-    } catch {
-      setCartCount(0);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    void refreshCartCount();
-  }, [refreshCartCount]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const id = window.setInterval(() => {
-      void refreshCartCount();
-    }, WALLET_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [isAuthenticated, refreshCartCount]);
-
-  useEffect(() => {
-    const handleCartUpdated = () => {
-      void refreshCartCount();
-    };
-    window.addEventListener("cartUpdated", handleCartUpdated);
-    return () => window.removeEventListener("cartUpdated", handleCartUpdated);
-  }, [refreshCartCount]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -174,18 +134,6 @@ export function Header() {
                     </div>
                   </div>
                   
-                  <button
-                    onClick={() => navigate("/account/cart")}
-                    className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2 cursor-pointer hover:bg-card/80 transition-colors relative"
-                    title="View cart"
-                  >
-                    <ShoppingCart className="w-5 h-5 text-primary" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {cartCount > 99 ? "99+" : cartCount}
-                      </span>
-                    )}
-                  </button>
                 </>
               )}
 
