@@ -272,6 +272,7 @@ export function Cart() {
       const res = await apiPost<BookingPaymentResponse>(`/bookings/${id}/pay-wallet`);
       setWalletBalance(Number(res.walletBalance));
       toast.success(res.message || "Payment completed from your wallet");
+      window.dispatchEvent(new Event("cartUpdated"));
       setConfirmBooking(null);
       await loadData();
     } catch (e) {
@@ -289,6 +290,7 @@ export function Cart() {
     try {
       await apiPost<BookingResponseDto>(`/bookings/${id}/cancel`);
       toast.success("Order cancelled");
+      window.dispatchEvent(new Event("cartUpdated"));
       setCancelBookingTarget(null);
       await loadData();
     } catch (e) {
@@ -347,7 +349,7 @@ export function Cart() {
             My
             <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               {" "}
-              cart
+              Cart
             </span>
           </h1>
           <p className="text-muted-foreground">
@@ -538,12 +540,8 @@ export function Cart() {
 
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 text-sm mb-4">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Points earned</span>
-                    <span className="font-medium">0 pt</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Unit price</span>
-                    <span className="font-medium text-money">{focusedPlan ? formatUsd(Number(focusedPlan.price ?? 0)) : "—"}</span>
+                    <span className="font-medium text-red-500">{focusedPlan ? formatUsd(Number(focusedPlan.price ?? 0)) : "—"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-muted-foreground">Preview days</span>
@@ -630,10 +628,10 @@ export function Cart() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-left">
-                <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-                  <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+                <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-destructive mt-0.5" />
                   <div>
-                    Ensure your wallet has enough funds before continuing.
+                    <strong>Non-refundable:</strong> Payments are non-refundable once completed.
                   </div>
                 </div>
                 <p>
@@ -643,7 +641,7 @@ export function Cart() {
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount</span>
-                    <span className="font-bold text-money">
+                    <span className="font-bold text-red-500 text-money">
                       {formatUsd(focusedBooking?.bookingId === confirmBooking?.bookingId ? previewTotal : Number(confirmBooking?.totalPrice ?? 0))}
                     </span>
                   </div>
@@ -660,17 +658,17 @@ export function Cart() {
                     </>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current balance</span>
+                    <span className="text-muted-foreground">Balance After Payment</span>
                     <span className="font-medium text-money">
-                      {walletBalance === null ? "—" : formatUsd(walletBalance)}
+                      {walletBalance === null ? "—" : formatUsd(walletBalance - (focusedBooking?.bookingId === confirmBooking?.bookingId ? previewTotal : Number(confirmBooking?.totalPrice ?? 0)))}
                     </span>
                   </div>
                 </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="border-border hover:text-red-500">Cancel</AlertDialogCancel>
             <Button
               onClick={handleConfirmPay}
               disabled={payingBookingId !== null}
@@ -707,7 +705,7 @@ export function Cart() {
               The order will be cancelled and no wallet funds will be charged.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
+          <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel className="border-border">Keep order</AlertDialogCancel>
             <Button
               onClick={handleConfirmCancel}

@@ -370,6 +370,7 @@ export function RentalHistory() {
     try {
       await apiPost<BookingResponseDto>(`/bookings/${id}/cancel`);
       toast.success("Rental cancelled. You have not been charged.");
+      window.dispatchEvent(new Event("cartUpdated"));
       setCancelBookingTarget(null);
       setItems((prev) =>
         prev.map((b) =>
