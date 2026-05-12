@@ -1,9 +1,8 @@
 -- Seed subscription plans for all active PC specs.
--- Market-aligned pricing (closer to cloud PC competitors):
+-- Pricing aligned with backend calculation:
 -- Weekly  = hourly * 4
 -- Monthly = hourly * 12
 -- Yearly  = hourly * 120
--- This guarantees: yearly <= monthly <= weekly <= hourly on effective-hour basis.
 
 USE onnetpc;
 

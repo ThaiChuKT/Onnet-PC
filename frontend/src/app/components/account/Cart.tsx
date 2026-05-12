@@ -161,13 +161,32 @@ export function Cart() {
 
           try {
             const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${item.specId}/plans`);
-            const matchedPlan =
-              plans.find((plan) => {
-                const unitPrice = Number(plan.price ?? 0);
-                if (!unitPrice) return false;
-                const inferred = Number(item.totalPrice ?? 0) / unitPrice;
-                return Number.isFinite(inferred) && Math.abs(inferred - Math.round(inferred)) < 0.01;
-              }) ?? plans[0] ?? null;
+            
+            // TODO: When backend is updated to include plan_id in booking response,
+            // use it directly instead of inferring from price:
+            // const matchedPlan = plans.find(p => p.id === item.planId) ?? plans[0] ?? null;
+            
+            // Find best-matching plan: prioritize quantity=1, then cleanest division
+            let matchedPlan = plans[0] ?? null;
+            let bestScore = Infinity;
+            
+            for (const plan of plans) {
+              const unitPrice = Number(plan.price ?? 0);
+              if (!unitPrice) continue;
+              const inferred = Number(item.totalPrice ?? 0) / unitPrice;
+              if (!Number.isFinite(inferred)) continue;
+              const roundedQty = Math.max(1, Math.round(inferred));
+              const distanceFromWhole = Math.abs(inferred - roundedQty);
+              const distanceFromOne = Math.abs(roundedQty - 1);
+              // Heavily penalize non-1 quantities, then prefer clean divisions
+              const score = distanceFromOne * 100 + distanceFromWhole * 10;
+              
+              if (score < bestScore) {
+                bestScore = score;
+                matchedPlan = plan;
+              }
+            }
+            
             const inferredQuantity = matchedPlan
               ? Math.max(1, Math.round(Number(item.totalPrice ?? 0) / Number(matchedPlan.price ?? 1)))
               : 1;
@@ -216,14 +235,6 @@ export function Cart() {
   const previewQuantity = Math.max(1, Math.floor(focusedDraft?.quantity || 1));
   const previewDays = focusedPlan ? focusedPlan.durationDays * previewQuantity : 0;
   const previewTotal = focusedPlan ? Number(focusedPlan.price ?? 0) * previewQuantity : Number(focusedBooking?.totalPrice ?? 0);
-
-  useEffect(() => {
-    if (focusedBookingId === null) return;
-    const target = items.find((item) => item.bookingId === focusedBookingId);
-    if (target) {
-      setConfirmBooking(target);
-    }
-  }, [focusedBookingId, items]);
 
   const handleConfirmPay = async () => {
     if (!confirmBooking || payingBookingId !== null) return;
@@ -325,17 +336,26 @@ export function Cart() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">
-          My
-          <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            {" "}
-            cart
-          </span>
-        </h1>
-        <p className="text-muted-foreground">
-          Review pending orders and pay directly from your wallet balance.
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">
+            My
+            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+              {" "}
+              cart
+            </span>
+          </h1>
+          <p className="text-muted-foreground">
+            Review pending orders and pay directly from your wallet balance.
+          </p>
+        </div>
+        <Button
+          asChild
+          variant="outline"
+          className="border-border"
+        >
+          <Link to="/#packages">Return to plans</Link>
+        </Button>
       </div>
 
       {isLoading && (
@@ -413,21 +433,16 @@ export function Cart() {
                             <p className="text-sm text-muted-foreground">Product information</p>
                             <h3 className="text-2xl font-bold">{item.specName}</h3>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Button type="button" variant="link" className="px-0 text-primary">
-                              Change the product
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setCancelBookingTarget(item)}
-                              disabled={cancellingBookingId !== null}
-                              className="border-border"
-                            >
-                              <XCircle className="w-4 h-4 mr-2" />
-                              Cancel
-                            </Button>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setCancelBookingTarget(item)}
+                            disabled={cancellingBookingId !== null}
+                            className="border-border"
+                          >
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cancel
+                          </Button>
                         </div>
                       </div>
 

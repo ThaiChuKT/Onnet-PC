@@ -97,6 +97,7 @@ const packages = [
 export function Packages() {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
   const [isSubmittingTier, setIsSubmittingTier] = useState<string | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
@@ -122,6 +123,30 @@ export function Packages() {
       toast.error(e instanceof Error ? e.message : "Could not create subscription order");
     } finally {
       setIsSubmittingTier(null);
+    }
+  };
+
+  const handleAddToCart = async (tierName: string) => {
+    if (isAddingToCart !== null) return;
+
+    if (!isAuthenticated) {
+      toast.message("Sign in to add to cart");
+      navigate("/login", { replace: false, state: { from: "/" } });
+      return;
+    }
+
+    setIsAddingToCart(tierName);
+    try {
+      await apiPost<RentMachineResponse>("/bookings/rent", {
+        tierName,
+        rentalUnit: selectedPeriod,
+        quantity: 1,
+      });
+      toast.success("Item added to cart");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not add to cart");
+    } finally {
+      setIsAddingToCart(null);
     }
   };
 
@@ -232,11 +257,7 @@ export function Packages() {
                         {currentPricing.period}
                       </span>
                     </div>
-                    {selectedPeriod === "year" && (
-                      <p className="text-xs text-accent mt-1">
-                        Save up to ~20% vs paying month-to-month
-                      </p>
-                    )}
+
                   </div>
 
                   <ul className="space-y-3 mb-6">
@@ -266,6 +287,22 @@ export function Packages() {
                       </>
                     ) : (
                       "Subscribe now"
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={() => handleAddToCart(pkg.tierName)}
+                    disabled={isAddingToCart !== null}
+                    variant="outline"
+                    className="w-full border-border"
+                  >
+                    {isAddingToCart === pkg.tierName ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Adding…
+                      </>
+                    ) : (
+                      "Add to cart"
                     )}
                   </Button>
                 </div>
