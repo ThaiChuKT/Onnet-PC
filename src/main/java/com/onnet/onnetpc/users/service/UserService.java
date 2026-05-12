@@ -1,5 +1,6 @@
 package com.onnet.onnetpc.users.service;
 
+import com.onnet.onnetpc.auth.PasswordPolicy;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.dto.ChangePasswordRequest;
@@ -64,6 +65,8 @@ public class UserService {
         if (!request.newPassword().equals(request.confirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "New password confirmation does not match");
         }
+
+        PasswordPolicy.validate(request.newPassword());
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setUpdatedAt(Instant.now());

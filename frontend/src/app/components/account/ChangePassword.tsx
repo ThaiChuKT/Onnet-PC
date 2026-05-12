@@ -6,6 +6,7 @@ import { Lock, Eye, EyeOff, Shield } from "lucide-react";
 import { useState } from "react";
 import { apiPost } from "../../api/http";
 import { toast } from "sonner";
+import { PasswordRequirements } from "../PasswordRequirements";
 
 export function ChangePassword() {
   const [showPasswords, setShowPasswords] = useState({
@@ -24,6 +25,34 @@ export function ChangePassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    // Client-side password requirements validation
+    if (formData.newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(formData.newPassword)) {
+      toast.error("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(formData.newPassword)) {
+      toast.error("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/\d/.test(formData.newPassword)) {
+      toast.error("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.newPassword)) {
+      toast.error("Password must contain at least one special character");
+      return;
+    }
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await apiPost<string, { oldPassword: string; newPassword: string; confirmPassword: string }>(
@@ -129,6 +158,12 @@ export function ChangePassword() {
               </button>
             </div>
           </div>
+
+          {formData.newPassword && (
+            <div className="bg-muted/50 border border-border rounded-lg p-4">
+              <PasswordRequirements password={formData.newPassword} />
+            </div>
+          )}
 
           {/* Confirm Password */}
           <div className="space-y-2">
