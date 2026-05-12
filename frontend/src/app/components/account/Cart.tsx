@@ -667,7 +667,7 @@ export function Cart() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
+          <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel className="border-border hover:text-red-500">Cancel</AlertDialogCancel>
             <Button
               onClick={handleConfirmPay}
@@ -705,7 +705,7 @@ export function Cart() {
               The order will be cancelled and no wallet funds will be charged.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
+          <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel className="border-border">Keep order</AlertDialogCancel>
             <Button
               onClick={handleConfirmCancel}
