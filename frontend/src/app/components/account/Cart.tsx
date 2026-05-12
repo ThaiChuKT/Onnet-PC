@@ -40,6 +40,7 @@ const quickAmounts = [5, 10, 20, 50, 100];
 type BookingHistoryItemResponse = {
   bookingId: number;
   specId: number | null;
+  planId: number | null;
   pcId: number | null;
   specName: string;
   queued: boolean;
@@ -162,30 +163,34 @@ export function Cart() {
           try {
             const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${item.specId}/plans`);
             
-            // TODO: When backend is updated to include plan_id in booking response,
-            // use it directly instead of inferring from price:
-            // const matchedPlan = plans.find(p => p.id === item.planId) ?? plans[0] ?? null;
+            // Priority: Use planId from backend if available (new behavior)
+            let matchedPlan = item.planId 
+              ? plans.find(p => p.id === item.planId)
+              : null;
             
-            // Find best-matching plan: prioritize quantity=1, then cleanest division
-            let matchedPlan = plans[0] ?? null;
-            let bestScore = Infinity;
-            
-            for (const plan of plans) {
-              const unitPrice = Number(plan.price ?? 0);
-              if (!unitPrice) continue;
-              const inferred = Number(item.totalPrice ?? 0) / unitPrice;
-              if (!Number.isFinite(inferred)) continue;
-              const roundedQty = Math.max(1, Math.round(inferred));
-              const distanceFromWhole = Math.abs(inferred - roundedQty);
-              const distanceFromOne = Math.abs(roundedQty - 1);
-              // Heavily penalize non-1 quantities, then prefer clean divisions
-              const score = distanceFromOne * 100 + distanceFromWhole * 10;
+            // Fallback: Infer from price if planId not available (legacy behavior)
+            if (!matchedPlan) {
+              let bestScore = Infinity;
               
-              if (score < bestScore) {
-                bestScore = score;
-                matchedPlan = plan;
+              for (const plan of plans) {
+                const unitPrice = Number(plan.price ?? 0);
+                if (!unitPrice) continue;
+                const inferred = Number(item.totalPrice ?? 0) / unitPrice;
+                if (!Number.isFinite(inferred)) continue;
+                const roundedQty = Math.max(1, Math.round(inferred));
+                const distanceFromWhole = Math.abs(inferred - roundedQty);
+                const distanceFromOne = Math.abs(roundedQty - 1);
+                // Heavily penalize non-1 quantities, then prefer clean divisions
+                const score = distanceFromOne * 100 + distanceFromWhole * 10;
+                
+                if (score < bestScore) {
+                  bestScore = score;
+                  matchedPlan = plan;
+                }
               }
             }
+            
+            matchedPlan = matchedPlan ?? plans[0] ?? null;
             
             const inferredQuantity = matchedPlan
               ? Math.max(1, Math.round(Number(item.totalPrice ?? 0) / Number(matchedPlan.price ?? 1)))

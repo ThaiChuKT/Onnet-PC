@@ -4,6 +4,7 @@ import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
+import com.onnet.onnetpc.subscription.SubscriptionPlan;
 import com.onnet.onnetpc.users.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -42,6 +43,10 @@ public class Booking {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "pc_id")
 	private Pc pc;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "plan_id")
+	private SubscriptionPlan plan;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "booking_type", nullable = false)

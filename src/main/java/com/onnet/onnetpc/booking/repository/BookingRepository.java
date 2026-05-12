@@ -63,6 +63,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         WHERE user_id = :userId
                           AND spec_id = :specId
                           AND booking_type = :bookingType
+                          AND plan_id = :planId
                           AND status = 'pending'
                         ORDER BY end_time DESC, id DESC
                         LIMIT 1
@@ -73,7 +74,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         Optional<Booking> findMergeablePendingSubscriptionForUpdate(
                 @Param("userId") Long userId,
                 @Param("specId") Long specId,
-                @Param("bookingType") String bookingType
+                @Param("bookingType") String bookingType,
+                @Param("planId") Long planId
         );
 
         @Query(

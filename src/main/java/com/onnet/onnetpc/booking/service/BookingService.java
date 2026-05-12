@@ -132,7 +132,7 @@ public class BookingService {
 
         if (pricing.bookingType() == BookingType.subscription) {
             Booking existing = bookingRepository
-                .findMergeablePendingSubscriptionForUpdate(user.getId(), pricing.spec().getId(), BookingType.subscription.name())
+                .findMergeablePendingSubscriptionForUpdate(user.getId(), pricing.spec().getId(), BookingType.subscription.name(), pricing.plan().getId())
                 .orElse(null);
 
             if (existing != null) {
@@ -187,6 +187,7 @@ public class BookingService {
             user,
             pricing.spec(),
             null,
+            pricing.plan(),
             pricing.bookingType(),
             pricing.totalHours(),
             startTime,
@@ -495,6 +496,7 @@ public class BookingService {
             int totalHours = quantity;
             return new PricingResult(
                 spec,
+                null,
                 BookingType.hourly,
                 totalHours,
                 Duration.ofHours(totalHours),
@@ -518,6 +520,7 @@ public class BookingService {
 
         return new PricingResult(
             spec,
+            plan,
             BookingType.subscription,
             null,
             Duration.ofDays((long) durationDays * quantity),
@@ -549,6 +552,7 @@ public class BookingService {
         User user,
         PcSpec spec,
         Pc pc,
+        SubscriptionPlan plan,
         BookingType bookingType,
         Integer totalHours,
         Instant startTime,
@@ -560,6 +564,7 @@ public class BookingService {
         booking.setUser(user);
         booking.setSpec(spec);
         booking.setPc(pc);
+        booking.setPlan(plan);
         booking.setBookingType(bookingType);
         booking.setTotalHours(totalHours);
         booking.setStartTime(startTime);
@@ -572,6 +577,7 @@ public class BookingService {
 
     private record PricingResult(
         PcSpec spec,
+        SubscriptionPlan plan,
         BookingType bookingType,
         Integer totalHours,
         Duration duration,
@@ -598,6 +604,7 @@ public class BookingService {
         return new BookingHistoryItemResponse(
             booking.getId(),
             booking.getSpec() == null ? null : booking.getSpec().getId(),
+            booking.getPlan() == null ? null : booking.getPlan().getId(),
             booking.getPc() == null ? null : booking.getPc().getId(),
             booking.getSpec() == null ? null : booking.getSpec().getSpecName(),
             waitingQueue != null,

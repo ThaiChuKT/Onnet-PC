@@ -6,6 +6,7 @@ import java.time.Instant;
 public record BookingHistoryItemResponse(
     Long bookingId,
     Long specId,
+    Long planId,
     Long pcId,
     String specName,
     boolean queued,
