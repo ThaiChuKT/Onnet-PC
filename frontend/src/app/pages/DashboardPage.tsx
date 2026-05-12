@@ -63,7 +63,7 @@ export function DashboardPage() {
       <Header />
       
       <main className="flex-1 pt-20 pb-12 bg-muted/30">
-        <div className="w-full px-4 py-8">
+        <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
           {/* Dashboard Header */}
           <div className="mb-8 flex items-center justify-between gap-4">
             <div>

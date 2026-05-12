@@ -395,35 +395,6 @@ export function Cart() {
           {canShowFocusedSummary ? (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
               <div className="space-y-6">
-                <Card className="p-5 border-border bg-card/50">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Coupon usage</p>
-                      <p className="text-xl font-bold">No coupon applied</p>
-                    </div>
-                    <Button type="button" variant="link" className="px-0 justify-start sm:justify-end text-primary">
-                      Change
-                    </Button>
-                  </div>
-                </Card>
-
-                <Card className="p-5 border-border bg-card/50">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Payment methods</p>
-                      <p className="text-xl font-bold">Wallet balance</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="px-0 justify-start sm:justify-end text-primary"
-                      onClick={() => setShowTopUp(true)}
-                    >
-                      Change
-                    </Button>
-                  </div>
-                </Card>
-
                 {items.map((item) => {
                   const draft = bookingDrafts[item.bookingId];
                   const itemPlan = draft?.planOptions.find((plan) => plan.id === draft.selectedPlanId) ?? draft?.planOptions[0] ?? null;
@@ -455,7 +426,7 @@ export function Cart() {
                         <div className="grid gap-6 sm:grid-cols-2">
                           <div className="rounded-lg border border-border bg-background p-4">
                             <p className="text-sm text-muted-foreground mb-2">Quantity</p>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-center gap-2">
                               <Button
                                 type="button"
                                 variant="outline"
@@ -497,7 +468,7 @@ export function Cart() {
                                     },
                                   }));
                                 }}
-                                className="h-10 w-24 text-center text-lg font-semibold"
+                                className="h-10 w-24 px-0 text-center text-lg font-semibold leading-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                               />
                               <Button
                                 type="button"
