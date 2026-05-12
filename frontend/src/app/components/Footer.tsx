@@ -1,4 +1,5 @@
 import { Monitor, Mail, Phone, MapPin } from "lucide-react";
+import { Link } from "react-router";
 
 export function Footer() {
   return (
@@ -35,12 +36,12 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a
-                  href="#packages"
+                <Link
+                  to="/packages"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Plans
-                </a>
+                </Link>
               </li>
               <li>
                 <a

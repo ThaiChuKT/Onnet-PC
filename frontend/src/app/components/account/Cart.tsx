@@ -354,13 +354,13 @@ export function Cart() {
             Review pending orders and pay directly from your wallet balance.
           </p>
         </div>
-        <Button
-          asChild
-          variant="outline"
-          className="border-border"
-        >
-          <Link to="/#packages">Return to plans</Link>
-        </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="border-border"
+          >
+            <Link to="/packages">Return to plans</Link>
+          </Button>
       </div>
 
       {isLoading && (
@@ -385,7 +385,7 @@ export function Cart() {
             Choose a subscription tier to get started.
           </p>
           <Button asChild className="bg-gradient-to-r from-primary to-accent">
-            <Link to="/#packages">Browse packages</Link>
+            <Link to="/packages">Browse packages</Link>
           </Button>
         </Card>
       )}

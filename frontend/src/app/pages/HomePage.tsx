@@ -1,8 +1,9 @@
 import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
-import { Packages } from "../components/Packages";
 import { Features } from "../components/Features";
 import { Footer } from "../components/Footer";
+import { Button } from "../components/ui/button";
+import { Link } from "react-router";
 
 export function HomePage() {
   return (
@@ -10,7 +11,7 @@ export function HomePage() {
       <Header />
       <main>
         <Hero />
-        <Packages />
+
         <Features />
       </main>
       <Footer />

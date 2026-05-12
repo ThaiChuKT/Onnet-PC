@@ -91,12 +91,12 @@ export function Header() {
               >
                 Home
               </a>
-              <a
-                href="/#packages"
+              <Link
+                to="/packages"
                 className="text-foreground hover:text-primary transition-colors"
               >
                 Plans
-              </a>
+              </Link>
               <a
                 href="/#features"
                 className="text-foreground hover:text-primary transition-colors"

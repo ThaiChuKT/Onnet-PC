@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import { HomePage } from "./pages/HomePage";
+import { PackagesPage } from "./pages/PackagesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
@@ -57,6 +58,10 @@ export const router = createBrowserRouter([
         <PackageFoldersPage />
       </AdminRoute>
     ),
+  },
+  {
+    path: "/packages",
+    Component: PackagesPage,
   },
   {
     path: "/computers/:id",

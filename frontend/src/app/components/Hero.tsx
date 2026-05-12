@@ -41,10 +41,10 @@ export function Hero() {
               className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-lg px-8"
               asChild
             >
-              <a href="#packages">
+              <Link to="/packages">
                 View plans
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </a>
+              </Link>
             </Button>
             <Button size="lg" variant="outline" className="border-primary text-foreground hover:bg-primary/10 text-lg px-8" asChild>
               <Link to="/ai-chat">Free AI consult</Link>
