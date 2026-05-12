@@ -143,6 +143,7 @@ export function Packages() {
         quantity: 1,
       });
       toast.success("Item added to cart");
+      window.dispatchEvent(new Event("cartUpdated"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not add to cart");
     } finally {
@@ -271,6 +272,10 @@ export function Packages() {
                     ))}
                   </ul>
 
+                  <Button asChild variant="ghost" className="w-full mt-2 text-primary hover:text-primary/90 ">
+                    <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
+                  </Button>
+
                   <Button
                     onClick={() => handleBookTier(pkg.tierName)}
                     disabled={isSubmittingTier !== null}
@@ -306,9 +311,7 @@ export function Packages() {
                     )}
                   </Button>
 
-                  <Button asChild variant="ghost" className="w-full mt-2 text-primary hover:text-primary">
-                    <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
-                  </Button>
+                  
                 </div>
               </Card>
             );
