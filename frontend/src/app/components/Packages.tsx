@@ -1,32 +1,13 @@
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Check, Cpu, Gamepad2, Zap, Clock, Loader2 } from "lucide-react";
+import { Check, Clock, Cpu, Gamepad2, Zap } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { useAuth } from "../auth/AuthProvider";
-import { apiPost } from "../api/http";
-import { toast } from "sonner";
+import { Link } from "react-router";
 import { formatUsd } from "../lib/formatUsd";
 
 /** Legacy list prices were in VND; USD amounts use 25,000 VND = 1 USD. */
 const vndToUsd = (vnd: number) => Math.round((vnd / 25_000) * 100) / 100;
-
-type RentMachineResponse = {
-  bookingId: number;
-  queued: boolean;
-  queuePosition: number | null;
-  sessionId: number | null;
-  pcId: number | null;
-  pcLocation: string | null;
-  specName: string;
-  startTime: string;
-  expectedEndTime: string;
-  totalPrice: number;
-  walletBalance: number;
-  status: string;
-  message: string;
-};
 
 const packages = [
   {
@@ -47,6 +28,11 @@ const packages = [
       "512GB NVMe SSD",
       '24" 144Hz monitor',
       "Keyboard & mouse included",
+    ],
+    benefits: [
+      "Perfect for 1080p gaming",
+      "Install your games & mods from Steam, Epic, Battle.net",
+      "Multi-screen and ultrawide support"
     ],
     popular: false,
   },
@@ -69,6 +55,11 @@ const packages = [
       '27" 240Hz monitor',
       "Full premium gaming kit",
     ],
+    benefits: [
+      "Deliver high framerates for competitive gaming",
+      "Built for streaming while gaming at high settings",
+      "Perfect for content creation and editing"
+    ],
     popular: true,
   },
   {
@@ -81,7 +72,7 @@ const packages = [
       year: { amountUsd: vndToUsd(119_900_000), period: "/ year" },
     },
     image:
-      "https://images.unsplash.com/photo-1636914011676-039d36b73765?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYyUyMGdhbWluZyUyMHJvb20lMjBzZXR1cHxlbnwxfHx8fDE3NzM2NzY1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      "https://images.unsplash.com/photo-1636914011676-039d36b73765?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYyUyMGdhbWluZyUyMHJvb20lMjBzZXR1cHxlbnwxfHx8fDE3NzY2NzY1ODd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     features: [
       "Intel Core i9 / Ryzen 9",
       "RTX 4080 16GB",
@@ -90,57 +81,124 @@ const packages = [
       '32" 4K 144Hz monitor',
       "Premium streaming-ready setup",
     ],
+    benefits: [
+      "Maximum performance for any game at ultra settings",
+      "Designed for competitive esports with max framerates",
+      "Professional-grade tools for 4K content creation"
+    ],
     popular: false,
   },
 ];
 
-export function Packages() {
+type PackagesProps = {
+  variant?: "home" | "page";
+};
+
+export function Packages({ variant = "page" }: PackagesProps) {
+  const isHome = variant === "home";
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
-  const [isSubmittingTier, setIsSubmittingTier] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
 
-  const handleBookTier = async (tierName: string) => {
-    if (isSubmittingTier !== null) return;
+  if (isHome) {
+    return (
+      <section id="packages" className="py-24 bg-gradient-to-b from-background via-muted/20 to-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mb-12">
+            <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground mb-3">Plans</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Our
+              <span className="block bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                plans
+              </span>
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl">
+              Choose the setup that matches your budget and performance target. Each plan is built for a
+              different play style, from entry level to high-end.
+            </p>
+            <div className="mt-6">
+              <Button asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
+                <Link to="/packages">Join now</Link>
+              </Button>
+            </div>
+          </div>
 
-    if (!isAuthenticated) {
-      toast.message("Sign in to subscribe to a tier");
-      navigate("/login", { replace: false, state: { from: "/" } });
-      return;
-    }
+          <div className="grid gap-6 lg:grid-cols-1 max-w-4xl mx-auto">
+            {packages.map((pkg) => {
+              const currentPricing = pkg.pricing.month;
 
-    setIsSubmittingTier(tierName);
-    try {
-      const res = await apiPost<RentMachineResponse>("/bookings/rent", {
-        tierName,
-        rentalUnit: selectedPeriod,
-        quantity: 1,
-      });
-      // Đổi câu thông báo sang hướng dẫn thanh toán
-      toast.success("Order created. Please complete your payment.");
-      navigate("/checkout", { state: { bookingId: res.bookingId } });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create subscription order");
-    } finally {
-      setIsSubmittingTier(null);
-    }
-  };
+              return (
+                <Card
+                  key={pkg.tierName}
+                  className={`relative overflow-hidden border-border bg-card/70 backdrop-blur-sm ${
+                    pkg.popular ? "ring-1 ring-primary/50 shadow-lg shadow-primary/10" : ""
+                  }`}
+                >
+                  {pkg.popular && (
+                    <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-primary to-accent text-white text-xs font-bold px-3 py-1 rounded-full">
+                      MOST POPULAR
+                    </div>
+                  )}
+
+                  <div className="relative h-52 overflow-hidden">
+                    <ImageWithFallback src={pkg.image} alt={pkg.name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
+                      <div className="bg-primary/20 p-2 rounded-lg border border-primary/40 backdrop-blur-sm">
+                        <pkg.icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{pkg.tierName}</p>
+                        <h3 className="text-2xl font-bold">{pkg.name}</h3>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-4xl font-bold text-money">{formatUsd(currentPricing.amountUsd)}</span>
+                      <span className="text-muted-foreground">{currentPricing.period}</span>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground">{pkg.features[0]}</p>
+
+                    <ul className="space-y-2">
+                      {pkg.features.slice(1, 4).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                          <span className="text-sm text-foreground/90">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="flex gap-3">
+                      <Button asChild variant="ghost" className="flex-1 text-primary hover:text-primary/90">
+                        <Link to="/packages">Join now</Link>
+                      </Button>
+                      <Button asChild className="flex-1 bg-card border border-border text-foreground hover:bg-primary/10">
+                        <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section
-      id="packages"
-      className="py-20 bg-gradient-to-b from-background to-muted/30"
-    >
+    <section id="packages" className="py-20 bg-gradient-to-b from-background to-muted/30">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Subscription
+            Choose your
             <span className="block bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              tiers
+              plan
             </span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-            Pick a tier and billing period. Hardware is maintained on a schedule so performance stays
+            Pick a plan and billing period. Hardware is maintained on a schedule so performance stays
             predictable.
           </p>
 
@@ -180,9 +238,7 @@ export function Packages() {
             >
               <Clock className="w-4 h-4" />
               Yearly
-              <span className="ml-1 text-xs bg-accent/20 px-2 py-0.5 rounded-full">
-                Best value
-              </span>
+              <span className="ml-1 text-xs bg-accent/20 px-2 py-0.5 rounded-full">Best value</span>
             </button>
           </div>
         </div>
@@ -195,9 +251,7 @@ export function Packages() {
               <Card
                 key={index}
                 className={`relative overflow-hidden group hover:scale-105 transition-all duration-300 ${
-                  pkg.popular
-                    ? "border-primary shadow-lg shadow-primary/20"
-                    : "border-border hover:border-primary/50"
+                  pkg.popular ? "border-primary shadow-lg shadow-primary/20" : "border-border hover:border-primary/50"
                 }`}
               >
                 {pkg.popular && (
@@ -212,7 +266,7 @@ export function Packages() {
                     alt={pkg.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
                   <div className="absolute bottom-4 left-4 right-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="bg-primary/20 p-2 rounded-lg border border-primary/50">
@@ -226,50 +280,23 @@ export function Packages() {
                 <div className="p-6">
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1 flex-wrap">
-                      <span className="text-4xl font-bold text-money">
-                        {formatUsd(currentPricing.amountUsd)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {currentPricing.period}
-                      </span>
+                      <span className="text-4xl font-bold text-money">{formatUsd(currentPricing.amountUsd)}</span>
+                      <span className="text-muted-foreground">{currentPricing.period}</span>
                     </div>
-
                   </div>
 
                   <ul className="space-y-3 mb-6">
-                    {pkg.features.map((feature, idx) => (
+                    {pkg.benefits.map((benefit, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                        <span className="text-sm text-foreground/90">
-                          {feature}
-                        </span>
+                        <span className="text-sm text-foreground/90">{benefit}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <Button asChild variant="ghost" className="w-full mt-2 text-primary hover:text-primary/90 ">
+                  <Button asChild className="w-full border border-amber-500/50 bg-transparent text-foreground hover:bg-amber-500/10 hover:border-amber-500">
                     <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
                   </Button>
-
-                  <Button
-                    onClick={() => handleBookTier(pkg.tierName)}
-                    disabled={isSubmittingTier !== null}
-                    className={`w-full ${
-                      pkg.popular
-                        ? "bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                        : "bg-card border border-primary text-foreground hover:bg-primary/10"
-                    }`}
-                  >
-                    {isSubmittingTier === pkg.tierName ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing…
-                      </>
-                    ) : (
-                      "Subscribe now"
-                    )}
-                  </Button>
-
                 </div>
               </Card>
             );
