@@ -9,8 +9,6 @@ import { apiGet, apiPost } from "../../api/http";
 import { toast } from "sonner";
 import { formatUsd } from "../../lib/formatUsd";
 
-const quickAmounts = [5, 10, 20, 50, 100, 200];
-
 export function TopUp() {
   const [amount, setAmount] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -32,10 +30,6 @@ export function TopUp() {
       cancelled = true;
     };
   }, []);
-
-  const handleQuickAmount = (value: number) => {
-    setAmount(String(value));
-  };
 
   const handleTopUp = async () => {
     if (!amount) return;
@@ -111,14 +105,23 @@ export function TopUp() {
 
       <div className="space-y-6">
         <Card className="p-6 border-border">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-primary/20 p-2 rounded-lg">
-              <DollarSign className="w-5 h-5 text-primary" />
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/20 p-2 rounded-lg">
+                <DollarSign className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="text-xl font-bold">Amount (USD)</h3>
             </div>
-            <h3 className="text-xl font-bold">Amount (USD)</h3>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+              <Wallet className="w-4 h-4 text-primary" />
+              <span className="text-sm text-muted-foreground">Balance</span>
+              <span className="font-bold text-primary">
+                {balance === null ? "—" : formatUsd(balance)}
+              </span>
+            </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="amount">Enter amount</Label>
               <Input
@@ -127,52 +130,26 @@ export function TopUp() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="text-2xl font-bold bg-input-background border-border h-14"
+                className="bg-input-background border-border md:w-80"
               />
               <p className="text-sm text-muted-foreground">
-                Checkout total: ${amountInUSD} USD
+                Checkout total:{" "}
+                <span className="font-bold text-green-600 dark:text-green-400">
+                  ${amountInUSD} USD
+                </span>
               </p>
             </div>
 
-            <div>
-              <Label className="mb-2 block">Quick picks</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {quickAmounts.map((value) => (
-                  <Button
-                    key={value}
-                    variant="outline"
-                    type="button"
-                    onClick={() => handleQuickAmount(value)}
-                    className={`border-border hover:border-primary ${
-                      amount === String(value) ? "border-primary bg-primary/10" : ""
-                    }`}
-                  >
-                    ${value}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <Button
+              onClick={handleTopUp}
+              disabled={!amount || isSubmitting}
+              className="h-11 w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50 md:w-48"
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              {isSubmitting ? "Processing…" : "Pay with PayPal"}
+            </Button>
           </div>
         </Card>
-
-        <Card className="p-6 border-border bg-gradient-to-br from-primary/10 to-accent/10">
-          <div className="flex items-center gap-3 mb-2">
-            <Wallet className="w-5 h-5 text-primary" />
-            <span className="text-muted-foreground">Current balance (display)</span>
-          </div>
-          <p className="text-3xl font-bold text-primary">
-            {balance === null ? "—" : formatUsd(balance)}
-          </p>
-        </Card>
-
-        <Button
-          onClick={handleTopUp}
-          disabled={!amount || isSubmitting}
-          className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 disabled:opacity-50"
-        >
-          <CreditCard className="w-5 h-5 mr-2" />
-          {isSubmitting ? "Processing…" : "Pay with PayPal"}
-        </Button>
       </div>
 
       <Card className="p-6 border-border bg-muted/30">
@@ -182,7 +159,7 @@ export function TopUp() {
           </span>
           Top-up notes
         </h4>
-        <ul className="space-y-2 text-sm text-muted-foreground">
+        <ul className="grid gap-1.5 text-sm text-muted-foreground md:grid-cols-3">
           <li className="flex gap-2">
             <span className="text-primary">•</span>
             <span>Settlement usually appears within 5–15 minutes after PayPal approves.</span>
