@@ -7,6 +7,7 @@ public record AdminPackageItemResponse(
     String planName,
     Long specId,
     String specName,
+    String tierName,
     Integer durationDays,
     BigDecimal price,
     Integer maxHoursPerDay,

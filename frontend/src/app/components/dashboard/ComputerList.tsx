@@ -1,19 +1,13 @@
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Badge } from "../ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog";
-import { Monitor, Plus, Edit, Trash2, Search, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../../api/http";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Input } from "../ui/input";
+import { Monitor, Power, Search, Shield } from "lucide-react";
+import { apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
+import { formatUsd } from "../../lib/formatUsd";
+import { ListPagination } from "./ListPagination";
 import {
   Select,
   SelectContent,
@@ -21,22 +15,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { formatUsd } from "../../lib/formatUsd";
-import { ListPagination } from "./ListPagination";
 
-interface Computer {
+type AdminPackageItemResponse = {
+  planId: number;
+  planName: string;
+  specId: number;
+  specName: string;
+  tierName: string | null;
+  durationDays: number;
+  price: number;
+  maxHoursPerDay: number | null;
+  active: boolean;
+};
+
+type AdminPcItemResponse = {
   pcId: number;
   specId: number;
   specName: string;
-  cpu: string;
-  gpu: string;
-  ram: number;
-  storage: number;
-  operatingSystem: string;
-  pricePerHour: number;
+  tierName: string | null;
   location: string;
   status: string;
-}
+};
 
 type PageResponse<T> = {
   content: T[];
@@ -46,322 +45,310 @@ type PageResponse<T> = {
   size: number;
 };
 
-type CreatePcRequest = {
-  specId?: number;
-  specName?: string;
-  cpu?: string;
-  gpu?: string;
-  ram?: number;
-  storage?: number;
-  operatingSystem?: string;
-  description?: string;
-  pricePerHour?: number;
-  location?: string;
-  status?: string;
+type TierKey = "basic" | "pro" | "ultra";
+
+type TierPackage = {
+  tier: TierKey;
+  title: string;
+  plans: AdminPackageItemResponse[];
+  specIds: number[];
+  active: boolean;
 };
 
-type UpdatePcRequest = Partial<CreatePcRequest>;
+type TierPageState = Record<TierKey, number>;
 
-function getStatusMeta(status: string) {
-  const normalized = (status ?? "").toLowerCase();
-  if (normalized === "available") {
-    return {
-      label: "Available",
-      className: "bg-accent/20 text-accent border-accent/50",
-    };
-  }
-  if (
-    normalized === "in_use" ||
-    normalized === "in-use" ||
-    normalized === "rented"
-  ) {
-    return {
-      label: "In Use",
-      className: "bg-secondary/20 text-secondary border-secondary/50",
-    };
-  }
-  if (normalized === "maintenance") {
-    return {
-      label: "Maintenance",
-      className: "bg-muted/20 text-muted-foreground border-border",
-    };
-  }
-  return {
-    label: status || "Unknown",
-    className: "bg-muted/20 text-muted-foreground border-border",
-  };
-}
+const TIER_ORDER: TierKey[] = ["basic", "pro", "ultra"];
 
-function detectTier(text: string) {
-  const t = text.toLowerCase();
-  if (t.includes("basic")) return "basic";
-  if (t.includes("pro")) return "pro";
-  if (t.includes("ultra")) return "ultra";
+const TIER_LABELS: Record<TierKey, string> = {
+  basic: "Basic",
+  pro: "Pro",
+  ultra: "Ultra",
+};
+
+const DEFAULT_TIER_PAGES: TierPageState = {
+  basic: 0,
+  pro: 0,
+  ultra: 0,
+};
+
+function detectTier(text: string): TierKey | null {
+  const normalized = text.toLowerCase();
+  if (normalized.includes("basic")) return "basic";
+  if (normalized.includes("pro")) return "pro";
+  if (normalized.includes("ultra")) return "ultra";
   return null;
 }
 
-function getStatusDotClass(status: string) {
+function normalizeTier(value?: string | null): TierKey | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "basic" || normalized === "pro" || normalized === "ultra") {
+    return normalized;
+  }
+  return detectTier(normalized);
+}
+
+function normalizeStatus(status: string) {
   const normalized = (status ?? "").toLowerCase();
-  if (normalized === "available") return "bg-emerald-500";
-  if (
-    normalized === "in_use" ||
-    normalized === "in-use" ||
-    normalized === "rented"
-  )
-    return "bg-blue-500";
-  if (normalized === "maintenance") return "bg-yellow-500";
-  return "bg-red-500";
+  if (normalized === "in-use" || normalized === "rented") {
+    return "in_use";
+  }
+  return normalized;
+}
+
+function getStatusMeta(status: string) {
+  const normalized = normalizeStatus(status);
+  if (normalized === "available") {
+    return {
+      label: "Available",
+      badgeClass: "bg-emerald-500/15 text-emerald-600 border-emerald-500/40",
+      dotClass: "bg-emerald-500",
+    };
+  }
+  if (normalized === "in_use") {
+    return {
+      label: "In Use",
+      badgeClass: "bg-blue-500/15 text-blue-500 border-blue-500/40",
+      dotClass: "bg-blue-500",
+    };
+  }
+  return {
+    label: "Maintenance / Unavailable",
+    badgeClass: "bg-yellow-500/15 text-yellow-600 border-yellow-500/40",
+    dotClass: "bg-yellow-500",
+  };
+}
+
+function isMachineVisible(
+  machine: AdminPcItemResponse,
+  searchTerm: string,
+  statusFilter: string,
+) {
+  const q = searchTerm.trim().toLowerCase();
+  const normalizedStatus = normalizeStatus(machine.status);
+  const matchesSearch =
+    !q ||
+    String(machine.pcId).includes(q) ||
+    String(machine.specId).includes(q) ||
+    (machine.specName ?? "").toLowerCase().includes(q) ||
+    (machine.tierName ?? "").toLowerCase().includes(q) ||
+    (machine.location ?? "").toLowerCase().includes(q) ||
+    normalizedStatus.includes(q);
+  const matchesStatus =
+    statusFilter === "all" || normalizedStatus === statusFilter;
+  return matchesSearch && matchesStatus;
 }
 
 export function ComputerList() {
-  const [computers, setComputers] = useState<Computer[]>([]);
+  const [packages, setPackages] = useState<AdminPackageItemResponse[]>([]);
+  const [machines, setMachines] = useState<AdminPcItemResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [addMode, setAddMode] = useState<"machine" | "package">("machine");
-  const [editingComputer, setEditingComputer] = useState<Computer | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [quantity, setQuantity] = useState<number | "">(1);
-  const [selectedSpecId, setSelectedSpecId] = useState<number | "">("");
-  const [formData, setFormData] = useState({
-    specName: "",
-    cpu: "",
-    gpu: "",
-    ram: 16,
-    storage: 512,
-    operatingSystem: "",
-    status: "available",
-  });
-  const [page, setPage] = useState(0);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
+  const [tierPages, setTierPages] = useState<TierPageState>(DEFAULT_TIER_PAGES);
   const pageSize = 4;
 
-  const filteredComputers = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    const selectedStatus = statusFilter.toLowerCase();
-    return computers.filter((pc) => {
-      const normalized = (pc.status ?? "").toLowerCase();
-      const matchesSearch =
-        !q ||
-        String(pc.pcId).includes(q) ||
-        pc.specName.toLowerCase().includes(q) ||
-        pc.cpu.toLowerCase().includes(q) ||
-        pc.gpu.toLowerCase().includes(q) ||
-        pc.location.toLowerCase().includes(q) ||
-        normalized.includes(q);
-      const matchesStatus =
-        selectedStatus === "all" || normalized === selectedStatus;
-      return matchesSearch && matchesStatus;
-    });
-  }, [computers, searchTerm, statusFilter]);
-
-  const visibleComputers = useMemo(() => {
-    return filteredComputers.slice(page * pageSize, page * pageSize + pageSize);
-  }, [filteredComputers, page]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredComputers.length / pageSize),
-  );
-
   useEffect(() => {
-    setPage(0);
-  }, [searchTerm, statusFilter]);
+    const load = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [packagePage, machinePage] = await Promise.all([
+          apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
+            page: 0,
+            size: 200,
+          }),
+          apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
+            page: 0,
+            size: 200,
+          }),
+        ]);
+        setPackages(packagePage.content ?? []);
+        setMachines(machinePage.content ?? []);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Unable to load machines";
+        setLoadError(message);
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const loadComputers = async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const response = await apiGet<PageResponse<Computer>>("/admin/pcs", {
-        page: 0,
-        size: 200,
-      });
-      setComputers(response.content ?? []);
-    } catch (e) {
-      console.error("ComputerList.loadComputers error:", e);
-      const message =
-        e instanceof Error ? e.message : "Unable to load computer list";
-      setLoadError(message);
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadComputers();
+    void load();
   }, []);
 
-  const specOptions = useMemo(() => {
-    const map = new Map<number, Computer>();
-    for (const pc of computers) {
-      if (!map.has(pc.specId)) {
-        map.set(pc.specId, pc);
-      }
-    }
-    return Array.from(map.values());
-  }, [computers]);
+  useEffect(() => {
+    setTierPages(DEFAULT_TIER_PAGES);
+  }, [searchTerm, statusFilter]);
 
-  const stats = {
-    total: computers.length,
-    available: computers.filter(
-      (pc) => (pc.status ?? "").toLowerCase() === "available",
-    ).length,
-    inUse: computers.filter(
-      (pc) =>
-        (pc.status ?? "").toLowerCase() === "in_use" ||
-        (pc.status ?? "").toLowerCase() === "in-use" ||
-        (pc.status ?? "").toLowerCase() === "rented",
-    ).length,
-    maintenance: computers.filter(
-      (pc) => (pc.status ?? "").toLowerCase() === "maintenance",
-    ).length,
-  };
+  const tierPackages = useMemo(() => {
+    const grouped = new Map<TierKey, TierPackage>();
 
-  const handleAdd = async () => {
-    try {
-      if (addMode === "machine") {
-        if (!selectedSpecId) {
-          toast.error("Please select a plan");
-          return;
-        }
-        const q = Number(quantity) || 1;
-        for (let i = 0; i < q; i++) {
-          // eslint-disable-next-line no-await-in-loop
-          await apiPost<Computer, CreatePcRequest>("/admin/pcs", {
-            specId: Number(selectedSpecId),
-            status: "available",
-          });
-        }
-        toast.success(`Successfully added ${q} computers`);
-      } else {
-        const payload: CreatePcRequest = {
-          specName: formData.specName,
-          cpu: formData.cpu,
-          gpu: formData.gpu,
-          ram: formData.ram,
-          storage: formData.storage,
-          operatingSystem: formData.operatingSystem,
-          pricePerHour: 0,
-          status: formData.status,
-        };
-        await apiPost<Computer, CreatePcRequest>("/admin/pcs", payload);
-        toast.success("Successfully created package and sample computer");
+    for (const pkg of packages) {
+      const tier = normalizeTier(pkg.tierName) ?? detectTier(`${pkg.planName} ${pkg.specName}`);
+      if (!tier) continue;
+
+      const existing = grouped.get(tier);
+      if (!existing) {
+        grouped.set(tier, {
+          tier,
+          title: TIER_LABELS[tier],
+          plans: [pkg],
+          specIds: [pkg.specId],
+          active: !!pkg.active,
+        });
+        continue;
       }
 
-      setFormData({
-        specName: "",
-        cpu: "",
-        gpu: "",
-        ram: 16,
-        storage: 512,
-        operatingSystem: "",
-        status: "available",
-      });
-      setQuantity(1);
-      setSelectedSpecId("");
-      setIsAddDialogOpen(false);
-      await loadComputers();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Unable to create computer");
+      existing.plans.push(pkg);
+      existing.specIds = Array.from(new Set([...existing.specIds, pkg.specId]));
+      existing.active = existing.active || !!pkg.active;
     }
-  };
 
-  const handleEdit = (computer: Computer) => {
-    setEditingComputer(computer);
-    setFormData({
-      specName: computer.specName,
-      cpu: computer.cpu,
-      gpu: computer.gpu,
-      ram: computer.ram,
-      storage: computer.storage,
-      operatingSystem: computer.operatingSystem,
-      status: computer.status,
-    });
-  };
+    return TIER_ORDER.map((tier) =>
+      grouped.get(tier) ?? {
+        tier,
+        title: TIER_LABELS[tier],
+        plans: [],
+        specIds: [],
+        active: false,
+      },
+    ).map((entry) => ({
+      ...entry,
+      plans: [...entry.plans].sort(
+        (a, b) => Number(a.durationDays ?? 0) - Number(b.durationDays ?? 0),
+      ),
+    }));
+  }, [packages]);
 
-  const handleUpdate = async (scope: "single" | "plan" = "single") => {
-    if (!editingComputer) return;
-    try {
-      const payload: UpdatePcRequest = {
-        specName: formData.specName,
-        cpu: formData.cpu,
-        gpu: formData.gpu,
-        ram: formData.ram,
-        storage: formData.storage,
-        operatingSystem: formData.operatingSystem,
-        status: formData.status,
-      };
+  const machinesBySpec = useMemo(() => {
+    return machines.reduce<Record<number, AdminPcItemResponse[]>>((acc, item) => {
+      const key = Number(item.specId);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }, [machines]);
 
-      const targetComputers =
-        scope === "plan"
-          ? computers.filter(
-              (pc) =>
-                detectTier(pc.specName) ===
-                detectTier(editingComputer.specName),
-            )
-          : [editingComputer];
-
-      for (const targetComputer of targetComputers) {
-        // eslint-disable-next-line no-await-in-loop
-        await apiPatch<Computer, UpdatePcRequest>(
-          `/admin/pcs/${targetComputer.pcId}`,
-          payload,
+  const tierMachineStats = useMemo(() => {
+    return tierPackages.reduce<Record<TierKey, AdminPcItemResponse[]>>(
+      (acc, tierPackage) => {
+        const rows = tierPackage.specIds.flatMap(
+          (specId) => machinesBySpec[specId] ?? [],
         );
-      }
+        const tierRows = rows.filter(
+          (machine) => normalizeTier(machine.tierName) === tierPackage.tier,
+        );
+        acc[tierPackage.tier] = tierRows
+          .filter((machine) =>
+            isMachineVisible(machine, searchTerm, statusFilter),
+          )
+          .sort((a, b) => Number(a.pcId) - Number(b.pcId));
+        return acc;
+      },
+      { basic: [], pro: [], ultra: [] },
+    );
+  }, [machinesBySpec, searchTerm, statusFilter, tierPackages]);
 
-      toast.success("Computer updated successfully");
-      setEditingComputer(null);
-      await loadComputers();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Unable to update computer");
-    }
-  };
+  const stats = useMemo(() => {
+    const allMachines = machines;
+    return {
+      total: allMachines.length,
+      available: allMachines.filter(
+        (machine) => normalizeStatus(machine.status) === "available",
+      ).length,
+      inUse: allMachines.filter(
+        (machine) => normalizeStatus(machine.status) === "in_use",
+      ).length,
+      maintenance: allMachines.filter(
+        (machine) => normalizeStatus(machine.status) === "maintenance",
+      ).length,
+    };
+  }, [machines]);
 
-  const handleDelete = async (pcId: number) => {
-    if (!confirm("Are you sure you want to delete this computer?")) return;
+  const handleToggleLock = async (machine: AdminPcItemResponse) => {
     try {
-      await apiDelete<string>(`/admin/pcs/${pcId}`);
-      toast.success("Computer deleted");
-      await loadComputers();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Unable to delete computer");
-    }
-  };
-
-  const handleToggleLock = async (computer: Computer) => {
-    try {
-      if ((computer.status ?? "").toLowerCase() === "maintenance") {
-        await apiPatch<Computer, UpdatePcRequest>(
-          `/admin/pcs/${computer.pcId}`,
+      if (normalizeStatus(machine.status) === "maintenance") {
+        await apiPatch<AdminPcItemResponse, { status: string }>(
+          `/admin/pcs/${machine.pcId}`,
           { status: "available" },
         );
-        toast.success("Computer unlocked");
+        toast.success(`Machine #${machine.pcId} unlocked`);
       } else {
-        await apiPost<Computer>(`/admin/pcs/${computer.pcId}/lock`);
-        toast.success("Computer locked and active session ended");
+        await apiPost<AdminPcItemResponse>(`/admin/pcs/${machine.pcId}/lock`);
+        toast.success(`Machine #${machine.pcId} locked and sessions ended`);
       }
-      await loadComputers();
+      const machinePage = await apiGet<PageResponse<AdminPcItemResponse>>(
+        "/admin/pcs",
+        { page: 0, size: 200 },
+      );
+      setMachines(machinePage.content ?? []);
     } catch (e) {
       toast.error(
-        e instanceof Error
-          ? e.message
-          : "Unable to change computer lock status",
+        e instanceof Error ? e.message : "Unable to update machine status",
       );
     }
   };
 
+  const renderMachineCard = (machine: AdminPcItemResponse) => {
+    const statusMeta = getStatusMeta(machine.status);
+    return (
+      <Card key={machine.pcId} className="border-border bg-card/70 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${statusMeta.dotClass}`} />
+              <p className="font-semibold truncate">PC #{machine.pcId}</p>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground truncate">
+              {machine.location || machine.specName}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground truncate">
+              Spec #{machine.specId} • {machine.specName}
+            </p>
+          </div>
+
+          <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void handleToggleLock(machine);
+            }}
+            className={
+              normalizeStatus(machine.status) === "maintenance"
+                ? "border-accent text-accent hover:bg-accent/10"
+                : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"
+            }
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            {normalizeStatus(machine.status) === "maintenance" ? "Unlock" : "Lock"}
+          </Button>
+          {normalizeStatus(machine.status) === "in_use" && (
+            <span className="text-xs text-blue-500">Session active</span>
+          )}
+        </div>
+      </Card>
+    );
+  };
+
   return (
     <div>
-      <div className="grid md:grid-cols-4 gap-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card className="p-4 border-border bg-card/60">
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Computers</p>
+              <p className="text-sm text-muted-foreground">Total machines</p>
               <p className="text-2xl font-bold">{stats.total}</p>
             </div>
           </div>
@@ -369,14 +356,12 @@ export function ComputerList() {
 
         <Card className="p-4 border-border bg-card/60">
           <div className="flex items-center gap-3">
-            <div className="bg-accent/20 p-3 rounded-lg">
-              <Power className="w-5 h-5 text-accent" />
+            <div className="bg-emerald-500/20 p-3 rounded-lg">
+              <Monitor className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">
-                Available Computers
-              </p>
-              <p className="text-2xl font-bold text-accent">
+              <p className="text-sm text-muted-foreground">Available</p>
+              <p className="text-2xl font-bold text-emerald-500">
                 {stats.available}
               </p>
             </div>
@@ -385,24 +370,24 @@ export function ComputerList() {
 
         <Card className="p-4 border-border bg-card/60">
           <div className="flex items-center gap-3">
-            <div className="bg-secondary/20 p-3 rounded-lg">
-              <Monitor className="w-5 h-5 text-secondary" />
+            <div className="bg-blue-500/20 p-3 rounded-lg">
+              <Monitor className="w-5 h-5 text-blue-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">In use</p>
-              <p className="text-2xl font-bold text-secondary">{stats.inUse}</p>
+              <p className="text-2xl font-bold text-blue-500">{stats.inUse}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4 border-border bg-card/60">
           <div className="flex items-center gap-3">
-            <div className="bg-muted/20 p-3 rounded-lg">
-              <Monitor className="w-5 h-5 text-muted-foreground" />
+            <div className="bg-yellow-500/20 p-3 rounded-lg">
+              <Monitor className="w-5 h-5 text-yellow-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Maintenance</p>
-              <p className="text-2xl font-bold text-muted-foreground">
+              <p className="text-2xl font-bold text-yellow-500">
                 {stats.maintenance}
               </p>
             </div>
@@ -410,11 +395,11 @@ export function ComputerList() {
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, ID, CPU, GPU..."
+            placeholder="Search machines by ID, location, spec, or status..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input-background border-border"
@@ -432,484 +417,133 @@ export function ComputerList() {
             <SelectItem value="maintenance">Maintenance</SelectItem>
           </SelectContent>
         </Select>
-
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Add New
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Add New</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAddMode("machine")}
-                  className={`px-3 py-2 rounded ${addMode === "machine" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
-                >
-                  Add Computer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddMode("package")}
-                  className={`px-3 py-2 rounded ${addMode === "package" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
-                >
-                  Add Package
-                </button>
-              </div>
-
-              {addMode === "machine" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Select Plan</Label>
-                    <Select
-                      value={String(selectedSpecId)}
-                      onValueChange={(val) => setSelectedSpecId(Number(val))}
-                    >
-                      <SelectTrigger className="bg-input-background border-border">
-                        <SelectValue placeholder="Select package to add computer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {specOptions.map((s) => (
-                          <SelectItem key={s.specId} value={String(s.specId)}>
-                            {s.specName} (#{s.specId})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Number of computers to add</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(e) =>
-                        setQuantity(
-                          e.target.value ? Number(e.target.value) : "",
-                        )
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                </>
-              )}
-
-              {addMode === "package" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Add New Package</Label>
-                    <Input
-                      placeholder="Package name (spec name)"
-                      value={formData.specName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, specName: e.target.value })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cpu">CPU</Label>
-                    <Input
-                      id="cpu"
-                      value={formData.cpu}
-                      onChange={(e) =>
-                        setFormData({ ...formData, cpu: e.target.value })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gpu">GPU</Label>
-                    <Input
-                      id="gpu"
-                      value={formData.gpu}
-                      onChange={(e) =>
-                        setFormData({ ...formData, gpu: e.target.value })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ram">RAM (GB)</Label>
-                    <Input
-                      id="ram"
-                      type="number"
-                      value={formData.ram}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          ram: Math.max(
-                            1,
-                            Math.floor(Number(e.target.value) || 1),
-                          ),
-                        })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="storage">Storage (GB)</Label>
-                    <Input
-                      id="storage"
-                      type="number"
-                      value={formData.storage}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          storage: Math.max(
-                            1,
-                            Math.floor(Number(e.target.value) || 1),
-                          ),
-                        })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="operatingSystem">Operating System</Label>
-                    <Input
-                      id="operatingSystem"
-                      value={formData.operatingSystem}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          operatingSystem: e.target.value,
-                        })
-                      }
-                      className="bg-input-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, status: value })
-                      }
-                    >
-                      <SelectTrigger
-                        id="status"
-                        className="bg-input-background border-border"
-                      >
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="in_use">In use</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-
-              <Button
-                onClick={() => {
-                  void handleAdd();
-                }}
-                className="w-full bg-gradient-to-r from-primary to-accent"
-              >
-                Save
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      <div className="space-y-4">
-        {isLoading && (
-          <Card className="p-12 border-border text-center bg-card/60">
-            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading computer list...</p>
-          </Card>
-        )}
+      {isLoading && (
+        <Card className="p-12 border-border text-center bg-card/60">
+          <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading machines...</p>
+        </Card>
+      )}
 
-        {loadError && !isLoading && (
-          <Card className="p-8 border-destructive/40 bg-destructive/5 text-center">
-            <p className="font-semibold text-destructive mb-2">
-              Failed to load computer list
-            </p>
-            <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
-            <Button variant="outline" onClick={() => void loadComputers()}>
-              Retry
-            </Button>
-          </Card>
-        )}
+      {loadError && !isLoading && (
+        <Card className="p-8 border-destructive/40 bg-destructive/5 text-center">
+          <p className="font-semibold text-destructive mb-2">
+            Failed to load machines
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLoadError(null);
+              void (async () => {
+                setIsLoading(true);
+                try {
+                  const [packagePage, machinePage] = await Promise.all([
+                    apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
+                      page: 0,
+                      size: 200,
+                    }),
+                    apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
+                      page: 0,
+                      size: 200,
+                    }),
+                  ]);
+                  setPackages(packagePage.content ?? []);
+                  setMachines(machinePage.content ?? []);
+                } catch (e) {
+                  toast.error(
+                    e instanceof Error ? e.message : "Unable to reload machines",
+                  );
+                } finally {
+                  setIsLoading(false);
+                }
+              })();
+            }}
+          >
+            Retry
+          </Button>
+        </Card>
+      )}
 
-        {!isLoading &&
-          loadError === null &&
-          visibleComputers.length === 0 &&
-          computers.length === 0 && (
-            <Card className="p-12 border-border text-center bg-card/60">
-              <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No computers found.</p>
-            </Card>
-          )}
+      {!isLoading && !loadError && (
+        <div className="grid gap-4 xl:grid-cols-3">
+          {tierPackages.map((tierPackage) => {
+            const visibleMachines = tierMachineStats[tierPackage.tier];
+            const currentPage = tierPages[tierPackage.tier];
+            const totalPages = Math.ceil(visibleMachines.length / pageSize);
+            const pageItems = visibleMachines.slice(
+              currentPage * pageSize,
+              currentPage * pageSize + pageSize,
+            );
+            const planSummary = tierPackage.plans
+              .map(
+                (plan) =>
+                  `${plan.planName} (${formatUsd(Number(plan.price ?? 0))})`,
+              )
+              .join(" • ");
 
-        {!isLoading &&
-          loadError === null &&
-          visibleComputers.length === 0 &&
-          computers.length > 0 && (
-            <Card className="p-12 border-border text-center bg-card/60">
-              <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2">No computers found</h3>
-              <p className="text-muted-foreground">
-                Try searching with different keywords or add a new computer
-              </p>
-            </Card>
-          )}
-
-        {!isLoading && loadError === null && visibleComputers.length > 0 && (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {visibleComputers.map((computer) => (
-              <Card
-                key={computer.pcId}
-                className="border-border bg-card/60 p-4 shadow-sm"
-              >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-bold">PC #{computer.pcId}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {computer.location || computer.specName}
-                    </p>
-                  </div>
-                  <Badge className={getStatusMeta(computer.status).className}>
-                    {getStatusMeta(computer.status).label}
-                  </Badge>
-                </div>
-
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${getStatusDotClass(computer.status)}`}
-                      />
-                      <p className="font-semibold truncate">
-                        {computer.specName}
+            return (
+              <Card key={tierPackage.tier} className="border-border bg-card/50 p-5">
+                <div className="mb-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-primary/20 p-2">
+                          <Power className="h-4 w-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-bold">{tierPackage.title}</h3>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {tierPackage.specIds.length} spec link{tierPackage.specIds.length === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {computer.cpu} • {computer.gpu}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {computer.ram}GB RAM • {computer.storage}GB •{" "}
-                      {computer.operatingSystem || "OS N/A"}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-primary">
-                      {formatUsd(Number(computer.pricePerHour))}
-                    </p>
+                    <Badge
+                      className={
+                        tierPackage.active
+                          ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
+                          : "bg-muted text-muted-foreground border-border"
+                      }
+                    >
+                      {tierPackage.active ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
+
+
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleToggleLock(computer)}
-                    className={
-                      (computer.status ?? "").toLowerCase() === "maintenance"
-                        ? "border-accent text-accent hover:bg-accent/10"
-                        : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10"
+                <div className="space-y-3">
+                  {pageItems.length > 0 ? (
+                    pageItems.map((machine) => renderMachineCard(machine))
+                  ) : (
+                    <Card className="border-border bg-muted/20 p-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No machines match this package, filter, or search.
+                      </p>
+                    </Card>
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <ListPagination
+                    page={currentPage}
+                    totalPages={Math.max(totalPages, 0)}
+                    onPageChange={(page) =>
+                      setTierPages((prev) => ({ ...prev, [tierPackage.tier]: page }))
                     }
-                  >
-                    {(computer.status ?? "").toLowerCase() === "maintenance"
-                      ? "Unlock"
-                      : "Lock"}
-                  </Button>
-
-                  <Dialog
-                    open={editingComputer?.pcId === computer.pcId}
-                    onOpenChange={(open) => !open && setEditingComputer(null)}
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          (computer.status ?? "").toLowerCase() !== "available"
-                        }
-                        onClick={() => handleEdit(computer)}
-                        className="border-primary text-foreground hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-card border-border">
-                      <DialogHeader>
-                        <DialogTitle>Edit Computer</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-specName">
-                            Configuration Name (Spec)
-                          </Label>
-                          <Input
-                            id="edit-specName"
-                            value={formData.specName}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                specName: e.target.value,
-                              })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-cpu">CPU</Label>
-                          <Input
-                            id="edit-cpu"
-                            value={formData.cpu}
-                            onChange={(e) =>
-                              setFormData({ ...formData, cpu: e.target.value })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-gpu">GPU</Label>
-                          <Input
-                            id="edit-gpu"
-                            value={formData.gpu}
-                            onChange={(e) =>
-                              setFormData({ ...formData, gpu: e.target.value })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-ram">RAM (GB)</Label>
-                          <Input
-                            id="edit-ram"
-                            type="number"
-                            value={formData.ram}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                ram: Math.max(
-                                  1,
-                                  Math.floor(Number(e.target.value) || 1),
-                                ),
-                              })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-storage">Storage (GB)</Label>
-                          <Input
-                            id="edit-storage"
-                            type="number"
-                            value={formData.storage}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                storage: Math.max(
-                                  1,
-                                  Math.floor(Number(e.target.value) || 1),
-                                ),
-                              })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-operatingSystem">
-                            Operating System
-                          </Label>
-                          <Input
-                            id="edit-operatingSystem"
-                            value={formData.operatingSystem}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                operatingSystem: e.target.value,
-                              })
-                            }
-                            className="bg-input-background border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-status">Computer Status</Label>
-                          <Select
-                            value={formData.status}
-                            onValueChange={(value) =>
-                              setFormData({ ...formData, status: value })
-                            }
-                          >
-                            <SelectTrigger
-                              id="edit-status"
-                              className="bg-input-background border-border"
-                            >
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="available">
-                                Available
-                              </SelectItem>
-                              <SelectItem value="in_use">In use</SelectItem>
-                              <SelectItem value="maintenance">
-                                Maintenance
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Button
-                            onClick={() => {
-                              void handleUpdate("single");
-                            }}
-                            className="w-full bg-gradient-to-r from-primary to-accent"
-                          >
-                            Update This Computer
-                          </Button>
-                          {detectTier(editingComputer?.specName ?? "") && (
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                void handleUpdate("plan");
-                              }}
-                              className="w-full border-primary text-foreground hover:bg-primary/10"
-                            >
-                              Edit all computers in{" "}
-                              {String(
-                                detectTier(editingComputer?.specName ?? ""),
-                              ).toUpperCase()}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(computer.pcId)}
-                    className="border-destructive text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  />
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {!isLoading && totalPages > 1 && (
-        <div className="pt-2">
-          <ListPagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+            );
+          })}
         </div>
+      )}
+
+      {!isLoading && !loadError && machines.length === 0 && (
+        <Card className="p-12 border-border text-center bg-card/60 mt-4">
+          <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No machines found.</p>
+        </Card>
       )}
     </div>
   );

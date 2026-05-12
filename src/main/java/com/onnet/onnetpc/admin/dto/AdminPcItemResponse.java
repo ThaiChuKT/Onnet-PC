@@ -13,6 +13,7 @@ public record AdminPcItemResponse(
     String operatingSystem,
     BigDecimal pricePerHour,
     String location,
-    String status
+    String status,
+    String tierName
 ) {
 }
