@@ -314,31 +314,6 @@ export function Packages() {
             );
           })}
         </div>
-
-        <div className="mt-12 text-center">
-          <div className="inline-flex flex-col sm:flex-row items-center gap-4 bg-card/50 backdrop-blur border border-border rounded-lg px-6 py-4">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary/20 p-2 rounded-lg">
-                <Zap className="w-5 h-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-bold">Flexible rental pricing</div>
-                <div className="text-xs text-muted-foreground">
-                  Switch period anytime before checkout
-                </div>
-              </div>
-            </div>
-            <div className="hidden sm:block w-px h-12 bg-border"></div>
-            <div className="text-sm text-muted-foreground">
-              Security deposit:{" "}
-              <span className="text-money font-bold">
-                {formatUsd(vndToUsd(500_000))}
-              </span>{" "}
-              — refunded
-              when hardware is returned
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
