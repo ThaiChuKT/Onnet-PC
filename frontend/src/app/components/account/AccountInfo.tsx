@@ -116,17 +116,7 @@ export function AccountInfo() {
                   disabled
                   className="bg-input-background border-border pr-10"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
+
               </div>
               <p className="text-xs text-muted-foreground">
                 Use the "Change Password" section to update your password
