@@ -385,7 +385,9 @@ export function Cart() {
             Choose a subscription tier to get started.
           </p>
           <Button asChild className="bg-gradient-to-r from-primary to-accent">
-            <Link to="/packages">Browse packages</Link>
+            <a href="/#packages" className="text-white hover:opacity-90">
+              Browse packages
+            </a>
           </Button>
         </Card>
       )}
@@ -524,7 +526,7 @@ export function Cart() {
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Amount of payment</p>
-                    <p className="text-3xl font-bold text-money">{formatUsd(previewTotal)}</p>
+                    <p className="text-3xl font-bold text-red-500">{formatUsd(previewTotal)}</p>
                   </div>
                   <div className="text-right text-sm text-muted-foreground">
                     <p>Wallet balance</p>
