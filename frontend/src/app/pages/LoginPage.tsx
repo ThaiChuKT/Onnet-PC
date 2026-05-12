@@ -4,8 +4,9 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
+import { PasswordRequirements } from "../components/PasswordRequirements";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, Link } from "react-router";
 import { Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { toast } from "sonner";
@@ -65,6 +66,22 @@ export function LoginPage() {
       }
       if (formData.password.length < 8) {
         toast.error("Password must be at least 8 characters.");
+        return;
+      }
+      if (!/[A-Z]/.test(formData.password)) {
+        toast.error("Password must contain at least one uppercase letter.");
+        return;
+      }
+      if (!/[a-z]/.test(formData.password)) {
+        toast.error("Password must contain at least one lowercase letter.");
+        return;
+      }
+      if (!/\d/.test(formData.password)) {
+        toast.error("Password must contain at least one number.");
+        return;
+      }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password)) {
+        toast.error("Password must contain at least one special character.");
         return;
       }
       if (formData.password !== formData.confirmPassword) {
@@ -239,6 +256,12 @@ export function LoginPage() {
                   </div>
                 )}
 
+                {!isLogin && formData.password && (
+                  <div className="bg-muted/30 border border-muted-foreground/20 rounded-lg p-3">
+                    <PasswordRequirements password={formData.password} />
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   disabled={isSubmitting}
@@ -249,6 +272,16 @@ export function LoginPage() {
               </form>
 
               <div className="mt-6 text-center">
+                {isLogin && (
+                  <div className="mb-4">
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsLogin(!isLogin)}

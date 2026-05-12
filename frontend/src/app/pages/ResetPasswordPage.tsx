@@ -4,6 +4,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
+import { PasswordRequirements } from "../components/PasswordRequirements";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { apiPost } from "../api/http";
@@ -30,6 +31,29 @@ export function ResetPasswordPage() {
       toast.error("Please fill all fields");
       return;
     }
+
+    // Client-side password requirements validation
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      toast.error("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      toast.error("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/\d/.test(newPassword)) {
+      toast.error("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) {
+      toast.error("Password must contain at least one special character");
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -73,6 +97,12 @@ export function ResetPasswordPage() {
                   <Label htmlFor="newPassword">New password</Label>
                   <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" />
                 </div>
+
+                {newPassword && (
+                  <div className="bg-muted/50 border border-border rounded-lg p-4">
+                    <PasswordRequirements password={newPassword} />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm password</Label>

@@ -18,6 +18,9 @@ import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
+import com.onnet.onnetpc.memberships.MembershipTier;
+import com.onnet.onnetpc.memberships.MembershipTierRepository;
+import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.pcs.PcStatus;
@@ -56,6 +59,8 @@ public class AdminService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SessionRepository sessionRepository;
+    private final MembershipTierRepository membershipTierRepository;
+    private final MembershipTierSpecMappingRepository membershipTierSpecMappingRepository;
 
     public AdminService(
         UserRepository userRepository,
@@ -65,7 +70,9 @@ public class AdminService {
         ReviewRepository reviewRepository,
         WalletTransactionRepository walletTransactionRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
-        SessionRepository sessionRepository
+        SessionRepository sessionRepository,
+        MembershipTierRepository membershipTierRepository,
+        MembershipTierSpecMappingRepository membershipTierSpecMappingRepository
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
@@ -75,6 +82,8 @@ public class AdminService {
         this.walletTransactionRepository = walletTransactionRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.sessionRepository = sessionRepository;
+        this.membershipTierRepository = membershipTierRepository;
+        this.membershipTierSpecMappingRepository = membershipTierSpecMappingRepository;
     }
 
     @Transactional(readOnly = true)
@@ -474,7 +483,8 @@ public class AdminService {
             pc.getSpec().getOs(),
             pc.getSpec().getPricePerHour(),
             pc.getLocation(),
-            pc.getStatus() == null ? null : pc.getStatus().name()
+            pc.getStatus() == null ? null : pc.getStatus().name(),
+            resolveTierName(pc.getSpec() == null ? null : pc.getSpec().getId())
         );
     }
 
@@ -484,11 +494,23 @@ public class AdminService {
             plan.getPlanName(),
             plan.getSpec() == null ? null : plan.getSpec().getId(),
             plan.getSpec() == null ? null : plan.getSpec().getSpecName(),
+            resolveTierName(plan.getSpec() == null ? null : plan.getSpec().getId()),
             plan.getDurationDays(),
             plan.getPrice(),
             plan.getMaxHoursPerDay(),
             plan.getActive()
         );
+    }
+
+    private String resolveTierName(Long specId) {
+        if (specId == null) {
+            return null;
+        }
+
+        return membershipTierSpecMappingRepository.findTierIdBySpecId(specId)
+            .flatMap(membershipTierRepository::findById)
+            .map(MembershipTier::getTierName)
+            .orElse(null);
     }
 
     private AdminBookingItemResponse toAdminBooking(Booking booking) {
