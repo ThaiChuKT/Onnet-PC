@@ -6,7 +6,7 @@ import { Input } from "../ui/input";
 import { Monitor, Power, Search, Shield } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
-import { formatUsd } from "../../lib/formatUsd";
+// removed unused formatUsd import
 import { ListPagination } from "./ListPagination";
 import {
   Select,
@@ -476,12 +476,7 @@ export function ComputerList() {
               currentPage * pageSize,
               currentPage * pageSize + pageSize,
             );
-            const planSummary = tierPackage.plans
-              .map(
-                (plan) =>
-                  `${plan.planName} (${formatUsd(Number(plan.price ?? 0))})`,
-              )
-              .join(" • ");
+            // planSummary removed — not currently displayed
 
             return (
               <Card key={tierPackage.tier} className="border-border bg-card/50 p-5">

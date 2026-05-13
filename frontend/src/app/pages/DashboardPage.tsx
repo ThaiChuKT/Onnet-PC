@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   TrendingUp,
   Users,
+  Wifi,
 } from "lucide-react";
 
 const navGroups = [
@@ -19,6 +20,7 @@ const navGroups = [
     items: [
       { path: "/dashboard/computers", label: "Machines", icon: Monitor },
       { path: "/dashboard/sessions", label: "Sessions", icon: Activity },
+      { path: "/dashboard/sunshine", label: "Sunshine", icon: Wifi },
     ],
   },
   {

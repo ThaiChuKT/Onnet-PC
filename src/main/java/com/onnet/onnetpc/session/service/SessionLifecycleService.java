@@ -8,6 +8,9 @@ import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.memberships.MembershipTier;
 import com.onnet.onnetpc.memberships.MembershipTierRepository;
 import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
+import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
+import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
+import com.onnet.onnetpc.moonlight.service.MoonlightService;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcStatus;
 import com.onnet.onnetpc.pcs.repository.PcRepository;
@@ -27,6 +30,8 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class SessionLifecycleService {
@@ -38,6 +43,8 @@ public class SessionLifecycleService {
     private final SessionQueueRepository sessionQueueRepository;
     private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
     private final MembershipTierRepository membershipTierRepository;
+    private final MoonlightService moonlightService;
+    private final SunshineHostRepository sunshineHostRepository;
 
     public SessionLifecycleService(
         UserRepository userRepository,
@@ -46,7 +53,9 @@ public class SessionLifecycleService {
         SessionRepository sessionRepository,
         SessionQueueRepository sessionQueueRepository,
         MembershipTierSpecMappingRepository tierSpecMappingRepository,
-        MembershipTierRepository membershipTierRepository
+        MembershipTierRepository membershipTierRepository,
+        MoonlightService moonlightService,
+        SunshineHostRepository sunshineHostRepository
     ) {
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
@@ -55,8 +64,11 @@ public class SessionLifecycleService {
         this.sessionQueueRepository = sessionQueueRepository;
         this.tierSpecMappingRepository = tierSpecMappingRepository;
         this.membershipTierRepository = membershipTierRepository;
+        this.moonlightService = moonlightService;
+        this.sunshineHostRepository = sunshineHostRepository;
     }
 
+    
     @Transactional
     public StartSessionResponse startSession(String email, Long bookingId) {
         // Ensure overdue active sessions are closed so stale machines can be reused.
@@ -126,6 +138,8 @@ public class SessionLifecycleService {
         session.setTotalCost(booking.getTotalPrice());
         session.setStatus("active");
         Session saved = sessionRepository.save(session);
+
+        startMoonlightAfterCommit(user.getEmail(), pc.getId());
 
         return toStartResponse(saved, "Session started successfully");
     }
@@ -413,6 +427,44 @@ public class SessionLifecycleService {
                 sessionQueueRepository.save(row);
             }
             position++;
+        }
+    }
+
+    private void startMoonlightAfterCommit(String email, Long pcId) {
+        Runnable launch = () -> launchMoonlightForPc(email, pcId);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    launch.run();
+                }
+            });
+            return;
+        }
+
+        launch.run();
+    }
+
+    private void launchMoonlightForPc(String email, Long pcId) {
+        if (pcId == null) {
+            return;
+        }
+
+        try {
+            sunshineHostRepository.findByPcId(pcId).ifPresent(host -> {
+                MoonlightCommandRequest request = new MoonlightCommandRequest(
+                    "STREAM",
+                    null,
+                    "Desktop",
+                    "1080p",
+                    60,
+                    8000,
+                    true
+                );
+                moonlightService.startUserStreamOnServer(email, host.getId(), request);
+            });
+        } catch (Exception ignored) {
+            // Session start must not fail if Moonlight cannot be launched.
         }
     }
 
