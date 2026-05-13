@@ -34,28 +34,28 @@ export function Features() {
       </div>
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-16 max-w-3xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+        <div className="text-center mb-20 max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-[1.18]">
             Built for
-            <span className="block bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+            <span className="block pb-2 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               modern gaming
             </span>
           </h2>
-          <p className="text-foreground/70 text-lg">
+          <p className="text-foreground/70 text-lg leading-relaxed">
             A cleaner, faster cloud-PC experience with the core benefits users expect when they compare plans.
           </p>
         </div>
 
-        <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
           {features.map((feature, index) => (
             <Card
               key={index}
-              className="border border-primary/20 bg-gradient-to-br from-card/50 to-primary/10 text-center shadow-sm hover:border-primary/40 hover:shadow-lg transition-all duration-300"
+              className="min-h-[25rem] border border-primary/20 bg-gradient-to-br from-card/50 to-primary/10 p-8 text-center shadow-sm transition-all duration-300 hover:border-primary/40 hover:shadow-lg"
             >
-              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-md shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
+              <div className="mx-auto mb-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-md shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
                 <feature.icon className="h-10 w-10 text-primary" />
               </div>
-              <h3 className="text-2xl font-semibold mb-3 text-foreground">{feature.title}</h3>
+              <h3 className="mb-6 text-2xl font-semibold leading-snug text-foreground">{feature.title}</h3>
               <p className="mx-auto max-w-[14rem] text-foreground/70 leading-relaxed">
                 {feature.description}
               </p>

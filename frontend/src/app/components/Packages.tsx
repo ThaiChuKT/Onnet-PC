@@ -102,15 +102,14 @@ export function Packages({ variant = "page" }: PackagesProps) {
     return (
       <section id="packages" className="py-24 bg-gradient-to-b from-background via-muted/20 to-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mb-12">
-            <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground mb-3">Plans</p>
+          <div className="max-w-4xl mx-auto mb-12 text-center">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Our
-              <span className="block bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+              Our{" "}
+              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 plans
               </span>
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Choose the setup that matches your budget and performance target. Each plan is built for a
               different play style, from entry level to high-end.
             </p>
@@ -121,7 +120,7 @@ export function Packages({ variant = "page" }: PackagesProps) {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-1 max-w-4xl mx-auto">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
             {packages.map((pkg) => {
               const currentPricing = pkg.pricing.month;
 
