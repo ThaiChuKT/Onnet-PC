@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Cpu, MapPin, Monitor, Search, Sparkles, HardDrive, Loader2 } from "lucide-react";
+import { ArrowLeft, Cpu, Monitor, Sparkles, HardDrive, Loader2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { apiGet, apiPost } from "../api/http";
 import { useAuth } from "../auth/AuthProvider";
@@ -117,7 +116,6 @@ export function PackageDetailsPage() {
   const [machines, setMachines] = useState<MachineListItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const title = tierKey ? TIER_LABELS[tierKey] : "Unknown";
@@ -185,26 +183,10 @@ export function PackageDetailsPage() {
     }
   };
 
-  const filteredMachines = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return machines;
-    return machines.filter((machine) => {
-      return (
-        String(machine.pcId).includes(q) ||
-        String(machine.specId).includes(q) ||
-        (machine.specName ?? "").toLowerCase().includes(q) ||
-        (machine.cpu ?? "").toLowerCase().includes(q) ||
-        (machine.gpu ?? "").toLowerCase().includes(q) ||
-        (machine.location ?? "").toLowerCase().includes(q) ||
-        (machine.status ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [machines, searchTerm]);
-
   const groups = useMemo<TierGroup[]>(() => {
     const grouped = new Map<string, TierGroup>();
 
-    for (const machine of filteredMachines) {
+    for (const machine of machines) {
       const specKey = `${machine.specId}-${machine.specName}-${machine.cpu}-${machine.gpu}-${machine.ram}-${machine.storage}`;
       const existing = grouped.get(specKey);
       if (!existing) {
@@ -225,18 +207,14 @@ export function PackageDetailsPage() {
     }
 
     return Array.from(grouped.values()).sort((a, b) => Number(a.specId) - Number(b.specId));
-  }, [filteredMachines]);
+  }, [machines]);
 
   const metrics = useMemo(() => {
     const uniqueSpecs = new Set(machines.map((machine) => machine.specId));
-    const averageRam = machines.length ? Math.round(machines.reduce((sum, machine) => sum + Number(machine.ram ?? 0), 0) / machines.length) : 0;
-    const averageStorage = machines.length ? Math.round(machines.reduce((sum, machine) => sum + Number(machine.storage ?? 0), 0) / machines.length) : 0;
 
     return {
       total: machines.length,
       specs: uniqueSpecs.size,
-      averageRam,
-      averageStorage,
     };
   }, [machines]);
 
@@ -315,7 +293,7 @@ export function PackageDetailsPage() {
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-4 mb-6">
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
             <Card className="p-4 border-border bg-card/70">
               <p className="text-sm text-muted-foreground">PCs listed</p>
               <p className="text-2xl font-bold">{metrics.total}</p>
@@ -324,24 +302,6 @@ export function PackageDetailsPage() {
               <p className="text-sm text-muted-foreground">Distinct specs</p>
               <p className="text-2xl font-bold">{metrics.specs}</p>
             </Card>
-            <Card className="p-4 border-border bg-card/70">
-              <p className="text-sm text-muted-foreground">Avg RAM</p>
-              <p className="text-2xl font-bold text-primary">{metrics.averageRam}GB</p>
-            </Card>
-            <Card className="p-4 border-border bg-card/70">
-              <p className="text-sm text-muted-foreground">Avg storage</p>
-              <p className="text-2xl font-bold text-accent">{metrics.averageStorage}GB</p>
-            </Card>
-          </div>
-
-          <div className="relative mb-6 max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by PC ID, CPU, GPU, RAM, storage, or location..."
-              className="pl-10 bg-background/80 border-border"
-            />
           </div>
 
           {isLoading && (
