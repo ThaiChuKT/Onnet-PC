@@ -70,7 +70,7 @@ type EndSessionResponse = {
 };
 
 const statusBadgeClass: Record<string, string> = {
-  active: "bg-accent/20 text-accent border-accent/50",
+  active: "bg-emerald-500/20 text-emerald-500 border-emerald-500/50 animate-pulse",
   ended: "bg-primary/20 text-primary border-primary/50",
   expired: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
 };

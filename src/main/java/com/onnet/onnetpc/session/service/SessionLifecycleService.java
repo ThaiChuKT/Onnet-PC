@@ -261,6 +261,8 @@ public class SessionLifecycleService {
             Pc lockedAssignedPc = pcRepository.findByIdForUpdate(booking.getPc().getId()).orElse(null);
             if (lockedAssignedPc != null
                 && lockedAssignedPc.getStatus() != PcStatus.maintenance
+                && lockedAssignedPc.getSpec() != null
+                && lockedAssignedPc.getSpec().getId().equals(booking.getSpec().getId())
                 && (lockedAssignedPc.getStatus() == PcStatus.available || isStaleReserved(lockedAssignedPc))) {
                 return lockedAssignedPc;
             }
@@ -269,29 +271,16 @@ public class SessionLifecycleService {
             bookingRepository.save(booking);
         }
 
-        if (booking.getBookingType() == BookingType.subscription) {
-            Long tierId = resolveTierIdByBookingSpec(booking);
-            if (tierId != null) {
-                List<Long> specIds = tierSpecMappingRepository.findAccessibleSpecIdsForRequestedTier(tierId);
-                if (!specIds.isEmpty()) {
-                    Pc availablePc = pcRepository.findNextAvailableBySpecIdsForUpdate(specIds).orElse(null);
-                    if (availablePc != null) {
-                        return availablePc;
-                    }
-                    Pc stalePc = pcRepository.findNextStaleReservedBySpecIdsForUpdate(specIds).orElse(null);
-                    if (stalePc != null) {
-                        return stalePc;
-                    }
-                }
-            }
-        }
-
         Pc availablePc = pcRepository.findNextAvailableBySpecIdForUpdate(booking.getSpec().getId()).orElse(null);
         if (availablePc == null) {
             // Backward compatibility for databases where deleted_at was auto-populated unexpectedly.
             availablePc = pcRepository.findNextAvailableBySpecIdAnyDeletedForUpdate(booking.getSpec().getId()).orElse(null);
         }
         if (availablePc != null) {
+            if (!availablePc.getSpec().getId().equals(booking.getSpec().getId())) {
+                throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi DB: PcRepository trả về sai máy! Cần cấu hình " 
+                    + booking.getSpec().getId() + " nhưng lại nhận được cấu hình " + availablePc.getSpec().getId() + ". Vui lòng kiểm tra lại @Query trong PcRepository.java");
+            }
             return availablePc;
         }
 
@@ -300,7 +289,7 @@ public class SessionLifecycleService {
             staleReserved = pcRepository.findNextStaleReservedBySpecIdAnyDeletedForUpdate(booking.getSpec().getId()).orElse(null);
         }
 
-        if (staleReserved != null) {
+        if (staleReserved != null && staleReserved.getSpec().getId().equals(booking.getSpec().getId())) {
             return staleReserved;
         }
 
@@ -371,10 +360,7 @@ public class SessionLifecycleService {
         }
 
         List<Long> candidateSpecIds = new ArrayList<>();
-        if (queued.getTier() != null && queued.getTier().getId() != null) {
-            candidateSpecIds.addAll(tierSpecMappingRepository.findAccessibleSpecIdsForRequestedTier(queued.getTier().getId()));
-        }
-        if (candidateSpecIds.isEmpty() && queuedBooking.getSpec() != null && queuedBooking.getSpec().getId() != null) {
+        if (queuedBooking.getSpec() != null && queuedBooking.getSpec().getId() != null) {
             candidateSpecIds.add(queuedBooking.getSpec().getId());
         }
 

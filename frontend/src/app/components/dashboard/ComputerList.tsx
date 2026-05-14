@@ -142,6 +142,7 @@ function isMachineVisible(
 export function ComputerList() {
   const [packages, setPackages] = useState<AdminPackageItemResponse[]>([]);
   const [machines, setMachines] = useState<AdminPcItemResponse[]>([]);
+  const [activeSessions, setActiveSessions] = useState<Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -167,6 +168,18 @@ export function ComputerList() {
         ]);
         setPackages(packagePage.content ?? []);
         setMachines(machinePage.content ?? []);
+        // load active sessions to display current user on in-use machines
+        try {
+          const sessionsPage = await apiGet<PageResponse<{ sessionId: number; pcId: number; userFullName?: string | null; userEmail?: string | null }>>("/admin/sessions", { page: 0, size: 500, status: "active" });
+          const map: Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }> = {};
+          for (const s of sessionsPage.content ?? []) {
+            if (s && s.pcId != null) map[Number(s.pcId)] = { sessionId: s.sessionId, userFullName: s.userFullName, userEmail: s.userEmail };
+          }
+          setActiveSessions(map);
+        } catch (ex) {
+          // best-effort; don't fail whole load if sessions can't be fetched
+          console.warn("Could not load active sessions", ex);
+        }
       } catch (e) {
         const message =
           e instanceof Error ? e.message : "Unable to load machines";
@@ -272,8 +285,14 @@ export function ComputerList() {
   }, [machines]);
 
   const handleToggleLock = async (machine: AdminPcItemResponse) => {
+    const status = normalizeStatus(machine.status);
+    if (status === "in_use") {
+      toast.error("Cannot lock a machine while it is in use. End the session first.");
+      return;
+    }
+
     try {
-      if (normalizeStatus(machine.status) === "maintenance") {
+      if (status === "maintenance") {
         await apiPatch<AdminPcItemResponse, { status: string }>(
           `/admin/pcs/${machine.pcId}`,
           { status: "available" },
@@ -288,6 +307,17 @@ export function ComputerList() {
         { page: 0, size: 200 },
       );
       setMachines(machinePage.content ?? []);
+      // refresh sessions map as well
+      try {
+        const sessionsPage = await apiGet<PageResponse<{ sessionId: number; pcId: number; userFullName?: string | null; userEmail?: string | null }>>("/admin/sessions", { page: 0, size: 500, status: "active" });
+        const map: Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }> = {};
+        for (const s of sessionsPage.content ?? []) {
+          if (s && s.pcId != null) map[Number(s.pcId)] = { sessionId: s.sessionId, userFullName: s.userFullName, userEmail: s.userEmail };
+        }
+        setActiveSessions(map);
+      } catch {
+        // ignore
+      }
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Unable to update machine status",
@@ -297,8 +327,17 @@ export function ComputerList() {
 
   const renderMachineCard = (machine: AdminPcItemResponse) => {
     const statusMeta = getStatusMeta(machine.status);
+    const isInUse = normalizeStatus(machine.status) === "in_use";
+    const active = activeSessions[Number(machine.pcId)];
+
     return (
-      <Card key={machine.pcId} className="border-border bg-card/70 p-4">
+      <Card
+        key={machine.pcId}
+        onClick={() => {
+          if (isInUse) navigate(`/dashboard/sessions?pcId=${machine.pcId}`);
+        }}
+        className={`border-border bg-card/70 p-4 ${isInUse ? "cursor-pointer hover:border-primary/30" : ""}`}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -320,9 +359,12 @@ export function ComputerList() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
+            onClick={(e) => {
+              // prevent card click
+              e.stopPropagation();
               void handleToggleLock(machine);
             }}
+            disabled={isInUse}
             className={
               normalizeStatus(machine.status) === "maintenance"
                 ? "border-accent text-accent hover:bg-accent/10"
@@ -332,8 +374,11 @@ export function ComputerList() {
             <Shield className="mr-2 h-4 w-4" />
             {normalizeStatus(machine.status) === "maintenance" ? "Unlock" : "Lock"}
           </Button>
-          {normalizeStatus(machine.status) === "in_use" && (
-            <span className="text-xs text-blue-500">Session active</span>
+          {isInUse && (
+            <div className="text-sm text-blue-500">
+              <div>In use by</div>
+              <div className="font-medium">{active?.userFullName ?? active?.userEmail ?? "Unknown user"}</div>
+            </div>
           )}
         </div>
       </Card>
