@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
@@ -20,7 +21,13 @@ public class JwtService {
         @Value("${app.jwt.secret}") String secret,
         @Value("${app.jwt.access-token-expiration-minutes}") long expirationMinutes
     ) {
-        this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("app.jwt.secret must be configured");
+        }
+
+        byte[] keyBytes = MessageDigest.getInstance("SHA-256")
+            .digest(secret.getBytes(StandardCharsets.UTF_8));
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.expirationMinutes = expirationMinutes;
     }
 
