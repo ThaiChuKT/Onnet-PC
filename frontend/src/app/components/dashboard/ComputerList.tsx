@@ -300,7 +300,7 @@ export function ComputerList() {
         toast.success(`Machine #${machine.pcId} unlocked`);
       } else {
         await apiPost<AdminPcItemResponse>(`/admin/pcs/${machine.pcId}/lock`);
-        toast.success(`Machine #${machine.pcId} locked and sessions ended`);
+        toast.success(`Machine #${machine.pcId} locked for maintenance`);
       }
       const machinePage = await apiGet<PageResponse<AdminPcItemResponse>>(
         "/admin/pcs",
