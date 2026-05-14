@@ -14,6 +14,7 @@ public record AdminSessionItemResponse(
     Instant startTime,
     Instant endTime,
     BigDecimal totalCost,
-    String status
+    String status,
+    String specName
 ) {
 }
