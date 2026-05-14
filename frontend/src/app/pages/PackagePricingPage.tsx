@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Header } from "../components/Header";
-import { Footer } from "../components/Footer";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -18,6 +16,7 @@ type AdminPackageItemResponse = {
 	planName: string;
 	specId: number;
 	specName: string;
+	tierName: string | null;
 	durationDays: number;
 	price: number;
 	maxHoursPerDay: number | null;
@@ -88,7 +87,10 @@ export function PackagePricingPage() {
 			setIsLoading(true);
 			try {
 				const page = await apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", { page: 0, size: 300 });
-				const matches = (page.content ?? []).filter((p) => detectTier(`${p.planName} ${p.specName}`) === tierKey);
+				const matches = (page.content ?? []).filter((p) => {
+					const tier = p.tierName?.toLowerCase() || detectTier(`${p.planName} ${p.specName}`);
+					return tier === tierKey;
+				});
 
 				const yearly = matches.find((p) => Number(p.durationDays ?? 0) >= 365) ?? null;
 				const monthly = matches.find((p) => Number(p.durationDays ?? 0) >= 28 && Number(p.durationDays ?? 0) < 365) ?? null;
@@ -151,15 +153,11 @@ export function PackagePricingPage() {
 	};
 
 	return (
-		<div className="min-h-screen flex flex-col">
-			<Header />
-
-			<main className="flex-1 pt-20 pb-12 bg-muted/30">
-				<div className="container mx-auto px-4 py-8">
+		<div className="space-y-6">
 					<div className="mb-6">
-						<Button variant="ghost" onClick={() => navigate("/computers")}> 
+						<Button variant="ghost" onClick={() => navigate("/dashboard/computers")}> 
 							<ArrowLeft className="w-4 h-4 mr-2" />
-							Back to package folders
+							Back to machines
 						</Button>
 					</div>
 
@@ -235,10 +233,6 @@ export function PackagePricingPage() {
 							</div>
 						</Card>
 					)}
-				</div>
-			</main>
-
-			<Footer />
 		</div>
 	);
 }

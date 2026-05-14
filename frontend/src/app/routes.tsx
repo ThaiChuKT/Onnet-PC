@@ -79,14 +79,6 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/packages/:tier/edit",
-    element: (
-      <AdminRoute>
-        <PackagePricingPage />
-      </AdminRoute>
-    ),
-  },
-  {
     path: "/ai-chat",
     Component: AIChatPage,
   },
@@ -199,6 +191,10 @@ export const router = createBrowserRouter([
       {
         path: "sunshine",
         Component: SunshineManagement,
+      },
+      {
+        path: "packages/:tier/edit",
+        Component: PackagePricingPage,
       },
     ],
   },
