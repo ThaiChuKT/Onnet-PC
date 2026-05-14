@@ -3,7 +3,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
-import { Monitor, Power, Search, Shield, Pencil } from "lucide-react";
+import { Monitor, Power, Search, Shield, Pencil, Settings, DollarSign } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 type AdminPackageItemResponse = {
   planId: number;
@@ -148,49 +154,57 @@ export function ComputerList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tierPages, setTierPages] = useState<TierPageState>(DEFAULT_TIER_PAGES);
+  
+  // State for Dropdown and Edit Plan
+  const [openEditMenu, setOpenEditMenu] = useState<TierKey | null>(null);
+  const [editPlanTier, setEditPlanTier] = useState<TierPackage | null>(null);
+  const [addSpecId, setAddSpecId] = useState("");
+  const [addQuantity, setAddQuantity] = useState("1");
+  const [isAdding, setIsAdding] = useState(false);
+  const [lockFromId, setLockFromId] = useState("");
+  const [lockToId, setLockToId] = useState("");
+  const [isBulkLocking, setIsBulkLocking] = useState(false);
+
   const pageSize = 4;
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      setLoadError(null);
+  const loadData = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [packagePage, machinePage] = await Promise.all([
+        apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
+          page: 0,
+          size: 500,
+        }),
+        apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
+          page: 0,
+          size: 200,
+        }),
+      ]);
+      setPackages(packagePage.content ?? []);
+      setMachines(machinePage.content ?? []);
       try {
-        const [packagePage, machinePage] = await Promise.all([
-          apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
-            page: 0,
-            size: 200,
-          }),
-          apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
-            page: 0,
-            size: 200,
-          }),
-        ]);
-        setPackages(packagePage.content ?? []);
-        setMachines(machinePage.content ?? []);
-        // load active sessions to display current user on in-use machines
-        try {
-          const sessionsPage = await apiGet<PageResponse<{ sessionId: number; pcId: number; userFullName?: string | null; userEmail?: string | null }>>("/admin/sessions", { page: 0, size: 500, status: "active" });
-          const map: Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }> = {};
-          for (const s of sessionsPage.content ?? []) {
-            if (s && s.pcId != null) map[Number(s.pcId)] = { sessionId: s.sessionId, userFullName: s.userFullName, userEmail: s.userEmail };
-          }
-          setActiveSessions(map);
-        } catch (ex) {
-          // best-effort; don't fail whole load if sessions can't be fetched
-          console.warn("Could not load active sessions", ex);
+        const sessionsPage = await apiGet<PageResponse<{ sessionId: number; pcId: number; userFullName?: string | null; userEmail?: string | null }>>("/admin/sessions", { page: 0, size: 500, status: "active" });
+        const map: Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }> = {};
+        for (const s of sessionsPage.content ?? []) {
+          if (s && s.pcId != null) map[Number(s.pcId)] = { sessionId: s.sessionId, userFullName: s.userFullName, userEmail: s.userEmail };
         }
-      } catch (e) {
-        const message =
-          e instanceof Error ? e.message : "Unable to load machines";
-        setLoadError(message);
-        toast.error(message);
-      } finally {
-        setIsLoading(false);
+        setActiveSessions(map);
+      } catch (ex) {
+        console.warn("Could not load active sessions", ex);
       }
-    };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Unable to load machines";
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    void load();
+  useEffect(() => {
+    void loadData();
   }, []);
 
   useEffect(() => {
@@ -248,6 +262,12 @@ export function ComputerList() {
     }, {});
   }, [machines]);
 
+  const unassignedPlans = useMemo(() => {
+    return packages
+      .filter((pkg) => !(normalizeTier(pkg.tierName) ?? detectTier(`${pkg.planName} ${pkg.specName}`)))
+      .sort((a, b) => Number(a.planId) - Number(b.planId));
+  }, [packages]);
+
   const tierMachineStats = useMemo(() => {
     return tierPackages.reduce<Record<TierKey, AdminPcItemResponse[]>>(
       (acc, tierPackage) => {
@@ -283,6 +303,35 @@ export function ComputerList() {
       ).length,
     };
   }, [machines]);
+
+  // Tự động phân tích khoảng ID được chọn để đưa ra Trạng thái và Nút bấm phù hợp
+  const bulkState = useMemo(() => {
+    const from = parseInt(lockFromId);
+    const to = parseInt(lockToId);
+
+    if (isNaN(from) || isNaN(to) || from > to) {
+      return { action: "lock", disabled: true, label: "Lock / Unlock", className: "" };
+    }
+
+    const rangeMachines = machines.filter((m) => m.pcId >= from && m.pcId <= to);
+    const expectedCount = to - from + 1;
+
+    if (rangeMachines.length === 0 || rangeMachines.length !== expectedCount) {
+       return { action: "lock", disabled: true, label: "Invalid range / Missing PCs", className: "" };
+    }
+
+    const allAvailable = rangeMachines.every(m => normalizeStatus(m.status) === "available");
+    const allMaintenance = rangeMachines.every(m => normalizeStatus(m.status) === "maintenance");
+
+    if (allAvailable) {
+      return { action: "lock", disabled: false, label: "Lock Selected", className: "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10" };
+    }
+    if (allMaintenance) {
+      return { action: "unlock", disabled: false, label: "Unlock Selected", className: "border-accent text-accent hover:bg-accent/10" };
+    }
+
+    return { action: "lock", disabled: true, label: "Mixed states or In-use PCs", className: "" };
+  }, [lockFromId, lockToId, machines]);
 
   const handleToggleLock = async (machine: AdminPcItemResponse) => {
     const status = normalizeStatus(machine.status);
@@ -322,6 +371,74 @@ export function ComputerList() {
       toast.error(
         e instanceof Error ? e.message : "Unable to update machine status",
       );
+    }
+  };
+
+  const handleAddMachines = async () => {
+    const qty = parseInt(addQuantity);
+    const spec = parseInt(addSpecId);
+
+    if (isNaN(qty) || qty <= 0 || isNaN(spec)) {
+      toast.error("Invalid quantity or spec");
+      return;
+    }
+
+    const selectedPlan = editPlanTier?.plans.find(p => p.specId === spec);
+    const specName = selectedPlan?.specName || "Unknown";
+
+    setIsAdding(true);
+    try {
+      const promises = [];
+      for (let i = 0; i < qty; i++) {
+        promises.push(
+          apiPost("/admin/pcs", {
+            specId: spec,
+            status: "available",
+            specName: specName,
+            pricePerHour: 0,
+            location: "N/A",
+          })
+        );
+      }
+      await Promise.all(promises);
+      toast.success(`Successfully added ${qty} machines`);
+      await loadData();
+      setAddQuantity("1");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to add machines");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleBulkLock = async (action: "lock" | "unlock") => {
+    const from = parseInt(lockFromId);
+    const to = parseInt(lockToId);
+
+    if (isNaN(from) || isNaN(to) || from > to) {
+      toast.error("Invalid range: 'From' must be less than or equal to 'To'");
+      return;
+    }
+
+    setIsBulkLocking(true);
+    try {
+      const promises = [];
+      for (let i = from; i <= to; i++) {
+        if (action === "lock") {
+          promises.push(apiPost(`/admin/pcs/${i}/lock`));
+        } else {
+          promises.push(apiPatch(`/admin/pcs/${i}`, { status: "available" }));
+        }
+      }
+      await Promise.allSettled(promises);
+      toast.success(`Bulk ${action} processed for PCs #${from} to #${to}`);
+      await loadData();
+      setLockFromId("");
+      setLockToId("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : `Failed to process bulk ${action}`);
+    } finally {
+      setIsBulkLocking(false);
     }
   };
 
@@ -505,29 +622,7 @@ export function ComputerList() {
             variant="outline"
             onClick={() => {
               setLoadError(null);
-              void (async () => {
-                setIsLoading(true);
-                try {
-                  const [packagePage, machinePage] = await Promise.all([
-                    apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
-                      page: 0,
-                      size: 200,
-                    }),
-                    apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
-                      page: 0,
-                      size: 200,
-                    }),
-                  ]);
-                  setPackages(packagePage.content ?? []);
-                  setMachines(machinePage.content ?? []);
-                } catch (e) {
-                  toast.error(
-                    e instanceof Error ? e.message : "Unable to reload machines",
-                  );
-                } finally {
-                  setIsLoading(false);
-                }
-              })();
+              void loadData();
             }}
           >
             Retry
@@ -536,7 +631,24 @@ export function ComputerList() {
       )}
 
       {!isLoading && !loadError && (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4">
+          {unassignedPlans.length > 0 && (
+            <Card className="border-border bg-amber-50/30 p-4">
+              <h3 className="text-sm font-semibold text-amber-700">Unassigned plans (chua map tier)</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cac plan nay da luu DB nhung chua xac dinh duoc Basic/Pro/Ultra, nen khong vao cac cot tier ben duoi.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unassignedPlans.map((plan) => (
+                  <Badge key={plan.planId} className="bg-amber-100 text-amber-800 border-amber-200">
+                    #{plan.planId} {plan.planName} - ${Number(plan.price ?? 0).toFixed(2)} / {plan.durationDays}d
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <div className="grid gap-4 xl:grid-cols-3">
           {tierPackages.map((tierPackage) => {
             const visibleMachines = tierMachineStats[tierPackage.tier];
             const currentPage = tierPages[tierPackage.tier];
@@ -558,19 +670,51 @@ export function ComputerList() {
                         </div>
                         <h3 className="text-xl font-bold">{tierPackage.title}</h3>
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {tierPackage.specIds.length} spec link{tierPackage.specIds.length === 1 ? "" : "s"}
+                      <p className="mt-2 text-sm text-muted-foreground ">
+                        Current plans price:{" "}
+                        <p className="text-muted-foreground gap-1 mt-1 space-x-1 text-xs">
+                        {tierPackage.plans.length > 0
+                          ? Array.from(new Map(tierPackage.plans.map(p => [p.durationDays, p])).values())
+                              .map((p) => `$${p.price.toFixed(2)} / ${p.durationDays} days`)
+                              .join(", ")
+                          : "No plans available"}
                       </p>
+                    </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/dashboard/packages/${tierPackage.tier}/edit`)}
-                      className="border-primary text-primary hover:bg-primary/10"
-                    >
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit prices
-                    </Button>
+                    <div className="relative">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOpenEditMenu(openEditMenu === tierPackage.tier ? null : tierPackage.tier)}
+                        className="border-primary text-primary hover:bg-primary/10"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                      {openEditMenu === tierPackage.tier && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenEditMenu(null)}></div>
+                          <div className="absolute right-0 mt-2 w-40 rounded-md border border-border bg-popover text-popover-foreground shadow-md z-50 p-1">
+                            <button
+                              onClick={() => { setOpenEditMenu(null); navigate(`/dashboard/packages/${tierPackage.tier}/edit`); }}
+                              className="w-full flex items-center px-2 py-2 text-sm hover:bg-muted rounded-sm transition-colors"
+                            >
+                              <DollarSign className="w-4 h-4 mr-2" /> Edit prices
+                            </button>
+                            <button
+                              onClick={() => { 
+                                setOpenEditMenu(null); 
+                                setEditPlanTier(tierPackage); 
+                                setAddSpecId(tierPackage.plans[0]?.specId.toString() ?? "");
+                              }}
+                              className="w-full flex items-center px-2 py-2 text-sm hover:bg-muted rounded-sm transition-colors"
+                            >
+                              <Settings className="w-4 h-4 mr-2" /> Edit plan
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
 
@@ -600,6 +744,7 @@ export function ComputerList() {
               </Card>
             );
           })}
+          </div>
         </div>
       )}
 
@@ -609,6 +754,64 @@ export function ComputerList() {
           <p className="text-muted-foreground">No machines found.</p>
         </Card>
       )}
+
+      <Dialog open={!!editPlanTier} onOpenChange={(open) => !open && setEditPlanTier(null)}>
+        <DialogContent className="sm:max-w-lg border-border bg-card">
+          <DialogHeader>
+            <DialogTitle>Manage {editPlanTier?.title} Plan</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/20">
+              <h4 className="font-semibold text-sm">Add machines to this plan</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Configuration</label>
+                  <Select value={addSpecId} onValueChange={setAddSpecId}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select configuration..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {Array.from(new Map(editPlanTier?.plans.map(p => [p.specId, p])).values()).map(p => (
+                        <SelectItem key={p.specId} value={p.specId.toString()}>
+                          {p.specName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Quantity</label>
+                  <Input type="number" min={1} value={addQuantity} onChange={e => setAddQuantity(e.target.value)} className="bg-background" />
+                </div>
+              </div>
+              <Button onClick={handleAddMachines} disabled={isAdding || !addSpecId || !addQuantity} className="w-full">
+                {isAdding ? "Adding..." : "Add Machines"}
+              </Button>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/20">
+              <h4 className="font-semibold text-sm">Bulk Lock / Unlock</h4>
+              <p className="text-xs text-muted-foreground">Select a range of PC IDs to apply bulk actions.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">From PC ID</label>
+                  <Input type="number" min={1} value={lockFromId} onChange={e => setLockFromId(e.target.value)} placeholder="e.g. 1" className="bg-background" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">To PC ID</label>
+                  <Input type="number" min={1} value={lockToId} onChange={e => setLockToId(e.target.value)} placeholder="e.g. 10" className="bg-background" />
+                </div>
+              </div>
+              <div className="pt-1">
+                <Button variant="outline" onClick={() => handleBulkLock(bulkState.action as "lock" | "unlock")} disabled={isBulkLocking || bulkState.disabled} className={`w-full ${bulkState.className}`}>
+                  {isBulkLocking ? "Processing..." : bulkState.label}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
