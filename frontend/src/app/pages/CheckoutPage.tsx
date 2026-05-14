@@ -135,14 +135,10 @@ type TierKey = "basic" | "pro" | "ultra";
 const SPEC_TO_TIER_MAP: Record<number, TierKey> = {
   1: "basic",
   2: "basic",
-  3: "basic",
-  4: "basic",
-  10: "basic",
-  5: "pro",
-  6: "pro",
-  7: "pro",
-  8: "ultra",
-  9: "ultra",
+  3: "pro",
+  4: "pro",
+  5: "ultra",
+  6: "ultra",
 };
 
 const getTierKeyFromSpecId = (specId: number | null | undefined): TierKey | null => {

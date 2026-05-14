@@ -49,18 +49,14 @@ type PageResponse<T> = {
 // Map specId to tier based on database tier_spec_mappings
 const SPEC_TO_TIER_MAP: Record<number, TierKey> = {
   // Basic tier (tier_id=1)
-  1: "basic",  // Nebula Starter
-  2: "basic",  // Nebula Plus
-  3: "basic",  // Nebula Creator
-  4: "basic",  // Orion Balanced
-  10: "basic", // Zephyr Dev
+  1: "basic",  // Basic Intel Starter
+  2: "basic",  // Basic AMD Ryzen Core
   // Pro tier (tier_id=2)
-  5: "pro",    // Orion Pro
-  6: "pro",    // Atlas Gamer
-  7: "pro",    // Atlas Creator
+  3: "pro",    // Pro Intel Gaming
+  4: "pro",    // Pro Ryzen Performance
   // Ultra tier (tier_id=3)
-  8: "ultra",  // Titan Workstation
-  9: "ultra",  // Titan AI
+  5: "ultra",  // Ultra Intel Ultimate
+  6: "ultra",  // Ultra AMD Beast
 };
 
 const TIER_LABELS: Record<TierKey, string> = {
@@ -143,8 +139,6 @@ export function PackageDetailsPage() {
           // Use spec_id mapping for accurate tier detection
           return SPEC_TO_TIER_MAP[machine.specId] === tierKey;
         });
-        console.log(`[PackageDetailsPage] Tier: ${tierKey}, Total fetched: ${machines.length}, Filtered: ${filtered.length}`);
-        console.log(`[PackageDetailsPage] All specs:`, machines.map(m => ({ pcId: m.pcId, specId: m.specId, specName: m.specName, tier: SPEC_TO_TIER_MAP[m.specId] ?? 'unknown' })));
         setMachines(filtered);
       } catch (e) {
         const message = e instanceof Error ? e.message : "Could not load machines";

@@ -5,7 +5,8 @@
 This integration uses Sunshine as host service and Moonlight as client.
 Onnet-PC manages Sunshine hosts from the web dashboard and can execute Moonlight CLI commands from backend (Option B).
 
-Current test host provided: 'ip'
+Current test host provided:
+- `58.187.67.90:47989`
 
 ## What is implemented
 
@@ -54,7 +55,7 @@ This migration creates:
 - `sunshine_hosts`
 - `moonlight_command_logs`
 
-It also seeds the provided host `ip` if not already present.
+It also seeds the provided host `58.187.67.90` if not already present.
 
 ## Required backend config for Option B
 
@@ -74,14 +75,14 @@ Notes:
 ## What you need to provide / do
 
 1. Install Moonlight CLI on the backend machine (the machine running Spring Boot API).
-2. Ensure backend can reach Sunshine host `ip` over required ports.
+2. Ensure backend can reach Sunshine host `58.187.67.90` over required ports.
 3. Run SQL migration file against your `onnetpc` database.
 4. Enable config flags above and restart backend.
 5. Sign in as admin and use `/dashboard/sunshine`.
 
 ## Recommended first validation
 
-1. Add or confirm host `ip` in dashboard.
+1. Add or confirm host `58.187.67.90` in dashboard.
 2. Run `PROBE` with server execution enabled.
 3. Check command log output in dashboard.
 4. Run `PAIR` when someone can accept pairing on Sunshine host.
