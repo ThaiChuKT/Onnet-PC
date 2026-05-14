@@ -196,23 +196,41 @@ export function InvoiceManagement() {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4 border-border bg-card/50">
+        <Card 
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("all");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30">
           <p className="text-sm text-muted-foreground">Total invoices</p>
           <p className="text-2xl font-bold">{stats.total}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("paid");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Paid invoices</p>
           <p className="text-2xl font-bold text-accent">{stats.paid}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("unpaid");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Unpaid invoices</p>
           <p className="text-2xl font-bold text-yellow-500">{stats.unpaid}</p>
         </Card>
         <Card className="p-4 border-border bg-gradient-to-br from-primary/10 to-accent/10">
           <p className="text-sm text-muted-foreground">Total bill value</p>
-          <p className="text-xl font-bold text-money">
-            {formatUsd(stats.totalAmount)}
-          </p>
+          <p className="text-xl font-bold text-money">{formatUsd(stats.totalAmount)}</p>
         </Card>
       </div>
 

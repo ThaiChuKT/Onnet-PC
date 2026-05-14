@@ -182,19 +182,47 @@ export function SessionManagement() {
   return (
     <div>
       <div className="grid md:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("all");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Total sessions</p>
           <p className="text-2xl font-bold">{stats.total}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("active");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Active</p>
           <p className="text-2xl font-bold text-accent">{stats.active}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("ended");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Ended</p>
           <p className="text-2xl font-bold text-primary">{stats.ended}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("expired");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <p className="text-sm text-muted-foreground">Expired</p>
           <p className="text-2xl font-bold text-yellow-500">{stats.expired}</p>
         </Card>
