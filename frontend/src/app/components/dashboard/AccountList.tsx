@@ -227,7 +227,14 @@ export function AccountList() {
   return (
     <div>
       <div className="grid md:grid-cols-4 gap-4 mb-6">
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("all");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-3 rounded-lg">
               <User className="w-5 h-5 text-primary" />
@@ -239,7 +246,14 @@ export function AccountList() {
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("user");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-accent/20 p-3 rounded-lg">
               <User className="w-5 h-5 text-accent" />
@@ -251,7 +265,14 @@ export function AccountList() {
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("admin");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-secondary/20 p-3 rounded-lg">
               <Shield className="w-5 h-5 text-secondary" />
@@ -265,7 +286,14 @@ export function AccountList() {
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/50">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("active-user");
+          }}
+          className="p-4 border-border bg-card/50 cursor-pointer hover:border-primary/30"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-accent/20 p-3 rounded-lg">
               <CheckCircle className="w-5 h-5 text-accent" />

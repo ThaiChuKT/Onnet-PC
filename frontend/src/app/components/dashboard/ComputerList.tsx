@@ -388,7 +388,13 @@ export function ComputerList() {
   return (
     <div>
       <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="p-4 border-border bg-card/60">
+        <Card 
+            role="button"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+            className="p-4 border-border bg-card/60 cursor-pointer hover:border-primary/30 hover:shadow-2xl">
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-primary" />
@@ -400,42 +406,59 @@ export function ComputerList() {
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/60">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-500/20 p-3 rounded-lg">
-              <Monitor className="w-5 h-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Available</p>
-              <p className="text-2xl font-bold text-emerald-500">
-                {stats.available}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-border bg-card/60">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("available");
+          }}
+          className="p-4 border-border bg-card/60 cursor-pointer hover:border-primary/30 hover:shadow-2xl"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-blue-500/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">In use</p>
-              <p className="text-2xl font-bold text-blue-500">{stats.inUse}</p>
+              <p className="text-sm text-muted-foreground">Available</p>
+              <p className="text-2xl font-bold text-blue-500">{stats.available}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 border-border bg-card/60">
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("in_use");
+          }}
+          className="p-4 border-border bg-card/60 cursor-pointer hover:border-primary/30 hover:shadow-2xl"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/20 p-3 rounded-lg">
+              <Monitor className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">In use</p>
+              <p className="text-2xl font-bold text-emerald-500">{stats.inUse}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          role="button"
+          onClick={() => {
+            setSearchTerm("");
+            setStatusFilter("maintenance");
+          }}
+          className="p-4 border-border bg-card/60 cursor-pointer hover:border-primary/30 hover:shadow-2xl"
+        >
           <div className="flex items-center gap-3">
             <div className="bg-yellow-500/20 p-3 rounded-lg">
               <Monitor className="w-5 h-5 text-yellow-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Maintenance</p>
-              <p className="text-2xl font-bold text-yellow-500">
-                {stats.maintenance}
-              </p>
+              <p className="text-2xl font-bold text-yellow-500">{stats.maintenance}</p>
             </div>
           </div>
         </Card>
