@@ -3,10 +3,10 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
-import { Monitor, Power, Search, Shield } from "lucide-react";
+import { Monitor, Power, Search, Shield, Pencil } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "../../api/http";
 import { toast } from "sonner";
-// removed unused formatUsd import
+import { useNavigate } from "react-router-dom";
 import { ListPagination } from "./ListPagination";
 import {
   Select,
@@ -148,6 +148,7 @@ export function ComputerList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [tierPages, setTierPages] = useState<TierPageState>(DEFAULT_TIER_PAGES);
   const pageSize = 4;
+  const navigate = useNavigate();
 
   useEffect(() => {
     const load = async () => {
@@ -493,7 +494,15 @@ export function ComputerList() {
                         {tierPackage.specIds.length} spec link{tierPackage.specIds.length === 1 ? "" : "s"}
                       </p>
                     </div>
-
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/dashboard/packages/${tierPackage.tier}/edit`)}
+                      className="border-primary text-primary hover:bg-primary/10"
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit prices
+                    </Button>
                   </div>
 
 

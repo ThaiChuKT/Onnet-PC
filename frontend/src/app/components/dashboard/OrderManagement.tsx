@@ -2,7 +2,7 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +68,11 @@ const statusConfig: Record<
     className: "bg-destructive/20 text-destructive border-destructive/50",
     icon: XCircle,
   },
+  paid: {
+    label: "Paid",
+    className: "bg-green-500/20 text-green-500 border-green-500/50",
+    icon: CheckCircle,
+  },
 };
 
 const normalizeBookingStatus = (value?: string | null) => {
@@ -78,25 +83,23 @@ const normalizeBookingStatus = (value?: string | null) => {
 export function OrderManagement() {
   const [orders, setOrders] = useState<AdminBookingItemResponse[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  // const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<AdminBookingItemResponse | null>(null);
+  const pageSize = 4;
 
-  const loadOrders = async (nextPage = 0) => {
+  const loadOrders = async () => {
     setIsLoading(true);
     try {
       const response = await apiGet<PageResponse<AdminBookingItemResponse>>("/admin/bookings", {
-        page: nextPage,
-        size: 4,
-        status: statusFilter === "all" ? undefined : statusFilter,
+        page: 0,
+        size: 500,
       });
       setOrders(response.content ?? []);
-      setTotalPages(response.totalPages ?? 0);
-      setPage(response.number ?? nextPage);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load orders");
     } finally {
@@ -105,8 +108,12 @@ export function OrderManagement() {
   };
 
   useEffect(() => {
-    void loadOrders(page);
-  }, [page, statusFilter]);
+    void loadOrders();
+  }, []);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, fromDate, toDate]);
 
   const handleStatusChange = async (bookingId: number, status: string) => {
     try {
@@ -152,7 +159,7 @@ export function OrderManagement() {
     const selectedStatus = statusFilter.toLowerCase();
     return currentOrders.filter((o) => {
       const rawStatus = normalizeBookingStatus(o.status);
-      const isPaid = rawStatus === "active" || rawStatus === "expired";
+      const isPaid = rawStatus === "paid";
       const isExpired = rawStatus === "expired";
       const statusHit =
         selectedStatus === "all" ||
@@ -165,14 +172,20 @@ export function OrderManagement() {
 
   const stats = useMemo(() => {
     const total = filteredOrders.length;
+    const paid = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "paid").length;
     const pending = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "pending").length;
-    const active = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "active").length;
     const completed = filteredOrders.filter((o) => normalizeBookingStatus(o.status) === "expired").length;
     const totalRevenue = filteredOrders
-      .filter((o) => ["active", "expired"].includes(normalizeBookingStatus(o.status)))
+      .filter((o) => ["paid", "expired"].includes(normalizeBookingStatus(o.status)))
       .reduce((sum, o) => sum + Number(o.totalPrice ?? 0), 0);
-    return { total, pending, active, completed, totalRevenue };
+    return { total, pending, paid, completed, totalRevenue };
   }, [filteredOrders]);
+
+  const totalPages = Math.ceil(filteredOrders.length / pageSize);
+
+  const paginatedOrders = useMemo(() => {
+    return filteredOrders.slice(page * pageSize, page * pageSize + pageSize);
+  }, [filteredOrders, page, pageSize]);
 
   return (
     <div>
@@ -193,7 +206,6 @@ export function OrderManagement() {
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
@@ -203,7 +215,7 @@ export function OrderManagement() {
         <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid md:grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
         <Card className="p-4 border-border bg-card/50">
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-3 rounded-lg">
@@ -212,6 +224,18 @@ export function OrderManagement() {
             <div>
               <p className="text-sm text-muted-foreground">Total orders</p>
               <p className="text-2xl font-bold">{stats.total}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 border-border bg-card/50">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/20 p-3 rounded-lg">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Paid</p>
+              <p className="text-2xl font-bold">{stats.paid}</p>
             </div>
           </div>
         </Card>
@@ -230,38 +254,12 @@ export function OrderManagement() {
 
         <Card className="p-4 border-border bg-card/50">
           <div className="flex items-center gap-3">
-            <div className="bg-accent/20 p-3 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-accent" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Active</p>
-              <p className="text-2xl font-bold text-accent">{stats.active}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-border bg-card/50">
-          <div className="flex items-center gap-3">
             <div className="bg-blue-500/20 p-3 rounded-lg">
               <CheckCircle className="w-5 h-5 text-blue-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Expired</p>
               <p className="text-2xl font-bold text-blue-500">{stats.completed}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 border-border bg-gradient-to-br from-primary/10 to-accent/10">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/20 p-3 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Revenue</p>
-              <p className="text-lg font-bold text-primary">
-                {(stats.totalRevenue / 1_000_000).toFixed(1)}M
-              </p>
             </div>
           </div>
         </Card>
@@ -275,7 +273,7 @@ export function OrderManagement() {
           </Card>
         )}
 
-        {filteredOrders.map((order) => {
+        {paginatedOrders.map((order) => {
           const key = normalizeBookingStatus(order.status);
           const cfg = statusConfig[key] ?? {
             label: order.status ?? "N/A",
@@ -435,4 +433,3 @@ export function OrderManagement() {
     </div>
   );
 }
-

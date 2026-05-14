@@ -12,7 +12,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";
 import {
@@ -67,7 +67,7 @@ type AdminBookingItemResponse = {
 export function AccountList() {
   const [users, setUsers] = useState<AdminUserItemResponse[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  // const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -79,17 +79,16 @@ export function AccountList() {
     number | null
   >(null);
   const [bookingStatusFilter, setBookingStatusFilter] = useState("all");
+  const pageSize = 4;
 
-  const loadUsers = async (keyword?: string, nextPage = 0) => {
+  const loadUsers = async () => {
     setIsLoading(true);
     try {
-      const page = await apiGet<PageResponse<AdminUserItemResponse>>(
+      const response = await apiGet<PageResponse<AdminUserItemResponse>>(
         "/admin/users",
-        { keyword, page: nextPage, size: 4 },
+        { page: 0, size: 500 },
       );
-      setUsers(page.content ?? []);
-      setTotalPages(page.totalPages ?? 0);
-      setPage(page.number ?? nextPage);
+      setUsers(response.content ?? []);
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Unable to load account list",
@@ -100,19 +99,12 @@ export function AccountList() {
   };
 
   useEffect(() => {
-    void loadUsers(searchTerm.trim() || undefined, page);
-  }, [page]);
+    void loadUsers();
+  }, []);
 
   useEffect(() => {
-    const handle = window.setTimeout(
-      () => {
-        setPage(0);
-        void loadUsers(searchTerm.trim() || undefined, 0);
-      },
-      250,
-    );
-    return () => window.clearTimeout(handle);
-  }, [searchTerm]);
+    setPage(0);
+  }, [searchTerm, statusFilter]);
 
   const filteredUsers = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -137,6 +129,12 @@ export function AccountList() {
     });
   }, [searchTerm, statusFilter, users]);
 
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+
+  const paginatedUsers = useMemo(() => {
+    return filteredUsers.slice(page * pageSize, page * pageSize + pageSize);
+  }, [filteredUsers, page, pageSize]);
+
   const handleToggleActive = async (user: AdminUserItemResponse) => {
     try {
       await apiPatch<AdminUserItemResponse, { active: boolean }>(
@@ -146,7 +144,7 @@ export function AccountList() {
         },
       );
       toast.success("Status updated successfully");
-      await loadUsers(searchTerm.trim() || undefined);
+      await loadUsers();
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Unable to update status",
@@ -188,7 +186,7 @@ export function AccountList() {
     try {
       await apiDelete<string>(`/admin/users/${user.id}`);
       toast.success("Account deleted");
-      await loadUsers(searchTerm.trim() || undefined);
+      await loadUsers();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Unable to delete account");
     }
@@ -216,16 +214,15 @@ export function AccountList() {
     });
   };
 
-  const stats = {
-    total: users.length,
-    users: users.filter((u) => (u.role ?? "").toUpperCase().includes("USER"))
-      .length,
-    admins: users.filter((u) => (u.role ?? "").toUpperCase().includes("ADMIN"))
-      .length,
-    mods: users.filter((u) => (u.role ?? "").toUpperCase().includes("MOD"))
-      .length,
-    active: users.filter((u) => u.active).length,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: filteredUsers.length,
+      users: filteredUsers.filter((u) => (u.role ?? "").toUpperCase().includes("USER")).length,
+      admins: filteredUsers.filter((u) => (u.role ?? "").toUpperCase().includes("ADMIN")).length,
+      mods: filteredUsers.filter((u) => (u.role ?? "").toUpperCase().includes("MOD")).length,
+      active: filteredUsers.filter((u) => u.active).length,
+    };
+  }, [filteredUsers]);
 
   return (
     <div>
@@ -315,7 +312,7 @@ export function AccountList() {
           </Card>
         )}
 
-        {filteredUsers.map((u) => (
+        {paginatedUsers.map((u) => (
           <Card
             key={u.id}
             className="p-6 border-border hover:border-primary/50 transition-all"

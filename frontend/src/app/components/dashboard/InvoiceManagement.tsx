@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge";
 import { apiGet } from "../../api/http";
 import { toast } from "sonner";
 import { Input } from "../ui/input";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -67,23 +67,23 @@ export function InvoiceManagement() {
     [],
   );
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  // const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const pageSize = 4;
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
         const topUpPage = await apiGet<PageResponse<AdminUserPaymentItemResponse>>("/admin/payments/topups", {
-          page,
-          size: 4,
+          page: 0,
+          size: 500,
         });
         setTopUpItems(topUpPage.content ?? []);
-        setTotalPages(topUpPage.totalPages ?? 0);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not load invoices");
       } finally {
@@ -91,7 +91,11 @@ export function InvoiceManagement() {
       }
     };
     void load();
-  }, [page]);
+  }, []);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, fromDate, toDate]);
 
   const allInvoices = useMemo<InvoiceRow[]>(() => {
     const topUpInvoices: InvoiceRow[] = topUpItems.map((item) => ({
@@ -144,6 +148,12 @@ export function InvoiceManagement() {
     );
     return { total, paid, unpaid: total - paid, totalAmount };
   }, [filtered]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+
+  const paginatedInvoices = useMemo(() => {
+    return filtered.slice(page * pageSize, page * pageSize + pageSize);
+  }, [filtered, page, pageSize]);
 
   return (
     <div>
@@ -215,7 +225,7 @@ export function InvoiceManagement() {
         )}
 
         {!isLoading &&
-          filtered.map((item) => {
+          paginatedInvoices.map((item) => {
             const paid = item.status === "paid";
             return (
               <Card
