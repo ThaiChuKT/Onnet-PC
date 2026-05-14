@@ -302,19 +302,19 @@ INSERT INTO `membership_tiers` (`id`, `tier_name`, `tier_level`, `monthly_fee`, 
 INSERT INTO `pc_specs` (`id`, `spec_name`, `cpu`, `gpu`, `ram`, `storage`, `os`, `price_per_hour`, `description`, `is_exclusive`) VALUES
 -- Basic Tier Specs
 (1, 'Basic Intel Starter', 'Intel Core i5-12400F', 'NVIDIA RTX 3060', 16, 512, 'Windows 11', 2.50, 'Phù hợp gaming Esports 1080p mượt mà', 0),
-(2, 'Basic AMD Ryzen Core', 'AMD Ryzen 5 5600X', 'AMD Radeon RX 6600', 16, 512, 'Windows 11', 2.40, 'Hiệu năng gaming thuần túy tối ưu chi phí', 0),
+(2, 'Basic AMD Ryzen Core', 'AMD Ryzen 5 5600X', 'AMD Radeon RX 6600', 16, 512, 'Windows 11', 2.50, 'Hiệu năng gaming thuần túy tối ưu chi phí', 0),
 -- Pro Tier Specs
 (3, 'Pro Intel Gaming', 'Intel Core i7-13700F', 'NVIDIA RTX 4070', 32, 1024, 'Windows 11', 5.00, 'Chiến mượt AAA Max Setting và Livestream', 0),
-(4, 'Pro Ryzen Performance', 'AMD Ryzen 7 7700X', 'NVIDIA RTX 4070 Super', 32, 1024, 'Windows 11', 5.50, 'Đồ họa đỉnh cao, xử lý đa nhiệm mượt mà', 0),
+(4, 'Pro Ryzen Performance', 'AMD Ryzen 7 7700X', 'NVIDIA RTX 4070 Super', 32, 1024, 'Windows 11', 5.00, 'Đồ họa đỉnh cao, xử lý đa nhiệm mượt mà', 0),
 -- Ultra Tier Specs
 (5, 'Ultra Intel Ultimate', 'Intel Core i9-14900K', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, 'Siêu quái vật Workstation chuyên render và 4K Gaming', 1),
-(6, 'Ultra AMD Beast', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.50, 'Cực đỉnh xử lý thuật toán AI và đồ họa nặng', 1);
+(6, 'Ultra AMD Beast', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, 'Cực đỉnh xử lý thuật toán AI và đồ họa nặng', 1);
 
 -- 2.3. Mapped Specs to Membership Tiers
 INSERT INTO `membership_tier_spec_mappings` (`tier_id`, `spec_id`) VALUES
-(1, 1), (1, 2), -- Basic Tier sở hữu máy 1, 2
-(2, 3), (2, 4), -- Pro Tier sở hữu máy 3, 4
-(3, 5), (3, 6); -- Ultra Tier sở hữu máy 5, 6
+(1, 1), (1, 2),
+(2, 3), (2, 4), 
+(3, 5), (3, 6);
 
 -- 2.4. Seed 30 PCs (Phân bổ đều: mỗi plan/tier quản lý đúng 10 máy)
 INSERT INTO `pcs` (`id`, `spec_id`, `status`, `location`) VALUES
@@ -355,23 +355,23 @@ INSERT INTO `pcs` (`id`, `spec_id`, `status`, `location`) VALUES
 -- 2.5. Seed Subscription Plans theo tuần/tháng cho các cấu hình máy
 INSERT INTO `subscription_plans` (`id`, `plan_name`, `spec_id`, `duration_days`, `price`) VALUES
 (1, 'Basic Intel - Weekly', 1, 7, 15.00),
-(2, 'Basic AMD - Weekly', 2, 7, 14.00),
-(3, 'Pro Intel - Monthly', 3, 30, 50.00),
-(4, 'Pro AMD - Monthly', 4, 30, 55.00),
-(5, 'Ultra Intel - Monthly', 5, 30, 100.00),
-(6, 'Ultra AMD - Monthly', 6, 30, 105.00),
-(7, 'Basic Intel - Monthly', 1, 30, 60.00),
-(8, 'Basic AMD - Monthly', 2, 30, 56.00),
-(9, 'Basic Intel - Yearly', 1, 365, 600.00),
-(10, 'Basic AMD - Yearly', 2, 365, 560.00),
-(11, 'Pro Intel - Weekly', 3, 7, 15.00),
-(12, 'Pro AMD - Weekly', 4, 7, 16.50),
-(13, 'Pro Intel - Yearly', 3, 365, 500.00),
-(14, 'Pro AMD - Yearly', 4, 365, 550.00),
-(15, 'Ultra Intel - Weekly', 5, 7, 30.00),
-(16, 'Ultra AMD - Weekly', 6, 7, 31.50),
-(17, 'Ultra Intel - Yearly', 5, 365, 1000.00),
-(18, 'Ultra AMD - Yearly', 6, 365, 1050.00);
+(2, 'Basic AMD - Weekly', 2, 7, 15.00),
+(3, 'Pro Intel - Monthly', 3, 30, 100.00),
+(4, 'Pro AMD - Monthly', 4, 30, 100.00),
+(5, 'Ultra Intel - Monthly', 5, 30, 200.00),
+(6, 'Ultra AMD - Monthly', 6, 30, 200.00),
+(7, 'Basic Intel - Monthly', 1, 30, 50.00),
+(8, 'Basic AMD - Monthly', 2, 30, 50.00),
+(9, 'Basic Intel - Yearly', 1, 365, 500.00),
+(10, 'Basic AMD - Yearly', 2, 365, 500.00),
+(11, 'Pro Intel - Weekly', 3, 7, 30.00),
+(12, 'Pro AMD - Weekly', 4, 7, 30.00),
+(13, 'Pro Intel - Yearly', 3, 365, 1000.00),
+(14, 'Pro AMD - Yearly', 4, 365, 1000.00),
+(15, 'Ultra Intel - Weekly', 5, 7, 60.00),
+(16, 'Ultra AMD - Weekly', 6, 7, 60.00),
+(17, 'Ultra Intel - Yearly', 5, 365, 2000.00),
+(18, 'Ultra AMD - Yearly', 6, 365, 2000.00);
 
 -- 2.6. Seed 15 Users (Gồm 1 Admin và 14 thành viên trải đều các gói hội viên)
 INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `phone`, `password_hash`, `role`, `tier_id`, `is_verified`) VALUES
@@ -429,23 +429,23 @@ INSERT INTO `wallet_transactions` (`wallet_id`, `amount`, `type`, `reference_id`
 -- 3.2. Fake Bookings (Đặt máy) cho 5 Users này
 INSERT INTO `bookings` (`id`, `user_id`, `spec_id`, `plan_id`, `pc_id`, `booking_type`, `total_hours`, `start_time`, `end_time`, `total_price`, `status`, `created_at`) VALUES
 -- User 2 (Chu Nguyen Quang Thai) đăng ký Gói tháng Ultra AMD (Spec 6)
-(1, 2, 6, 6, 22, 'subscription', NULL, '2026-05-10 09:00:00', '2026-06-09 09:00:00', 105.00, 'completed', '2026-05-10 08:45:00'),
+(1, 2, 6, 6, 22, 'subscription', NULL, '2026-05-10 09:00:00', '2026-06-09 09:00:00', 200.00, 'completed', '2026-05-10 08:45:00'),
 -- User 3 (Le Hoang Long) đăng ký Gói tháng Pro Intel (Spec 3)
-(2, 3, 3, 3, 11, 'subscription', NULL, '2026-05-11 10:00:00', '2026-06-10 10:00:00', 50.00, 'completed', '2026-05-11 09:45:00'),
+(2, 3, 3, 3, 11, 'subscription', NULL, '2026-05-11 10:00:00', '2026-06-10 10:00:00', 100.00, 'completed', '2026-05-11 09:45:00'),
 -- User 4 (Dang Minh Tu) thuê máy theo giờ (Gói Basic AMD - Spec 2 - Máy số 2) trong 6 giờ
-(3, 4, 2, NULL, 2, 'hourly', 6, '2026-05-12 11:00:00', '2026-05-12 17:00:00', 14.40, 'completed', '2026-05-12 10:55:00'),
+(3, 4, 2, NULL, 2, 'hourly', 6, '2026-05-12 11:00:00', '2026-05-12 17:00:00', 15.00, 'completed', '2026-05-12 10:55:00'),
 -- User 5 (Tran Linh Dan) thuê máy theo giờ (Gói Pro AMD - Spec 4 - Máy số 12) trong 4 giờ
-(4, 5, 4, NULL, 12, 'hourly', 4, '2026-05-12 15:00:00', '2026-05-12 19:00:00', 22.00, 'completed', '2026-05-12 14:50:00'),
+(4, 5, 4, NULL, 12, 'hourly', 4, '2026-05-12 15:00:00', '2026-05-12 19:00:00', 20.00, 'completed', '2026-05-12 14:50:00'),
 -- User 6 (Nguyen Tien Anh) đăng ký Gói tháng Ultra Intel (Spec 5)
-(5, 6, 5, 5, 21, 'subscription', NULL, '2026-05-13 08:00:00', '2026-06-12 08:00:00', 100.00, 'completed', '2026-05-13 07:45:00');
+(5, 6, 5, 5, 21, 'subscription', NULL, '2026-05-13 08:00:00', '2026-06-12 08:00:00', 200.00, 'completed', '2026-05-13 07:45:00');
 
 -- Ghi nhận trừ tiền tương ứng trong ví sau khi Book máy thành công
 INSERT INTO `wallet_transactions` (`wallet_id`, `amount`, `type`, `reference_id`, `note`, `created_at`) VALUES
-(2, -105.00, 'deduct', 1, 'Thanh toán đăng ký gói tháng Ultra AMD', '2026-05-10 08:45:00'),
-(3, -50.00, 'deduct', 2, 'Thanh toán đăng ký gói tháng Pro Intel', '2026-05-11 09:45:00'),
-(4, -14.40, 'deduct', 3, 'Thanh toán thuê máy Basic AMD theo giờ', '2026-05-12 10:55:00'),
-(5, -22.00, 'deduct', 4, 'Thanh toán thuê máy Pro AMD theo giờ', '2026-05-12 14:50:00'),
-(6, -100.00, 'deduct', 5, 'Thanh toán đăng ký gói tháng Ultra Intel', '2026-05-13 07:45:00');
+(2, -200.00, 'deduct', 1, 'Thanh toán đăng ký gói tháng Ultra AMD', '2026-05-10 08:45:00'),
+(3, -100.00, 'deduct', 2, 'Thanh toán đăng ký gói tháng Pro Intel', '2026-05-11 09:45:00'),
+(4, -15.00, 'deduct', 3, 'Thanh toán thuê máy Basic AMD theo giờ', '2026-05-12 10:55:00'),
+(5, -20.00, 'deduct', 4, 'Thanh toán thuê máy Pro AMD theo giờ', '2026-05-12 14:50:00'),
+(6, -200.00, 'deduct', 5, 'Thanh toán đăng ký gói tháng Ultra Intel', '2026-05-13 07:45:00');
 
 -- 3.3. Fake Sessions (Các phiên làm việc thực tế được ghi nhận trên máy trạm)
 INSERT INTO `sessions` (`id`, `booking_id`, `user_id`, `pc_id`, `start_time`, `end_time`, `total_cost`, `status`) VALUES
@@ -454,9 +454,9 @@ INSERT INTO `sessions` (`id`, `booking_id`, `user_id`, `pc_id`, `start_time`, `e
 -- Phiên chơi máy của Long (User 3) trên máy trạm Pro Intel số 11 (Đã kết thúc phiên thứ nhất)
 (2, 2, 3, 11, '2026-05-11 10:00:00', '2026-05-11 13:30:00', 0.00, 'ended'),
 -- Phiên sử dụng của Tú (User 4) chạy suốt 6 tiếng trực tiếp đúng giờ đặt thuê máy 
-(3, 3, 4, 2, '2026-05-12 11:00:00', '2026-05-12 17:00:00', 14.40, 'ended'),
+(3, 3, 4, 2, '2026-05-12 11:00:00', '2026-05-12 17:00:00', 15.00, 'ended'),
 -- Phiên sử dụng của Đan (User 5) chạy hết 4 tiếng trọn vẹn
-(4, 4, 5, 12, '2026-05-12 15:00:00', '2026-05-12 19:00:00', 22.00, 'ended'),
+(4, 4, 5, 12, '2026-05-12 15:00:00', '2026-05-12 19:00:00', 20.00, 'ended'),
 -- Phiên kết nối của Tiến Anh (User 6) trên quái vật Ultra Intel số 21 (Đã kết thúc phiên đầu tiên)
 (5, 5, 6, 21, '2026-05-13 08:00:00', '2026-05-13 12:00:00', 0.00, 'ended');
 
