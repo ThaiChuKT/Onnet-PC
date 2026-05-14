@@ -359,7 +359,19 @@ INSERT INTO `subscription_plans` (`id`, `plan_name`, `spec_id`, `duration_days`,
 (3, 'Pro Intel - Monthly', 3, 30, 50.00),
 (4, 'Pro AMD - Monthly', 4, 30, 55.00),
 (5, 'Ultra Intel - Monthly', 5, 30, 100.00),
-(6, 'Ultra AMD - Monthly', 6, 30, 105.00);
+(6, 'Ultra AMD - Monthly', 6, 30, 105.00),
+(7, 'Basic Intel - Monthly', 1, 30, 60.00),
+(8, 'Basic AMD - Monthly', 2, 30, 56.00),
+(9, 'Basic Intel - Yearly', 1, 365, 600.00),
+(10, 'Basic AMD - Yearly', 2, 365, 560.00),
+(11, 'Pro Intel - Weekly', 3, 7, 15.00),
+(12, 'Pro AMD - Weekly', 4, 7, 16.50),
+(13, 'Pro Intel - Yearly', 3, 365, 500.00),
+(14, 'Pro AMD - Yearly', 4, 365, 550.00),
+(15, 'Ultra Intel - Weekly', 5, 7, 30.00),
+(16, 'Ultra AMD - Weekly', 6, 7, 31.50),
+(17, 'Ultra Intel - Yearly', 5, 365, 1000.00),
+(18, 'Ultra AMD - Yearly', 6, 365, 1050.00);
 
 -- 2.6. Seed 15 Users (Gồm 1 Admin và 14 thành viên trải đều các gói hội viên)
 INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `phone`, `password_hash`, `role`, `tier_id`, `is_verified`) VALUES
