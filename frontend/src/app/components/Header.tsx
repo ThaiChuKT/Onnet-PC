@@ -70,12 +70,6 @@ export function Header() {
                 Dashboard Home
               </Link>
               <Link
-                to="/computers"
-                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
-              >
-                PC catalog
-              </Link>
-              <Link
                 to="/faq-admin"
                 className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
