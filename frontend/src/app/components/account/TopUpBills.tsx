@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "../ui/card";
-import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Search, ReceiptText, Wallet } from "lucide-react";
