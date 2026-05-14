@@ -7,6 +7,7 @@ import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminSessionItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
+import com.onnet.onnetpc.admin.dto.CreatePackageRequest;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetReviewStatusRequest;
@@ -19,6 +20,7 @@ import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.memberships.MembershipTier;
+import com.onnet.onnetpc.memberships.MembershipTierSpecMapping;
 import com.onnet.onnetpc.memberships.MembershipTierRepository;
 import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
@@ -39,6 +41,7 @@ import com.onnet.onnetpc.users.repository.UserRepository;
 import com.onnet.onnetpc.wallet.WalletTransaction;
 import com.onnet.onnetpc.wallet.WalletTransactionType;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -243,6 +246,95 @@ public class AdminService {
         SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Package not found"));
         return toAdminPackage(plan);
+    }
+
+    @Transactional
+    public List<AdminPackageItemResponse> createPackage(CreatePackageRequest request) {
+        if (request.planName() == null || request.planName().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Plan name is required");
+        }
+        if (request.cpu() == null || request.cpu().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CPU is required");
+        }
+        if (request.gpu() == null || request.gpu().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "GPU is required");
+        }
+        if (request.operatingSystem() == null || request.operatingSystem().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Operating system is required");
+        }
+        if (request.ram() == null || request.ram() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "RAM must be greater than 0");
+        }
+        if (request.storage() == null || request.storage() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Storage must be greater than 0");
+        }
+        if (request.monthlyPrice() == null || request.monthlyPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Monthly price must be greater than 0");
+        }
+
+        String baseName = request.planName().trim();
+        BigDecimal monthlyPrice = request.monthlyPrice();
+        BigDecimal weeklyPrice = monthlyPrice.divide(BigDecimal.valueOf(4), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal yearlyPrice = monthlyPrice.multiply(BigDecimal.TEN).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        PcSpec spec = new PcSpec();
+        spec.setSpecName(baseName);
+        spec.setCpu(request.cpu().trim());
+        spec.setGpu(request.gpu().trim());
+        spec.setRam(request.ram());
+        spec.setStorage(request.storage());
+        spec.setOs(request.operatingSystem().trim());
+
+        String locationSuffix = request.location() == null || request.location().isBlank()
+            ? ""
+            : " | Location: " + request.location().trim();
+        spec.setDescription((request.description() == null ? "" : request.description().trim()) + locationSuffix);
+        spec.setPricePerHour(null);
+        spec.setAvailable(true);
+
+        String tierName = resolveTierNameForNewPackage(request.tierName(), baseName);
+        spec.setExclusive("ultra".equalsIgnoreCase(tierName));
+        PcSpec savedSpec = pcSpecRepository.save(spec);
+
+        if (tierName != null) {
+            membershipTierRepository.findByTierNameIgnoreCaseAndActiveTrue(tierName).ifPresent((tier) -> {
+                MembershipTierSpecMapping mapping = new MembershipTierSpecMapping();
+                mapping.setTier(tier);
+                mapping.setSpec(savedSpec);
+                membershipTierSpecMappingRepository.save(mapping);
+            });
+        }
+
+        boolean active = request.active() == null ? true : request.active();
+
+        SubscriptionPlan weeklyPlan = new SubscriptionPlan();
+        weeklyPlan.setPlanName(withSuffix(baseName, "Weekly"));
+        weeklyPlan.setSpec(savedSpec);
+        weeklyPlan.setDurationDays(7);
+        weeklyPlan.setPrice(weeklyPrice);
+        weeklyPlan.setActive(active);
+
+        SubscriptionPlan monthlyPlan = new SubscriptionPlan();
+        monthlyPlan.setPlanName(withSuffix(baseName, "Monthly"));
+        monthlyPlan.setSpec(savedSpec);
+        monthlyPlan.setDurationDays(30);
+        monthlyPlan.setPrice(monthlyPrice.setScale(2, java.math.RoundingMode.HALF_UP));
+        monthlyPlan.setActive(active);
+
+        SubscriptionPlan yearlyPlan = new SubscriptionPlan();
+        yearlyPlan.setPlanName(withSuffix(baseName, "Yearly"));
+        yearlyPlan.setSpec(savedSpec);
+        yearlyPlan.setDurationDays(365);
+        yearlyPlan.setPrice(yearlyPrice);
+        yearlyPlan.setActive(active);
+
+        subscriptionPlanRepository.saveAll(List.of(weeklyPlan, monthlyPlan, yearlyPlan));
+
+        return subscriptionPlanRepository
+            .findBySpecIdAndActiveTrueOrderByDurationDaysAsc(savedSpec.getId())
+            .stream()
+            .map(this::toAdminPackage)
+            .toList();
     }
 
     @Transactional
@@ -511,6 +603,35 @@ public class AdminService {
             .flatMap(membershipTierRepository::findById)
             .map(MembershipTier::getTierName)
             .orElse(null);
+    }
+
+    private String resolveTierNameForNewPackage(String requestTierName, String baseName) {
+        if (requestTierName != null && !requestTierName.isBlank()) {
+            String normalized = requestTierName.trim().toLowerCase();
+            if ("basic".equals(normalized) || "pro".equals(normalized) || "ultra".equals(normalized)) {
+                return normalized;
+            }
+        }
+
+        String name = baseName.toLowerCase();
+        if (name.contains("basic")) {
+            return "basic";
+        }
+        if (name.contains("pro")) {
+            return "pro";
+        }
+        if (name.contains("ultra")) {
+            return "ultra";
+        }
+        return null;
+    }
+
+    private String withSuffix(String planName, String suffix) {
+        String normalized = planName.toLowerCase();
+        if (normalized.endsWith("- " + suffix.toLowerCase()) || normalized.endsWith(" " + suffix.toLowerCase())) {
+            return planName;
+        }
+        return planName + " - " + suffix;
     }
 
     private AdminBookingItemResponse toAdminBooking(Booking booking) {
