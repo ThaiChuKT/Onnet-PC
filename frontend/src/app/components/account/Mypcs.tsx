@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
@@ -92,13 +92,17 @@ type SpecSummary = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  paid: {
+  ready: {
     label: "Ready",
     className: "bg-blue-500/20 text-blue-500 border-blue-500/50",
   },
-  active: {
-    label: "Active",
+  in_use: {
+    label: "In Use",
     className: "bg-accent/20 text-accent border-accent/50",
+  },
+  maintenance: {
+    label: "Maintenance",
+    className: "bg-red-500/20 text-red-500 border-red-500/50",
   },
   waiting: {
     label: "Waiting",
@@ -116,7 +120,12 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 const normalizeBookingStatus = (value?: string | null) => {
   const normalized = (value ?? "").toLowerCase();
-  return normalized === "completed" ? "expired" : normalized;
+  if (normalized === "completed") return "expired";
+  if (normalized === "paid") return "ready";
+  if (normalized === "active") return "in_use";
+  if (normalized === "in use") return "in_use";
+  if (normalized === "locked") return "maintenance";
+  return normalized;
 };
 
 const POLL_MS = 15_000;
@@ -183,11 +192,11 @@ export function Mypcs() {
     () =>
       items.filter((item) => {
         const status = normalizeBookingStatus(item.status);
-        // Do not show cancelled bookings on My PCs; history handles cancelled records
         return (
-          status === "paid" ||
-          status === "active" ||
+          status === "ready" ||
+          status === "in_use" ||
           status === "waiting" ||
+          status === "maintenance" ||
           status === "expired"
         );
       }),
@@ -231,7 +240,7 @@ export function Mypcs() {
           item.bookingId === bookingId
             ? {
                 ...item,
-                status: "active",
+                status: "in_use",
                 pcId: res.pcId ?? item.pcId,
               }
             : item,
@@ -272,8 +281,8 @@ export function Mypcs() {
     }
   };
 
-  const activeCount = visibleItems.filter((item) => normalizeBookingStatus(item.status) === "active" || activeBookingId === item.bookingId).length;
-  const readyCount = visibleItems.filter((item) => normalizeBookingStatus(item.status) === "paid").length;
+  const activeCount = visibleItems.filter((item) => normalizeBookingStatus(item.status) === "in_use" || activeBookingId === item.bookingId).length;
+  const readyCount = visibleItems.filter((item) => normalizeBookingStatus(item.status) === "ready").length;
 
   return (
     <div>
@@ -290,24 +299,20 @@ export function Mypcs() {
             Start or stop your session here. Specs and status are shown for each machine.
           </p>
         </div>
-
-        <Button asChild variant="outline" className="border-border w-fit">
-          <Link to="/packages">Choose your plans</Link>
-        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-6">
-        <Card className="p-4 border-border bg-card/70">
-          <p className="text-sm text-muted-foreground">Available bookings</p>
-          <p className="text-2xl font-bold">{visibleItems.length}</p>
+        <Card className="p-4 border-border bg-card/70 flex flex-col justify-center">
+          <p className="text-lg font-semibold text-muted-foreground">Available bookings</p>
+          <p className="text-3xl font-bold mt-1">{visibleItems.length}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/70">
-          <p className="text-sm text-muted-foreground">Ready to start</p>
-          <p className="text-2xl font-bold text-money">{readyCount}</p>
+        <Card className="p-4 border-border bg-card/70 flex flex-col justify-center">
+          <p className="text-lg font-semibold text-muted-foreground">Ready to start</p>
+          <p className="text-3xl font-bold text-money mt-1">{readyCount}</p>
         </Card>
-        <Card className="p-4 border-border bg-card/70">
-          <p className="text-sm text-muted-foreground">Active sessions</p>
-          <p className="text-2xl font-bold text-accent">{activeCount}</p>
+        <Card className="p-4 border-border bg-card/70 flex flex-col justify-center">
+          <p className="text-lg font-semibold text-muted-foreground">Active sessions</p>
+          <p className="text-3xl font-bold text-accent mt-1">{activeCount}</p>
         </Card>
       </div>
 
@@ -357,8 +362,8 @@ export function Mypcs() {
                 className: "bg-muted text-muted-foreground border-border",
               };
               const spec = item.specId ? specCatalog.get(item.specId) ?? null : null;
-              const isActive = status === "active" || activeBookingId === item.bookingId;
-              const canStart = status === "paid" && activeBookingId === null;
+              const isActive = status === "in_use" || activeBookingId === item.bookingId;
+              const canStart = status === "ready" && activeBookingId === null;
               const isStarting = startingBookingId === item.bookingId;
               const isEnding = endingBookingId === item.bookingId;
               const canShowStart = canStart && !isActive;
@@ -372,7 +377,7 @@ export function Mypcs() {
                         <Badge className={cfg.className}>{cfg.label}</Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Booking #{item.bookingId}
+                        Hours left: {item.remainingMinutes !== null ? `${Math.ceil(item.remainingMinutes / 60)}h` : "—"}
                       </div>
                       {item.queued && (
                         <div className="text-xs text-orange-400">
