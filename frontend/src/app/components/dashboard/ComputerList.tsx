@@ -101,15 +101,15 @@ function getStatusMeta(status: string) {
   if (normalized === "available") {
     return {
       label: "Available",
-      badgeClass: "bg-emerald-500/15 text-emerald-600 border-emerald-500/40",
-      dotClass: "bg-emerald-500",
+      badgeClass: "bg-blue-500/15 text-blue-500 border-blue-500/40",
+      dotClass: "bg-blue-500",
     };
   }
   if (normalized === "in_use") {
     return {
       label: "In Use",
-      badgeClass: "bg-blue-500/15 text-blue-500 border-blue-500/40",
-      dotClass: "bg-blue-500",
+      badgeClass: "bg-emerald-500/15 text-emerald-600 border-emerald-500/40 animate-pulse",
+      dotClass: "bg-emerald-500",
     };
   }
   return {
@@ -375,9 +375,9 @@ export function ComputerList() {
             {normalizeStatus(machine.status) === "maintenance" ? "Unlock" : "Lock"}
           </Button>
           {isInUse && (
-            <div className="text-sm text-blue-500">
-              <div>In use by</div>
-              <div className="font-medium">{active?.userFullName ?? active?.userEmail ?? "Unknown user"}</div>
+            <div className="text-sm text-emerald-600">
+              <div>Session started by</div>
+              <div className="font-bold">{active?.userFullName ?? active?.userEmail ?? "Unknown user"}</div>
             </div>
           )}
         </div>
