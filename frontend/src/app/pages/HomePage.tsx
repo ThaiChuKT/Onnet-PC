@@ -10,8 +10,8 @@ export function HomePage() {
       <Header />
       <main>
         <Hero />
-        <Packages variant="home" />
         <Features />
+        <Packages />
       </main>
       <Footer />
     </div>

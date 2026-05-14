@@ -94,97 +94,10 @@ type PackagesProps = {
   variant?: "home" | "page";
 };
 
-export function Packages({ variant = "page" }: PackagesProps) {
-  const isHome = variant === "home";
+export function Packages({ }: PackagesProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
 
-  if (isHome) {
-    return (
-      <section id="packages" className="py-24 bg-gradient-to-b from-background via-muted/20 to-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto mb-12 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Our{" "}
-              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                plans
-              </span>
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the setup that matches your budget and performance target. Each plan is built for a
-              different play style, from entry level to high-end.
-            </p>
-            <div className="mt-6">
-              <Button asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
-                <Link to="/packages">Join now</Link>
-              </Button>
-            </div>
-          </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-            {packages.map((pkg) => {
-              const currentPricing = pkg.pricing.month;
-
-              return (
-                <Card
-                  key={pkg.tierName}
-                  className={`relative overflow-hidden border-border bg-card/70 backdrop-blur-sm ${
-                    pkg.popular ? "ring-1 ring-primary/50 shadow-lg shadow-primary/10" : ""
-                  }`}
-                >
-                  {pkg.popular && (
-                    <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-primary to-accent text-white text-xs font-bold px-3 py-1 rounded-full">
-                      MOST POPULAR
-                    </div>
-                  )}
-
-                  <div className="relative h-52 overflow-hidden">
-                    <ImageWithFallback src={pkg.image} alt={pkg.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
-                      <div className="bg-primary/20 p-2 rounded-lg border border-primary/40 backdrop-blur-sm">
-                        <pkg.icon className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{pkg.tierName}</p>
-                        <h3 className="text-2xl font-bold">{pkg.name}</h3>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-5">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-4xl font-bold text-money">{formatUsd(currentPricing.amountUsd)}</span>
-                      <span className="text-muted-foreground">{currentPricing.period}</span>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">{pkg.features[0]}</p>
-
-                    <ul className="space-y-2">
-                      {pkg.features.slice(1, 4).map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                          <span className="text-sm text-foreground/90">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="flex gap-3">
-                      <Button asChild variant="ghost" className="flex-1 text-primary hover:text-primary/90">
-                        <Link to="/packages">Join now</Link>
-                      </Button>
-                      <Button asChild className="flex-1 bg-card border border-border text-foreground hover:bg-primary/10">
-                        <Link to={`/packages/${pkg.tierName.toLowerCase()}`}>View details</Link>
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section id="packages" className="py-20 bg-gradient-to-b from-background to-muted/30">

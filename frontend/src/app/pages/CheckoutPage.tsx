@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Header } from "../components/Header";
-import { Footer } from "../components/Footer";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -31,6 +29,11 @@ import {
   CreditCard as CheckoutIcon,
   Wallet,
   XCircle,
+  Cpu,
+  Zap,
+  MemoryStick,
+  HardDrive,
+  Monitor,
 } from "lucide-react";
 import { apiGet, apiPost } from "../api/http";
 import { toast } from "sonner";
@@ -77,6 +80,32 @@ type PageResponse<T> = {
   size: number;
 };
 
+type MachineListItemResponse = {
+  pcId: number;
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  hourlyPrice: number | string;
+  location: string;
+  status?: string;
+};
+
+type PcConfigOption = {
+  pcId: number;
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  hourlyPrice: number;
+  location: string;
+  machineCount: number;
+};
+
 type SubscriptionPlanPriceResponse = {
   id: number;
   planName: string;
@@ -93,10 +122,96 @@ type TopUpResponse = {
 };
 
 type BookingDraftState = {
+  configOptions: PcConfigOption[];
+  selectedConfigSpecId: number | null;
   planOptions: SubscriptionPlanPriceResponse[];
   selectedPlanId: number | null;
   quantity: number;
   originalQuantity: number;
+};
+
+type TierKey = "basic" | "pro" | "ultra";
+
+const SPEC_TO_TIER_MAP: Record<number, TierKey> = {
+  1: "basic",
+  2: "basic",
+  3: "basic",
+  4: "basic",
+  10: "basic",
+  5: "pro",
+  6: "pro",
+  7: "pro",
+  8: "ultra",
+  9: "ultra",
+};
+
+const getTierKeyFromSpecId = (specId: number | null | undefined): TierKey | null => {
+  if (specId == null) return null;
+  return SPEC_TO_TIER_MAP[specId] ?? null;
+};
+
+const buildConfigOptions = (machines: MachineListItemResponse[], specId: number) => {
+  const tierKey = getTierKeyFromSpecId(specId);
+  const filtered = machines.filter((machine) => {
+    if (tierKey) return getTierKeyFromSpecId(machine.specId) === tierKey;
+    return machine.specId === specId;
+  });
+
+  const grouped = new Map<string, PcConfigOption>();
+
+  for (const machine of filtered) {
+    const key = `${machine.specId}-${machine.specName}-${machine.cpu}-${machine.gpu}-${machine.ram}-${machine.storage}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.machineCount += 1;
+      continue;
+    }
+
+    grouped.set(key, {
+      pcId: machine.pcId,
+      specId: machine.specId,
+      specName: machine.specName,
+      cpu: machine.cpu,
+      gpu: machine.gpu,
+      ram: machine.ram,
+      storage: machine.storage,
+      hourlyPrice: Number(machine.hourlyPrice),
+      location: machine.location,
+      machineCount: 1,
+    });
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => Number(a.specId) - Number(b.specId));
+};
+
+const pickBestPlan = (
+  plans: SubscriptionPlanPriceResponse[],
+  preferredPlanId: number | null,
+  totalPrice: number,
+) => {
+  const directMatch = preferredPlanId ? plans.find((plan) => plan.id === preferredPlanId) ?? null : null;
+  if (directMatch) return directMatch;
+
+  let matchedPlan: SubscriptionPlanPriceResponse | null = null;
+  let bestScore = Infinity;
+
+  for (const plan of plans) {
+    const unitPrice = Number(plan.price ?? 0);
+    if (!unitPrice) continue;
+    const inferred = Number(totalPrice ?? 0) / unitPrice;
+    if (!Number.isFinite(inferred)) continue;
+    const roundedQty = Math.max(1, Math.round(inferred));
+    const distanceFromWhole = Math.abs(inferred - roundedQty);
+    const distanceFromOne = Math.abs(roundedQty - 1);
+    const score = distanceFromOne * 100 + distanceFromWhole * 10;
+
+    if (score < bestScore) {
+      bestScore = score;
+      matchedPlan = plan;
+    }
+  }
+
+  return matchedPlan ?? plans[0] ?? null;
 };
 
 const normalizeBookingStatus = (value?: string | null) => {
@@ -107,6 +222,7 @@ const normalizeBookingStatus = (value?: string | null) => {
 export function CheckoutPage() {
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, BookingDraftState>>({});
+  const [availableMachines, setAvailableMachines] = useState<MachineListItemResponse[]>([]);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -117,6 +233,7 @@ export function CheckoutPage() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [receiveEmail, setReceiveEmail] = useState(true);
   const [showTopUp, setShowTopUp] = useState(false);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [isTopUpSubmitting, setIsTopUpSubmitting] = useState(false);
   const [showReturnConfirm, setShowReturnConfirm] = useState(false);
@@ -131,15 +248,21 @@ export function CheckoutPage() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [page, wallet] = await Promise.all([
+      const [page, wallet, machinesPage] = await Promise.all([
         apiGet<PageResponse<BookingHistoryItemResponse>>("/bookings/my", { page: 0, size: 50 }),
         apiGet<{ walletId: number; balance: number }>("/wallet").catch(() => null),
+        apiGet<PageResponse<MachineListItemResponse>>("/pcs", { page: 0, size: 200, sort: "price_asc" }).catch(() => null),
       ]);
       const pending = (page.content ?? []).filter(
         (item) => normalizeBookingStatus(item.status) === "pending",
       );
       setItems(pending);
       if (wallet) setWalletBalance(Number(wallet.balance));
+      const machineItems = (machinesPage?.content ?? []).map((machine) => ({
+        ...machine,
+        hourlyPrice: typeof machine.hourlyPrice === "string" ? parseFloat(machine.hourlyPrice) : Number(machine.hourlyPrice),
+      }));
+      setAvailableMachines(machineItems);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not load checkout";
       setLoadError(msg);
@@ -160,49 +283,39 @@ export function CheckoutPage() {
       const entries = await Promise.all(
         items.map(async (item) => {
           if (!item.specId) {
-            return [item.bookingId, { planOptions: [], selectedPlanId: null, quantity: 1, originalQuantity: 1 }] as const;
+            return [item.bookingId, { configOptions: [], selectedConfigSpecId: null, planOptions: [], selectedPlanId: null, quantity: 1, originalQuantity: 1 }] as const;
           }
 
           try {
-            const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${item.specId}/plans`);
-            
-            let matchedPlan = item.planId 
-              ? plans.find(p => p.id === item.planId)
-              : null;
-            
-            if (!matchedPlan) {
-              let bestScore = Infinity;
-              
-              for (const plan of plans) {
-                const unitPrice = Number(plan.price ?? 0);
-                if (!unitPrice) continue;
-                const inferred = Number(item.totalPrice ?? 0) / unitPrice;
-                if (!Number.isFinite(inferred)) continue;
-                const roundedQty = Math.max(1, Math.round(inferred));
-                const distanceFromWhole = Math.abs(inferred - roundedQty);
-                const distanceFromOne = Math.abs(roundedQty - 1);
-                const score = distanceFromOne * 100 + distanceFromWhole * 10;
-                
-                if (score < bestScore) {
-                  bestScore = score;
-                  matchedPlan = plan;
-                }
-              }
-            }
-            
-            matchedPlan = matchedPlan ?? plans[0] ?? null;
-            
+            const configOptions = buildConfigOptions(availableMachines, item.specId);
+            const selectedConfigSpecId = configOptions.find((config) => config.specId === item.specId)?.specId ?? configOptions[0]?.specId ?? null;
+            const plans = selectedConfigSpecId
+              ? await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${selectedConfigSpecId}/plans`)
+              : [];
+
+            const matchedPlan = pickBestPlan(plans, item.planId, Number(item.totalPrice ?? 0));
             const inferredQuantity = matchedPlan
               ? Math.max(1, Math.round(Number(item.totalPrice ?? 0) / Number(matchedPlan.price ?? 1)))
               : 1;
+
             return [item.bookingId, {
+              configOptions,
+              selectedConfigSpecId,
               planOptions: plans,
               selectedPlanId: matchedPlan?.id ?? null,
               quantity: inferredQuantity,
               originalQuantity: inferredQuantity,
             }] as const;
           } catch {
-            return [item.bookingId, { planOptions: [], selectedPlanId: null, quantity: 1, originalQuantity: 1 }] as const;
+            const configOptions = buildConfigOptions(availableMachines, item.specId);
+            return [item.bookingId, {
+              configOptions,
+              selectedConfigSpecId: configOptions.find((config) => config.specId === item.specId)?.specId ?? configOptions[0]?.specId ?? null,
+              planOptions: [],
+              selectedPlanId: null,
+              quantity: 1,
+              originalQuantity: 1,
+            }] as const;
           }
         }),
       );
@@ -217,7 +330,7 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [items]);
+  }, [items, availableMachines]);
 
   const focusedBookingId = useMemo(() => {
     const bookingId = location.state?.bookingId;
@@ -254,11 +367,18 @@ export function CheckoutPage() {
     let id = confirmBooking.bookingId;
     setCheckoutBusy(true);
     try {
-      if (isFocusedOrder && focusedBooking?.specId && focusedPlan && previewQuantity !== (focusedDraft?.originalQuantity ?? previewQuantity)) {
+      const selectedConfigSpecId = focusedDraft?.selectedConfigSpecId ?? focusedBooking?.specId ?? null;
+      const shouldRecreateBooking =
+        isFocusedOrder &&
+        selectedConfigSpecId !== null &&
+        focusedPlan &&
+        (selectedConfigSpecId !== focusedBooking?.specId || previewQuantity !== (focusedDraft?.originalQuantity ?? previewQuantity));
+
+      if (shouldRecreateBooking) {
         const created = await apiPost<BookingResponseDto, { specId: number; planId: number; quantity: number }>(
           "/bookings/subscription",
           {
-            specId: focusedBooking.specId,
+            specId: selectedConfigSpecId,
             planId: focusedPlan.id,
             quantity: previewQuantity,
           },
@@ -354,7 +474,6 @@ export function CheckoutPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
       <main className="flex-1 pt-24 pb-12 bg-muted/30">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="mb-8 flex items-center justify-between">
@@ -405,32 +524,70 @@ export function CheckoutPage() {
           )}
 
           {!isLoading && !loadError && items.length > 0 && canShowFocusedSummary && (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start shadow-2xl ">
               <div className="space-y-6">
                 {[focusedBooking].filter((b): b is BookingHistoryItemResponse => b !== null).map((item) => {
                   const draft = bookingDrafts[item.bookingId];
+                  const itemConfig = draft?.configOptions.find((config) => config.specId === draft.selectedConfigSpecId) ?? draft?.configOptions[0] ?? null;
                   const itemPlan = draft?.planOptions.find((plan) => plan.id === draft.selectedPlanId) ?? draft?.planOptions[0] ?? null;
                   const itemQuantity = Math.max(1, Math.floor(draft?.quantity || 1));
                   const itemPreviewDays = itemPlan ? itemPlan.durationDays * itemQuantity : 0;
                   const itemTotal = itemPlan ? Number(itemPlan.price ?? 0) * itemQuantity : Number(item.totalPrice ?? 0);
                   return (
-                    <Card key={item.bookingId} className="p-0 border-border overflow-hidden">
+                    <Card key={item.bookingId} className="p-0 border-border overflow-hidden shadow-md">
                       <div className="border-b border-border px-5 py-4 bg-muted/20">
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-start justify-between gap-4">
                           <div>
                             <p className="text-sm text-muted-foreground">Product information</p>
                             <h3 className="text-2xl font-bold">{item.specName}</h3>
+                            {itemConfig && (
+                              <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
+                                <div className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                  <Monitor className="w-4 h-4 text-primary" />
+                                  Configuration: <span className="text-primary">{itemConfig.specName}</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Cpu className="w-4 h-4 text-primary shrink-0" />
+                                    <span className="text-foreground">{itemConfig.cpu}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Zap className="w-4 h-4 text-secondary shrink-0" />
+                                    <span className="text-foreground">{itemConfig.gpu}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <MemoryStick className="w-4 h-4 text-accent shrink-0" />
+                                    <span className="text-foreground">{itemConfig.ram} GB</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <HardDrive className="w-4 h-4 text-primary shrink-0" />
+                                    <span className="text-foreground">{itemConfig.storage} GB</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setCancelBookingTarget(item)}
-                            disabled={cancellingBookingId !== null}
-                            className="border-border hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <XCircle className="w-4 h-4 mr-2" />
-                            Cancel
-                          </Button>
+                          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowConfigDialog(true)}
+                              disabled={cancellingBookingId !== null}
+                              className="border-border"
+                            >
+                              Choose configuration
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setCancelBookingTarget(item)}
+                              disabled={cancellingBookingId !== null}
+                              className="border-border text-destructive hover:bg-destructive/50 hover:text-destructive/90"
+                            >
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       </div>
 
@@ -448,6 +605,8 @@ export function CheckoutPage() {
                                     ...current,
                                     [item.bookingId]: {
                                       ...(current[item.bookingId] ?? {
+                                        configOptions: draft?.configOptions ?? [],
+                                        selectedConfigSpecId: draft?.selectedConfigSpecId ?? null,
                                         planOptions: draft?.planOptions ?? [],
                                         selectedPlanId: itemPlan?.id ?? null,
                                         quantity: 1,
@@ -471,6 +630,8 @@ export function CheckoutPage() {
                                     ...current,
                                     [item.bookingId]: {
                                       ...(current[item.bookingId] ?? {
+                                        configOptions: draft?.configOptions ?? [],
+                                        selectedConfigSpecId: draft?.selectedConfigSpecId ?? null,
                                         planOptions: draft?.planOptions ?? [],
                                         selectedPlanId: itemPlan?.id ?? null,
                                         quantity: 1,
@@ -491,6 +652,8 @@ export function CheckoutPage() {
                                     ...current,
                                     [item.bookingId]: {
                                       ...(current[item.bookingId] ?? {
+                                        configOptions: draft?.configOptions ?? [],
+                                        selectedConfigSpecId: draft?.selectedConfigSpecId ?? null,
                                         planOptions: draft?.planOptions ?? [],
                                         selectedPlanId: itemPlan?.id ?? null,
                                         quantity: 1,
@@ -535,14 +698,12 @@ export function CheckoutPage() {
               <Card className="p-5 border-border bg-card/70 lg:sticky lg:top-24">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Amount of payment</p>
-                    <p className="text-3xl font-bold text-red-500">{formatUsd(previewTotal)}</p>
-                  </div>
-                  <div className="text-right text-sm text-muted-foreground">
                     <p>Wallet balance</p>
-                    <p className="font-semibold text-money">
-                      {walletBalance === null ? "—" : formatUsd(walletBalance)}
-                    </p>
+                      <p className="text-3xl font-bold text-money">{walletBalance === null ? "—" : formatUsd(walletBalance)}</p>
+                  </div>
+                  <div className="text-right text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">Amount of payment</p>
+                    <p className="text-2xl font-semibold text-red-500">{formatUsd(previewTotal)}</p>
                   </div>
                 </div>
 
@@ -558,16 +719,26 @@ export function CheckoutPage() {
                 </div>
 
                 {walletBalance !== null && previewTotal > walletBalance ? (
-                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 mb-4 text-sm">
-                    <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">Insufficient balance</p>
-                    <p className="text-muted-foreground">Top up your wallet before you finalize the purchase.</p>
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 mb-4 text-sm flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 mt-0.5 text-amber-600" />
+                    <div>
+                      <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">Insufficient balance</p>
+                      <p className="text-muted-foreground">Your wallet balance is not enough for this configuration yet. You can top up now and complete payment when ready.</p>
+                    </div>
                   </div>
                 ) : null}
 
                 <div className="space-y-3">
+                  {/* Combined button: Top up when insufficient, Finalize when enough */}
                   <Button
                     type="button"
-                    onClick={() => setConfirmBooking(focusedBooking)}
+                    onClick={() => {
+                      if (walletBalance !== null && previewTotal <= walletBalance) {
+                        setConfirmBooking(focusedBooking);
+                      } else {
+                        setShowTopUp(true);
+                      }
+                    }}
                     disabled={!focusedBooking || checkoutBusy || payingBookingId !== null}
                     className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                   >
@@ -576,23 +747,19 @@ export function CheckoutPage() {
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Processing…
                       </>
-                    ) : (
+                    ) : walletBalance !== null && previewTotal <= walletBalance ? (
                       "Finalize the purchase"
+                    ) : (
+                      "Top up wallet"
                     )}
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowTopUp(true)}
-                    className="w-full border-border"
-                  >
-                    Top up wallet
-                  </Button>
-
-                  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-                    <Checkbox checked={receiveEmail} onCheckedChange={(checked) => setReceiveEmail(checked === true)} />
-                    <span>Receive email receipt</span>
+                  <div className="flex items-center justify-between gap-3">
+            
+                    <div className="flex items-center gap-3 py-3 text-sm">
+                      <Checkbox checked={receiveEmail} onCheckedChange={(checked) => setReceiveEmail(checked === true)} />
+                      <span>Receive email receipt</span>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -600,7 +767,6 @@ export function CheckoutPage() {
           )}
         </div>
       </main>
-      <Footer />
 
       <AlertDialog
         open={!!confirmBooking}
@@ -739,6 +905,73 @@ export function CheckoutPage() {
             >
               {isTopUpSubmitting ? "Processing…" : "Pay with PayPal"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="max-w-lg border-border bg-card">
+          <DialogHeader>
+            <DialogTitle>Choose configuration</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {focusedDraft?.configOptions && focusedDraft.configOptions.length > 0 ? (
+              focusedDraft.configOptions.map((config) => (
+                <div
+                  key={config.specId}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${config.specId === focusedDraft.selectedConfigSpecId ? "border-primary bg-primary/5" : "border-border bg-muted/10"}`}
+                >
+                  <div>
+                    <div className="font-medium">{config.specName}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {config.cpu} • {config.gpu} • {config.ram}GB RAM • {config.storage}GB SSD
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {config.machineCount} machine{config.machineCount > 1 ? "s" : ""} available
+                    </div>
+                  </div>
+                  <div>
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        if (!focusedBooking) return;
+                        try {
+                          const plans = await apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${config.specId}/plans`);
+                          const matchedPlan = pickBestPlan(plans, focusedDraft?.selectedPlanId ?? null, Number(focusedBooking.totalPrice ?? 0));
+                          setBookingDrafts((current) => ({
+                            ...current,
+                            [focusedBooking.bookingId]: {
+                              ...(current[focusedBooking.bookingId] ?? {
+                                configOptions: focusedDraft.configOptions,
+                                selectedConfigSpecId: focusedDraft.selectedConfigSpecId,
+                                planOptions: focusedDraft.planOptions,
+                                selectedPlanId: focusedDraft.selectedPlanId,
+                                quantity: focusedDraft.quantity,
+                                originalQuantity: focusedDraft.originalQuantity,
+                              }),
+                              selectedConfigSpecId: config.specId,
+                              planOptions: plans,
+                              selectedPlanId: matchedPlan?.id ?? null,
+                            },
+                          }));
+                          setShowConfigDialog(false);
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Could not load configuration plans");
+                        }
+                      }}
+                      className="ml-2"
+                    >
+                      Select
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 text-sm text-muted-foreground">No configurations available.</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
