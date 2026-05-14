@@ -23,18 +23,23 @@ public class JwtService {
         @Value("${app.jwt.access-token-expiration-minutes}") long expirationMinutes
     ) {
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException("app.jwt.secret must be configured");
+            throw new IllegalStateException("app.jwt.secret must be configured and non-empty");
         }
 
-        byte[] keyBytes;
         try {
-            keyBytes = MessageDigest.getInstance("SHA-256")
-                .digest(secret.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("Unable to derive JWT signing key", ex);
+            byte[] keyBytes;
+            try {
+                keyBytes = MessageDigest.getInstance("SHA-256")
+                    .digest(secret.getBytes(StandardCharsets.UTF_8));
+            } catch (NoSuchAlgorithmException ex) {
+                throw new IllegalStateException("Unable to derive JWT signing key (SHA-256 not available)", ex);
+            }
+
+            this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+            this.expirationMinutes = expirationMinutes;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to initialize JwtService: " + ex.getMessage(), ex);
         }
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
-        this.expirationMinutes = expirationMinutes;
     }
 
     public String generateToken(String subject) {
