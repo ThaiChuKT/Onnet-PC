@@ -5,9 +5,13 @@ WORKDIR /app
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
+RUN chmod +x ./mvnw || true
+RUN sed -i 's/\r$//' ./mvnw || true
 RUN ./mvnw dependency:go-offline -B
 
 COPY src src
+RUN chmod +x ./mvnw || true
+RUN sed -i 's/\r$//' ./mvnw || true
 RUN ./mvnw package -DskipTests
 
 # ---- Runtime stage ----
