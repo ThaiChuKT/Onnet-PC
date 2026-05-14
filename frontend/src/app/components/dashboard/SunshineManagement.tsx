@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Activity, Copy, Plus, RefreshCw, Trash2, Wifi } from "lucide-react";
 import { apiDelete, apiGet, apiPost } from "../../api/http";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "../ui/input-otp";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
@@ -38,7 +37,6 @@ type MoonlightCommandResponse = {
 
 type MoonlightCommandRequest = {
   action: string;
-  pin?: string;
   resolution?: string;
   fps?: number;
   appName?: string;
@@ -65,7 +63,6 @@ export function SunshineManagement() {
   const [newPort, setNewPort] = useState("47989");
   const [newNotes, setNewNotes] = useState("");
   const [selectedAction, setSelectedAction] = useState("PROBE");
-  const [selectedPin, setSelectedPin] = useState("");
   const [selectedResolution, setSelectedResolution] = useState("1080p");
   const [selectedFps, setSelectedFps] = useState("60");
 
@@ -150,10 +147,6 @@ export function SunshineManagement() {
       executeOnServer: true,
     };
 
-    if (selectedAction === "PAIR") {
-      payload.pin = selectedPin.trim();
-    }
-
     if (selectedAction === "STREAM") {
       payload.resolution = selectedResolution;
       payload.fps = Number(selectedFps);
@@ -163,11 +156,6 @@ export function SunshineManagement() {
   };
 
   const handleRunCommand = async (host: SunshineHost) => {
-    if (selectedAction === "PAIR" && selectedPin.trim().length !== 4) {
-      toast.error("Enter the 4-digit PIN shown in Moonlight before pairing");
-      return;
-    }
-
     setExecutingHostId(host.id);
     try {
       const result = await apiPost<MoonlightCommandResponse, MoonlightCommandRequest>(
@@ -187,11 +175,6 @@ export function SunshineManagement() {
   };
 
   const handleCopyCommand = async (host: SunshineHost) => {
-    if (selectedAction === "PAIR" && selectedPin.trim().length !== 4) {
-      toast.error("Enter the 4-digit PIN shown in Moonlight before copying the pair command");
-      return;
-    }
-
     const result = await apiPost<MoonlightCommandResponse, MoonlightCommandRequest>(
       `/admin/moonlight/hosts/${host.id}/commands`,
       { ...buildCommandPayload(), executeOnServer: false },
@@ -277,25 +260,6 @@ export function SunshineManagement() {
             </SelectContent>
           </Select>
         </div>
-
-        {selectedAction === "PAIR" && (
-          <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
-            <div className="mb-3">
-              <p className="text-sm font-semibold">Moonlight PIN</p>
-              <p className="text-xs text-muted-foreground">
-                Enter the 4-digit PIN shown in the Moonlight client. The backend will pass it to Sunshine with the pairing command.
-              </p>
-            </div>
-            <InputOTP maxLength={4} value={selectedPin} onChange={setSelectedPin}>
-              <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-        )}
       </Card>
 
       <div className="space-y-4">
