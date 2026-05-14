@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
@@ -25,8 +26,13 @@ public class JwtService {
             throw new IllegalStateException("app.jwt.secret must be configured");
         }
 
-        byte[] keyBytes = MessageDigest.getInstance("SHA-256")
-            .digest(secret.getBytes(StandardCharsets.UTF_8));
+        byte[] keyBytes;
+        try {
+            keyBytes = MessageDigest.getInstance("SHA-256")
+                .digest(secret.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("Unable to derive JWT signing key", ex);
+        }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.expirationMinutes = expirationMinutes;
     }
