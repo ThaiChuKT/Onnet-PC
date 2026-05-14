@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Cpu, Monitor, Sparkles, HardDrive, Loader2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -240,7 +240,7 @@ export function PackageDetailsPage() {
                   alt={tierKey ? TIER_IMAGES[tierKey].alt : "Plan image"}
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/100 via-transparent to-black/100 blur-transparent" />
               </div>
 
               {/* Content section */}
@@ -287,17 +287,6 @@ export function PackageDetailsPage() {
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2 mb-6">
-            <Card className="p-4 border-border bg-card/70">
-              <p className="text-sm text-muted-foreground">PCs listed</p>
-              <p className="text-2xl font-bold">{metrics.total}</p>
-            </Card>
-            <Card className="p-4 border-border bg-card/70">
-              <p className="text-sm text-muted-foreground">Distinct specs</p>
-              <p className="text-2xl font-bold">{metrics.specs}</p>
-            </Card>
-          </div>
-
           {isLoading && (
             <Card className="p-10 border-border text-center bg-card/70">
               <Monitor className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
@@ -313,9 +302,9 @@ export function PackageDetailsPage() {
           )}
 
           {!isLoading && !loadError && groups.length > 0 && (
-            <div className="space-y-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {groups.map((group) => (
-                <Card key={group.specKey} className="overflow-hidden border-border bg-card/70">
+                <Card key={group.specKey} className="overflow-hidden border-border bg-card/70 flex flex-col">
                   <div className="border-b border-border/70 bg-muted/30 p-5 md:p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -327,8 +316,8 @@ export function PackageDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="p-5 md:p-6">
-                    <div className="grid gap-3 grid-cols-2 md:grid-cols-4 mb-4">
+                  <div className="p-5 md:p-6 flex-1">
+                    <div className="flex flex-col gap-3 h-full">
                       <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                           <Cpu className="w-4 h-4 text-primary" />
@@ -357,10 +346,6 @@ export function PackageDetailsPage() {
                         </div>
                         <p className="font-semibold text-sm">{group.storage}GB SSD</p>
                       </div>
-                    </div>
-
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Available in {group.machines.length} location{group.machines.length > 1 ? "s" : ""}</span>
                     </div>
                   </div>
                 </Card>
