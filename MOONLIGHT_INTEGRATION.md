@@ -33,6 +33,7 @@ Authenticated user endpoints:
   - `PAIR` -> `moonlight pair <host> [--pin <pin>]`
   - `STREAM` -> `moonlight stream <host> [options]`
 - Can prepare command only (copy command flow), or execute on server (`executeOnServer=true`) if enabled.
+- Pairing now accepts a Moonlight PIN from the dashboard and forwards it to Sunshine with `moonlight pair --pin`, so the client-to-host PIN handoff no longer needs to be typed manually on the host side.
 
 ### Frontend behavior
 
@@ -79,6 +80,7 @@ Notes:
 3. Run SQL migration file against your `onnetpc` database.
 4. Enable config flags above and restart backend.
 5. Sign in as admin and use `/dashboard/sunshine`.
+6. For `PAIR`, copy the PIN shown by Moonlight into the dashboard before running the command.
 
 ## Recommended first validation
 
