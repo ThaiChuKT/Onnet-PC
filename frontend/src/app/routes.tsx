@@ -9,6 +9,7 @@ import { ComputerDetailPage } from "./pages/ComputerDetailPage";
 import { PackagePricingPage } from "./pages/PackagePricingPage";
 import { PackageDetailsPage } from "./pages/PackageDetailsPage.tsx";
 import { AIChatPage } from "./pages/AIChatPage";
+import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EmailVerificationPage } from "./pages/EmailVerificationPage";
@@ -17,9 +18,9 @@ import { AdminFAQPage } from "./pages/AdminFAQPage";
 import { AccountInfo } from "./components/account/AccountInfo";
 import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
-import { Cart } from "./components/account/Cart";
 import { TopUp } from "./components/account/TopUp";
 import { TopUpBills } from "./components/account/TopUpBills";
+import { Mypcs } from "./components/account/Mypcs.tsx";
 import { ComputerList } from "./components/dashboard/ComputerList";
 import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
@@ -78,16 +79,16 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/packages/:tier/edit",
-    element: (
-      <AdminRoute>
-        <PackagePricingPage />
-      </AdminRoute>
-    ),
-  },
-  {
     path: "/ai-chat",
     Component: AIChatPage,
+  },
+  {
+    path: "/checkout",
+    element: (
+      <ProtectedRoute>
+        <CheckoutPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/wallet",
@@ -122,10 +123,6 @@ export const router = createBrowserRouter([
         Component: ChangePassword,
       },
       {
-        path: "cart",
-        Component: Cart,
-      },
-      {
         path: "transactions",
         Component: RentalHistory,
       },
@@ -140,6 +137,10 @@ export const router = createBrowserRouter([
       {
         path: "top-up-bills",
         Component: TopUpBills,
+      },
+      {
+        path: "mypcs",
+        Component: Mypcs,
       },
     ],
   },
@@ -191,7 +192,10 @@ export const router = createBrowserRouter([
         path: "sunshine",
         Component: SunshineManagement,
       },
+      {
+        path: "packages/:tier/edit",
+        Component: PackagePricingPage,
+      },
     ],
   },
 ]);
-

@@ -288,6 +288,11 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid plan price");
         }
 
+        List<Booking> oldPendingBookings = bookingRepository.findByUserIdAndStatus(user.getId(), BookingStatus.pending);
+        if (!oldPendingBookings.isEmpty()) {
+            bookingRepository.deleteAll(oldPendingBookings);
+        }
+
         Instant startTime = Instant.now();
         long totalDays = (long) plan.getDurationDays() * request.quantity();
         Instant endTime = startTime.plus(Duration.ofDays(totalDays));
@@ -416,8 +421,12 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
 
-        if (booking.getStatus() != BookingStatus.pending) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Only unpaid orders can be cancelled");
+        if (booking.getStatus().equals(BookingStatus.cancelled)){
+            bookingRepository.delete(booking);
+        } else {
+            booking.setStatus(BookingStatus.cancelled);
+            booking.setUpdatedAt(Instant.now());
+            bookingRepository.save(booking);
         }
 
         booking.setStatus(BookingStatus.cancelled);

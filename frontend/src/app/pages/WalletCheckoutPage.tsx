@@ -59,8 +59,8 @@ export function WalletCheckoutPage() {
   const safeRedirect = redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
     ? redirectParam
     : null;
-  const redirectLabel = safeRedirect?.includes("/cart")
-    ? "Back to cart"
+  const redirectLabel = safeRedirect?.includes("/checkout")
+    ? "Back to checkout"
     : safeRedirect?.includes("/transactions")
       ? "Back to transactions"
       : "Continue";

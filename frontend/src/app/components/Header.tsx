@@ -1,4 +1,4 @@
-import { Monitor, Menu, User, Wallet, LogOut, ShoppingCart } from "lucide-react";
+import { Monitor, Menu, User, Wallet, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
@@ -12,7 +12,6 @@ export function Header() {
   const navigate = useNavigate();
   const { isAuthenticated, isAdmin, user, logout } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
-  const [cartCount, setCartCount] = useState<number>(0);
 
   const refreshWallet = useCallback(async () => {
     if (!isAuthenticated) {
@@ -46,78 +45,33 @@ export function Header() {
     navigate("/");
   };
 
-  const refreshCartCount = useCallback(async () => {
-    if (!isAuthenticated) {
-      setCartCount(0);
-      return;
-    }
-    try {
-      const response = await apiGet<{ content: Array<{ status: string }> }>(
-        "/bookings/my",
-        { page: 0, size: 50 }
-      );
-      const pending = (response.content ?? []).filter(
-        (item) => (item.status ?? "").toLowerCase() === "pending"
-      );
-      setCartCount(pending.length);
-    } catch {
-      setCartCount(0);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    void refreshCartCount();
-  }, [refreshCartCount]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const id = window.setInterval(() => {
-      void refreshCartCount();
-    }, WALLET_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [isAuthenticated, refreshCartCount]);
-
-  useEffect(() => {
-    const handleCartUpdated = () => {
-      void refreshCartCount();
-    };
-    window.addEventListener("cartUpdated", handleCartUpdated);
-    return () => window.removeEventListener("cartUpdated", handleCartUpdated);
-  }, [refreshCartCount]);
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-md border-b border-border">
+      <div className="container mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 py-3">
         <Link
           to={isAdmin ? "/dashboard" : "/"}
-          className="flex items-center gap-2"
+          className="justify-self-start flex items-center gap-3"
         >
-          <div className="bg-gradient-to-br from-primary to-accent p-2 rounded-lg">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent">
             <Monitor className="w-6 h-6 text-white" />
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+          <span className="text-xl font-bold leading-none bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             RentPC Pro
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center justify-center gap-10 justify-self-center">
           {isAdmin ? (
             <>
               <Link
                 to="/dashboard"
-                className="text-foreground hover:text-primary transition-colors"
+                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
                 Dashboard Home
               </Link>
               <Link
-                to="/computers"
-                className="text-foreground hover:text-primary transition-colors"
-              >
-                PC catalog
-              </Link>
-              <Link
                 to="/faq-admin"
-                className="text-foreground hover:text-primary transition-colors"
+                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
                 FAQ Management
               </Link>
@@ -127,19 +81,19 @@ export function Header() {
             <>
               <a
                 href="/#home"
-                className="text-foreground hover:text-primary transition-colors"
+                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
                 Home
               </a>
               <a
-                href="/#packages"
-                className="text-foreground hover:text-primary transition-colors"
+                href="/packages"
+                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
                 Plans
               </a>
               {/* <a
                 href="/#features"
-                className="text-foreground hover:text-primary transition-colors"
+                className="text-sm font-medium text-foreground/90 hover:text-primary transition-colors"
               >
                 Features
               </a> */}
@@ -153,14 +107,14 @@ export function Header() {
           )}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="justify-self-end flex items-center gap-3 lg:translate-x-4">
           {isAuthenticated ? (
             <>
               {!isAdmin && (
                 <>
                   <div 
                     onClick={() => navigate("/account/top-up")}
-                    className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2 cursor-pointer hover:bg-card/80 transition-colors"
+                    className="hidden h-14 min-w-40 md:flex items-center gap-3 rounded-xl border border-border bg-card/80 px-4 cursor-pointer hover:bg-card transition-colors"
                     title="View wallet"
                   >
                     <Wallet className="w-5 h-5 text-primary" />
@@ -168,36 +122,24 @@ export function Header() {
                       <span className="text-xs text-muted-foreground">
                         Balance
                       </span>
-                      <span className="text-sm font-bold text-money">
+                      <span className="text-sm font-bold leading-tight text-money">
                         {balance === null ? "—" : formatUsd(balance)}
                       </span>
                     </div>
                   </div>
                   
-                  <button
-                    onClick={() => navigate("/account/cart")}
-                    className="hidden md:flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2 cursor-pointer hover:bg-card/80 transition-colors relative"
-                    title="View cart"
-                  >
-                    <ShoppingCart className="w-5 h-5 text-primary" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {cartCount > 99 ? "99+" : cartCount}
-                      </span>
-                    )}
-                  </button>
                 </>
               )}
 
               <div
                 onClick={() => navigate("/account")}
-                className="flex items-center gap-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/50 rounded-lg px-4 py-2 cursor-pointer hover:from-primary/30 hover:to-accent/30 transition-all"
+                className="flex h-14 min-w-40 items-center gap-3 rounded-xl border border-primary/50 bg-gradient-to-r from-primary/20 to-accent/20 px-4 cursor-pointer hover:from-primary/30 hover:to-accent/30 transition-all"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
-                <div className="hidden md:flex flex-col">
-                  <span className="text-sm font-bold">
+                <div className="hidden min-w-0 md:flex flex-col">
+                  <span className="max-w-24 truncate text-sm font-bold leading-tight">
                     {user?.email?.split("@")[0] ?? "User"}
                   </span>
                   <span className="text-xs text-muted-foreground">Account</span>
@@ -208,7 +150,7 @@ export function Header() {
                 onClick={handleLogout}
                 variant="outline"
                 size="icon"
-                className="border-destructive text-destructive hover:bg-destructive/10"
+                className="h-12 w-12 rounded-lg border-destructive text-destructive hover:bg-destructive/10"
                 title="Sign out"
               >
                 <LogOut className="w-5 h-5" />

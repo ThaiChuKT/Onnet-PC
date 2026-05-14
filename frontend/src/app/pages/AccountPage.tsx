@@ -1,9 +1,14 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { User, Lock, History, Wallet, ReceiptText, ShoppingCart } from "lucide-react";
+import { User, Lock, History, Wallet, ReceiptText, Monitor } from "lucide-react";
 
 const menuItems = [
+  {
+    path: "/account/mypcs",
+    label: "My PCs",
+    icon: Monitor,
+  },
   {
     path: "/account",
     label: "Profile",
@@ -18,11 +23,6 @@ const menuItems = [
     path: "/account/top-up",
     label: "Top up",
     icon: Wallet,
-  },
-  {
-    path: "/account/cart",
-    label: "Cart",
-    icon: ShoppingCart,
   },
   {
     path: "/account/top-up-bills",

@@ -115,4 +115,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                 order by b.id asc
         """)
         List<Long> findTimedOutPendingBookingIds(@Param("cutoff") Instant cutoff);
+
+        List<Booking> findByUserIdAndStatus(Long id, BookingStatus pending);
 }

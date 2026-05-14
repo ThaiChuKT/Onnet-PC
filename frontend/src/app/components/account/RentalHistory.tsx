@@ -11,18 +11,8 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../ui/dialog";
-import {
   Calendar,
   Clock,
-  Play,
-  Square,
   Loader2,
   Wallet,
   CreditCard,
@@ -31,15 +21,15 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { apiGet, apiPost } from "../../api/http";
-import { useAuth } from "../../auth/AuthProvider";
 import { toast } from "sonner";
 import { formatUsd } from "../../lib/formatUsd";
 
 type BookingHistoryItemResponse = {
   bookingId: number;
   specId: number | null;
+  planId: number | null;
   pcId: number | null;
   specName: string;
   queued: boolean;
@@ -82,36 +72,9 @@ type ActiveSessionResponse = {
   message: string;
 };
 
-type StartSessionResponse = {
-  sessionId: number;
-  bookingId: number;
-  pcId: number;
-  pcLocation: string;
-  startedAt: string;
-  expectedEndTime: string;
-  remainingSeconds: number;
-  connectionInfo: string;
-  status: string;
-  message: string;
-};
-
-type EndSessionResponse = {
-  sessionId: number;
-  bookingId: number;
-  endedAt: string;
-  noRefundApplied: boolean;
-  status: string;
-  message: string;
-};
-
 type BookingResponseDto = {
   bookingId: number;
   status: string;
-};
-
-type RenewTarget = {
-  booking: BookingHistoryItemResponse;
-  plans: SubscriptionPlanPriceResponse[];
 };
 
 type PageResponse<T> = {
@@ -157,33 +120,22 @@ const normalizeBookingStatus = (value?: string | null) => {
 const POLL_MS = 15_000;
 
 export function RentalHistory() {
-  const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<BookingHistoryItemResponse[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "paid" | "active" | "expired"
+    "all" | "paid" | "active" | "expired" | "cancelled"
   >("all");
-  const [showCancelled, setShowCancelled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [payingBookingId, setPayingBookingId] = useState<number | null>(null);
-  const [startingBookingId, setStartingBookingId] = useState<number | null>(
-    null,
-  );
-  const [endingBookingId, setEndingBookingId] = useState<number | null>(null);
   const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
   const [confirmBooking, setConfirmBooking] =
     useState<BookingHistoryItemResponse | null>(null);
   const [cancelBookingTarget, setCancelBookingTarget] =
     useState<BookingHistoryItemResponse | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<number | null>(
-    null,
-  );
-  const [renewTarget, setRenewTarget] = useState<RenewTarget | null>(null);
-  const [renewLoading, setRenewLoading] = useState(false);
-  const [renewPlanId, setRenewPlanId] = useState<number | null>(null);
-  const [renewingBookingId, setRenewingBookingId] = useState<number | null>(
     null,
   );
 
@@ -253,7 +205,6 @@ export function RentalHistory() {
   const visibleItems = useMemo(() => {
     return items.filter((item) => {
       const status = normalizeBookingStatus(item.status);
-      if ((!isAdmin || !showCancelled) && status === "cancelled") return false;
       if (status === "pending") return false;
       if (statusFilter === "all") return true;
       if (statusFilter === "active") {
@@ -261,7 +212,7 @@ export function RentalHistory() {
       }
       return status === statusFilter;
     });
-  }, [items, isAdmin, showCancelled, statusFilter, activeBookingId]);
+  }, [items, statusFilter, activeBookingId]);
 
   const formatCountdown = (endIso: string | null) => {
     if (!endIso) return null;
@@ -276,14 +227,6 @@ export function RentalHistory() {
       return `${hours}h ${mins.toString().padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`;
     }
     return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
-  };
-
-  const formatDurationLabel = (days: number | null | undefined) => {
-    if (!days || days <= 0) return "Package";
-    if (days === 7) return "Weekly";
-    if (days === 30) return "Monthly";
-    if (days === 365) return "Yearly";
-    return `${days} days`;
   };
 
   const handleConfirmPay = async () => {
@@ -310,56 +253,41 @@ export function RentalHistory() {
     }
   };
 
-  const handleStartSession = async (bookingId: number) => {
-    if (startingBookingId !== null || endingBookingId !== null) return;
-    setStartingBookingId(bookingId);
-    try {
-      const res = await apiPost<StartSessionResponse>(
-        `/bookings/${bookingId}/start-session`,
-      );
-      setActiveBookingId(res.bookingId ?? bookingId);
-      setItems((prev) =>
-        prev.map((b) =>
-          b.bookingId === bookingId
-            ? {
-                ...b,
-                status: "active",
-                pcId: res.pcId ?? b.pcId,
-              }
-            : b,
-        ),
-      );
-      toast.success(res.message || "Session started");
-      await loadData("silent");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start session");
-    } finally {
-      setStartingBookingId(null);
+  const handleRenewBooking = async (booking: BookingHistoryItemResponse) => {
+    if (!booking.specId) {
+      toast.error("Missing machine group for renew");
+      return;
     }
-  };
 
-  const handleEndSession = async (bookingId: number) => {
-    if (startingBookingId !== null || endingBookingId !== null) return;
-    setEndingBookingId(bookingId);
     try {
-      const res = await apiPost<EndSessionResponse>("/sessions/current/end");
-      setActiveBookingId(null);
-      setItems((prev) =>
-        prev.map((b) =>
-          b.bookingId === (res.bookingId ?? bookingId)
-            ? {
-                ...b,
-                status: "expired",
-              }
-            : b,
-        ),
-      );
-      toast.success(res.message || "Session ended");
-      await loadData("silent");
+      const planId = booking.planId ?? null;
+      let resolvedPlanId = planId;
+
+      if (resolvedPlanId === null) {
+        const plans = await apiGet<SubscriptionPlanPriceResponse[]>(
+          `/pcs/specs/${booking.specId}/plans`,
+        );
+        resolvedPlanId = plans[0]?.id ?? null;
+      }
+
+      if (resolvedPlanId === null) {
+        toast.error("No active subscription plans are configured for this machine group");
+        return;
+      }
+
+      const created = await apiPost<
+        BookingResponseDto,
+        { specId: number; planId: number; quantity: number }
+      >("/bookings/subscription", {
+        specId: booking.specId,
+        planId: resolvedPlanId,
+        quantity: 1,
+      });
+
+      toast.success("Renewal order created");
+      navigate("/checkout", { state: { bookingId: created.bookingId } });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not end session");
-    } finally {
-      setEndingBookingId(null);
+      toast.error(e instanceof Error ? e.message : "Could not renew booking");
     }
   };
 
@@ -369,14 +297,17 @@ export function RentalHistory() {
     setCancellingBookingId(id);
     try {
       await apiPost<BookingResponseDto>(`/bookings/${id}/cancel`);
-      toast.success("Rental cancelled. You have not been charged.");
+      toast.success("Plan cancelled. You can renew it anytime.");
       window.dispatchEvent(new Event("cartUpdated"));
       setCancelBookingTarget(null);
-      setItems((prev) =>
-        prev.map((b) =>
-          b.bookingId === id ? { ...b, status: "cancelled" } : b,
-        ),
-      );
+      const prevStatus = normalizeBookingStatus(cancelBookingTarget.status);
+      if (prevStatus === "paid") {
+        setItems((prev) =>
+          prev.map((b) => (b.bookingId === id ? { ...b, status: "cancelled" } : b)),
+        );
+      } else {
+        setItems((prev) => prev.filter((b) => b.bookingId !== id));
+      }
       await loadData("silent");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not cancel rental");
@@ -385,57 +316,12 @@ export function RentalHistory() {
     }
   };
 
-  const handleOpenRenew = async (booking: BookingHistoryItemResponse) => {
-    if (!booking.specId) {
-      toast.error("Missing machine group for renew");
-      return;
-    }
-    setRenewLoading(true);
-    setRenewPlanId(null);
-    try {
-      const plans = await apiGet<SubscriptionPlanPriceResponse[]>(
-        `/pcs/specs/${booking.specId}/plans`,
-      );
-      setRenewTarget({ booking, plans });
-      if (plans.length > 0) {
-        setRenewPlanId(plans[0].id);
-      }
-    } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Could not load renew plans",
-      );
-    } finally {
-      setRenewLoading(false);
-    }
-  };
-
-  const handleConfirmRenew = async () => {
-    if (!renewTarget || !renewPlanId || renewingBookingId !== null) return;
-    const { booking } = renewTarget;
-    setRenewingBookingId(booking.bookingId);
-    try {
-      await apiPost<
-        BookingResponseDto,
-        { specId: number; planId: number; quantity: number }
-      >("/bookings/subscription", {
-        specId: booking.specId ?? 0,
-        planId: renewPlanId,
-        quantity: 1,
-      });
-      toast.success("Renewal order created");
-      setRenewTarget(null);
-      setRenewPlanId(null);
-      await loadData("silent");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not renew booking");
-    } finally {
-      setRenewingBookingId(null);
-    }
-  };
-
   const price = confirmBooking ? Number(confirmBooking.totalPrice ?? 0) : 0;
   const balanceAfter = walletBalance !== null ? walletBalance - price : null;
   const payRemaining = confirmBooking?.remainingMinutes;
+  const cancelRemainingHours = cancelBookingTarget?.endTime
+    ? Math.max(0, Math.ceil((new Date(cancelBookingTarget.endTime).getTime() - now) / 36e5))
+    : cancelBookingTarget?.totalHours ?? null;
 
   return (
     <div>
@@ -454,7 +340,7 @@ export function RentalHistory() {
 
       <Card className="p-4 border-border mb-4 bg-card/40">
         <div className="flex flex-wrap items-center gap-2">
-          {["all", "paid", "active", "expired"].map((key) => {
+          {["all", "paid", "active", "expired", "cancelled"].map((key) => {
             const active = statusFilter === key;
             return (
               <Button
@@ -464,7 +350,7 @@ export function RentalHistory() {
                 size="sm"
                 onClick={() =>
                   setStatusFilter(
-                    key as "all" | "paid" | "active" | "expired",
+                    key as "all" | "paid" | "active" | "expired" | "cancelled",
                   )
                 }
                 className={
@@ -477,21 +363,6 @@ export function RentalHistory() {
               </Button>
             );
           })}
-          {isAdmin && (
-            <Button
-              type="button"
-              variant={showCancelled ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowCancelled((prev) => !prev)}
-              className={
-                showCancelled
-                  ? "bg-muted-foreground text-background"
-                  : "border-border"
-              }
-            >
-              {showCancelled ? "Hide cancelled" : "Show cancelled"}
-            </Button>
-          )}
         </div>
       </Card>
 
@@ -601,6 +472,9 @@ export function RentalHistory() {
                   cancelled. You will not be charged for unpaid orders.
                 </p>
                 <p className="text-muted-foreground">
+                  Remaining time: <strong>{cancelRemainingHours ?? "—"}</strong> hour(s).
+                </p>
+                <p className="text-muted-foreground">
                   If you change your mind, you can create a new booking from the
                   home page.
                 </p>
@@ -631,125 +505,6 @@ export function RentalHistory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={renewLoading || !!renewTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRenewTarget(null);
-            setRenewPlanId(null);
-            setRenewLoading(false);
-          }
-        }}
-      >
-        <DialogContent className="border-border bg-card max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 text-primary" />
-              Renew package
-            </DialogTitle>
-            <DialogDescription>
-              Select a weekly, monthly, or yearly plan to create a new booking
-              for the same machine group.
-            </DialogDescription>
-          </DialogHeader>
-
-          {renewLoading && !renewTarget ? (
-            <div className="py-10 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Loading plans…
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
-                <p className="font-medium mb-1">
-                  {renewTarget?.booking.specName} renewal options
-                </p>
-                <p className="text-muted-foreground">
-                  Order <strong>#{renewTarget?.booking.bookingId}</strong> will
-                  be renewed as a new subscription booking.
-                </p>
-              </div>
-
-              <div className="grid gap-3">
-                {renewTarget?.plans.map((plan) => {
-                  const selected = renewPlanId === plan.id;
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setRenewPlanId(plan.id)}
-                      className={`text-left rounded-lg border p-4 transition-all ${
-                        selected
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-background hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">
-                            {formatDurationLabel(plan.durationDays)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {plan.planName}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-money">
-                            {formatUsd(Number(plan.price ?? 0))}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {plan.durationDays} day(s)
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {renewTarget && renewTarget.plans.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No active subscription plans are configured for this machine
-                  group.
-                </p>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRenewTarget(null);
-                setRenewPlanId(null);
-              }}
-              className="border-border"
-            >
-              Close
-            </Button>
-            <Button
-              onClick={handleConfirmRenew}
-              disabled={
-                renewLoading ||
-                !renewTarget ||
-                !renewPlanId ||
-                renewingBookingId !== null
-              }
-              className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
-            >
-              {renewingBookingId !== null ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating renewal…
-                </>
-              ) : (
-                "Confirm renewal"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <div className="space-y-4">
         {isLoading && (
@@ -799,13 +554,6 @@ export function RentalHistory() {
             walletBalance !== null &&
             walletBalance < total;
           const canOpenPay = isPending && total > 0 && !insufficient;
-          const canStart = isPaid && !isQueued && activeBookingId === null;
-          const isBusy =
-            payingBookingId === rental.bookingId ||
-            startingBookingId === rental.bookingId ||
-            endingBookingId === rental.bookingId ||
-            cancellingBookingId === rental.bookingId;
-
           return (
             <Card
               key={rental.bookingId}
@@ -873,8 +621,7 @@ export function RentalHistory() {
                           onClick={() => setConfirmBooking(rental)}
                           disabled={
                             payingBookingId !== null ||
-                            startingBookingId !== null ||
-                            endingBookingId !== null
+                            cancellingBookingId !== null
                           }
                           className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                         >
@@ -914,14 +661,12 @@ export function RentalHistory() {
                         onClick={() => setCancelBookingTarget(rental)}
                         disabled={
                           payingBookingId !== null ||
-                          startingBookingId !== null ||
-                          endingBookingId !== null ||
                           cancellingBookingId !== null
                         }
                         className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
                       >
                         <XCircle className="w-4 h-4" />
-                        Cancel rental
+                        Cancel plan
                       </Button>
                     </div>
                   )}
@@ -929,85 +674,56 @@ export function RentalHistory() {
                   {isPaid && (
                     <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
                       <Button
-                        onClick={() => handleStartSession(rental.bookingId)}
-                        disabled={!canStart || isBusy}
-                        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-500/90 hover:to-cyan-500/90"
+                        onClick={() => setCancelBookingTarget(rental)}
+                        disabled={
+                          payingBookingId !== null ||
+                          cancellingBookingId !== null
+                        }
+                        className="w-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-500/90 hover:to-orange-500/90"
                       >
-                        {startingBookingId === rental.bookingId ? (
+                        {cancellingBookingId === rental.bookingId ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Starting…
+                            Cancelling…
                           </>
                         ) : (
                           <>
-                            <Play className="w-4 h-4 mr-2" />
-                            Start session
-                          </>
-                        )}
-                      </Button>
-                      {!canStart &&
-                        activeBookingId !== null &&
-                        activeBookingId !== rental.bookingId && (
-                          <p className="text-xs text-muted-foreground text-right sm:text-left">
-                            Another session is already active.
-                          </p>
-                        )}
-                      {!canStart && isQueued && (
-                        <p className="text-xs text-orange-400 text-right sm:text-left">
-                          Order is queued; a machine will be assigned when a
-                          slot is free.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {isExpired && (
-                    <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
-                      <Button
-                        onClick={() => handleOpenRenew(rental)}
-                        disabled={renewLoading || renewingBookingId !== null}
-                        className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
-                      >
-                        {renewLoading &&
-                        renewTarget?.booking.bookingId === rental.bookingId ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Loading plans…
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Renew package
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cancel plan
                           </>
                         )}
                       </Button>
                       <p className="text-xs text-muted-foreground text-right sm:text-left">
-                        Renew with weekly, monthly, or yearly plans.
+                        Start sessions and active session controls are managed in My PCs.
                       </p>
                     </div>
                   )}
 
-                  {isActive && (
+                  {(isExpired || key === "cancelled") && (
                     <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[180px]">
                       <Button
-                        onClick={() => handleEndSession(rental.bookingId)}
-                        disabled={isBusy}
-                        className="w-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-500/90 hover:to-orange-500/90"
+                        onClick={() => handleRenewBooking(rental)}
+                        disabled={cancellingBookingId !== null}
+                        className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
                       >
-                        {endingBookingId === rental.bookingId ? (
+                        {cancellingBookingId === rental.bookingId ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Ending…
+                            Renewing…
                           </>
                         ) : (
                           <>
-                            <Square className="w-4 h-4 mr-2" />
-                            End session
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Renew
                           </>
                         )}
                       </Button>
+                      <p className="text-xs text-muted-foreground text-right sm:text-left">
+                        Renew and continue in checkout.
+                      </p>
                     </div>
                   )}
+
                 </div>
               </div>
             </Card>
