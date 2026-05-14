@@ -237,7 +237,7 @@ export function SessionManagement() {
             const isActive = status === "active";
             const lastUsedLabel =
               !isActive && item.endTime
-                ? new Date(item.endTime).toLocaleString("en-US")
+                ? formatDuration(item.startTime, item.endTime)
                 : "-";
             const activeDuration = isActive
               ? formatDuration(item.startTime, new Date(nowTick).toISOString())
@@ -262,7 +262,7 @@ export function SessionManagement() {
                         {item.status}
                       </Badge>
                       <Badge className="bg-slate-200 text-slate-700 border-slate-300">
-                        {isActive ? "Using for:" : "Last used:"} {" "}
+                        {isActive ? "Using for:" : "Used for:"} {" "}
                         {isActive ? activeDuration : lastUsedLabel}
                       </Badge>
                     </div>
