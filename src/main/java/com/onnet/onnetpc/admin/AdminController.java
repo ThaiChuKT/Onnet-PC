@@ -7,6 +7,7 @@ import com.onnet.onnetpc.admin.dto.AdminReviewItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminSessionItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
+import com.onnet.onnetpc.admin.dto.CreatePackageRequest;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetReviewStatusRequest;
@@ -116,6 +117,11 @@ public class AdminController {
     @GetMapping("/packages/{planId}")
     public ApiResponse<AdminPackageItemResponse> getPackage(@PathVariable Long planId) {
         return ApiResponse.success(adminService.getPackage(planId));
+    }
+
+    @PostMapping("/packages")
+    public ApiResponse<List<AdminPackageItemResponse>> createPackage(@RequestBody CreatePackageRequest request) {
+        return ApiResponse.success(adminService.createPackage(request));
     }
 
     @PatchMapping("/packages/{planId}")
