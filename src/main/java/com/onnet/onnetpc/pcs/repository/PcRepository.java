@@ -190,4 +190,5 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         nativeQuery = true
     )
     Optional<Pc> findByIdForUpdate(@Param("pcId") Long pcId);
+    Optional<Pc> findFirstBySpecIdAndStatus(Long specId, String status);
 }

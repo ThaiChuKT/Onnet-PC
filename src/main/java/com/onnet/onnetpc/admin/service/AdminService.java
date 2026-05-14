@@ -562,7 +562,9 @@ public class AdminService {
             session.getStartTime(),
             session.getEndTime(),
             session.getTotalCost(),
-            session.getStatus()
+            session.getStatus(),
+            session.getPc() != null && session.getPc().getSpec() != null ? session.getPc().getSpec().getSpecName() : null
+
         );
     }
 

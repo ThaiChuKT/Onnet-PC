@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -46,19 +46,19 @@ function roundMoney(n: number) {
 }
 
 function derivePricesFrom(duration: "yearly" | "monthly" | "weekly", value: number) {
-	let dailyBase = 0;
-	if (duration === "yearly") {
-		dailyBase = value / 365;
+	let baseWeekly = 0;
+	if (duration === "weekly") {
+		baseWeekly = value;
 	} else if (duration === "monthly") {
-		dailyBase = value / (30 * 1.15);
-	} else {
-		dailyBase = value / (7 * 1.25);
+		baseWeekly = value / 4;
+	} else if (duration === "yearly") {
+		baseWeekly = value / 40; // 1 năm = 10 tháng = 10 * 4 tuần = 40 tuần
 	}
 
 	return {
-		yearly: roundMoney(dailyBase * 365),
-		monthly: roundMoney(dailyBase * 30 * 1.15),
-		weekly: roundMoney(dailyBase * 7 * 1.25),
+		weekly: roundMoney(baseWeekly),
+		monthly: roundMoney(baseWeekly * 4),
+		yearly: roundMoney(baseWeekly * 40),
 	};
 }
 

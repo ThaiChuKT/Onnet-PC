@@ -15,6 +15,7 @@ import {
 import { Activity, Power, Search } from "lucide-react";
 import { formatUsd } from "../../lib/formatUsd";
 import { toEnglishMessage } from "../../lib/englishMessage";
+import { ListPagination } from "./ListPagination";
 
 function formatDuration(startTime: string, endTime?: string | null): string {
   const start = new Date(startTime).getTime();
@@ -48,6 +49,7 @@ type AdminSessionItemResponse = {
   endTime: string | null;
   totalCost: number;
   status: string;
+  specName: string;
 };
 
 type PageResponse<T> = {
@@ -68,7 +70,7 @@ type EndSessionResponse = {
 };
 
 const statusBadgeClass: Record<string, string> = {
-  active: "bg-accent/20 text-accent border-accent/50",
+  active: "bg-emerald-500/20 text-emerald-500 border-emerald-500/50 animate-pulse",
   ended: "bg-primary/20 text-primary border-primary/50",
   expired: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
 };
@@ -82,20 +84,20 @@ export function SessionManagement() {
   const [processingSessionId, setProcessingSessionId] = useState<number | null>(
     null,
   );
+  const [page, setPage] = useState(0);
+  const pageSize = 4;
 
   const loadSessions = async () => {
     setIsLoading(true);
     try {
-      const page = await apiGet<PageResponse<AdminSessionItemResponse>>(
+      const response = await apiGet<PageResponse<AdminSessionItemResponse>>(
         "/admin/sessions",
         {
           page: 0,
-          size: 100,
-          status: statusFilter === "all" ? undefined : statusFilter,
-          keyword: searchTerm.trim() || undefined,
+          size: 500,
         },
       );
-      setItems(page.content ?? []);
+      setItems(response.content ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not load sessions");
     } finally {
@@ -104,9 +106,28 @@ export function SessionManagement() {
   };
 
   useEffect(() => {
-    const handle = window.setTimeout(() => void loadSessions(), 250);
-    return () => window.clearTimeout(handle);
+    void loadSessions();
+  }, []);
+
+  useEffect(() => {
+    setPage(0);
   }, [statusFilter, searchTerm]);
+
+  const filteredItems = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesSearch = 
+        !q ||
+        String(item.sessionId).includes(q) ||
+        (item.userEmail ?? "").toLowerCase().includes(q) ||
+        (item.userFullName ?? "").toLowerCase().includes(q) ||
+        (item.pcLocation ?? "").toLowerCase().includes(q);
+      
+      const matchesStatus = statusFilter === "all" || (item.status ?? "").toLowerCase() === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [items, searchTerm, statusFilter]);
 
   useEffect(() => {
     const handle = window.setInterval(() => setNowTick(Date.now()), 60000);
@@ -114,22 +135,28 @@ export function SessionManagement() {
   }, []);
 
   const stats = useMemo(() => {
-    const active = items.filter(
+    const active = filteredItems.filter(
       (s) => (s.status ?? "").toLowerCase() === "active",
     ).length;
-    const ended = items.filter(
+    const ended = filteredItems.filter(
       (s) => (s.status ?? "").toLowerCase() === "ended",
     ).length;
-    const expired = items.filter(
+    const expired = filteredItems.filter(
       (s) => (s.status ?? "").toLowerCase() === "expired",
     ).length;
     return {
-      total: items.length,
+      total: filteredItems.length,
       active,
       ended,
       expired,
     };
-  }, [items]);
+  }, [filteredItems]);
+
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+
+  const paginatedItems = useMemo(() => {
+    return filteredItems.slice(page * pageSize, page * pageSize + pageSize);
+  }, [filteredItems, page, pageSize]);
 
   const handleForceEnd = async (sessionId: number) => {
     if (!confirm("Force-end this active session?")) {
@@ -205,12 +232,12 @@ export function SessionManagement() {
         )}
 
         {!isLoading &&
-          items.map((item) => {
+          paginatedItems.map((item) => {
             const status = (item.status ?? "").toLowerCase();
             const isActive = status === "active";
             const lastUsedLabel =
               !isActive && item.endTime
-                ? new Date(item.endTime).toLocaleString("en-US")
+                ? formatDuration(item.startTime, item.endTime)
                 : "-";
             const activeDuration = isActive
               ? formatDuration(item.startTime, new Date(nowTick).toISOString())
@@ -220,7 +247,7 @@ export function SessionManagement() {
                 key={item.sessionId}
                 className="p-6 border-border hover:border-primary/40 transition-all"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex col-1 lg:flex-row lg:flex-row lg:items-center justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-lg font-bold">
@@ -235,25 +262,23 @@ export function SessionManagement() {
                         {item.status}
                       </Badge>
                       <Badge className="bg-slate-200 text-slate-700 border-slate-300">
-                        {isActive ? "Using for:" : "Last used:"} {" "}
+                        {isActive ? "Using for:" : "Used for:"} {" "}
                         {isActive ? activeDuration : lastUsedLabel}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {item.userFullName} ({item.userEmail})
                     </p>
-                    <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                    <div className="grid sm:grid-cols-1 gap-2 text-sm">
                       <p>
-                        Machine: #{item.pcId}{" "}
-                        {item.pcLocation ? `- ${item.pcLocation}` : ""}
+                        Spec: {item.specName || "Unknown"} (PC #{item.pcId})
                       </p>
-                      <p>Cost: <span className="text-money font-semibold">{formatUsd(Number(item.totalCost ?? 0))}</span></p>
-                      <p>
+                      <span>
                         Started:{" "}
                         {item.startTime
                           ? new Date(item.startTime).toLocaleString("en-US")
                           : "-"}
-                      </p>
+                      </span>
                       <p>
                         Ended:{" "}
                         {item.endTime
@@ -284,7 +309,7 @@ export function SessionManagement() {
           })}
       </div>
 
-      {!isLoading && items.length === 0 && (
+      {!isLoading && filteredItems.length === 0 && (
         <Card className="p-10 border-border text-center">
           <Activity className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
           <p className="font-medium">No sessions found</p>
@@ -293,6 +318,10 @@ export function SessionManagement() {
           </p>
         </Card>
       )}
+
+      <div className="mt-6">
+        <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
     </div>
   );
 }

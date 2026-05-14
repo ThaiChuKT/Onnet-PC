@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   AlertTriangle,
   CreditCard,
@@ -233,6 +240,8 @@ export function CheckoutPage() {
   const [topUpAmount, setTopUpAmount] = useState("");
   const [isTopUpSubmitting, setIsTopUpSubmitting] = useState(false);
   const [showReturnConfirm, setShowReturnConfirm] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(5);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -388,8 +397,60 @@ export function CheckoutPage() {
       const res = await apiPost<BookingPaymentResponse>(`/bookings/${id}/pay-wallet`);
       setWalletBalance(Number(res.walletBalance));
       toast.success(res.message || "Payment completed from your wallet");
+      setPaymentSuccess(true);
+      setCountdown(5);
       setConfirmBooking(null);
       await loadData();
+      useEffect(() => {
+        if (!paymentSuccess) return;
+        let timer = window.setInterval(() => {
+          setCountdown((c) => {
+            if (c <= 1) {
+              window.clearInterval(timer);
+              navigate("/account/mypcs");
+              return 0;
+            }
+            return c - 1;
+          });
+        }, 1000);
+
+        return () => {
+          window.clearInterval(timer);
+        };
+      }, [paymentSuccess, navigate]);
+
+      if (paymentSuccess) {
+        return (
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1 pt-24 pb-12 bg-muted/30">
+              <div className="container mx-auto px-4 max-w-5xl">
+                <div className="mb-8 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2">
+                      Secure
+                      <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                        {" "}
+                        Checkout
+                      </span>
+                    </h1>
+                    <p className="text-muted-foreground">Review your order and complete payment to activate your Cloud PC.</p>
+                  </div>
+                  <Button variant="outline" className="border-border" onClick={() => setShowReturnConfirm(true)}>
+                    Return to plans
+                  </Button>
+                </div>
+
+                <Card className="p-12 border-border text-center">
+                  <CheckoutIcon className="w-16 h-16 mx-auto mb-4 text-primary" />
+                  <h3 className="text-2xl font-bold mb-2">Payment successful</h3>
+                  <p className="text-muted-foreground mb-4">Redirecting to My PCs in {countdown} second{countdown === 1 ? "" : "s"}...</p>
+                  <Button className="bg-gradient-to-r from-primary to-accent" onClick={() => navigate("/account/mypcs")}>Go to My PCs</Button>
+                </Card>
+              </div>
+            </main>
+          </div>
+        );
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Payment failed");
     } finally {
@@ -520,7 +581,7 @@ export function CheckoutPage() {
           )}
 
           {!isLoading && !loadError && items.length > 0 && canShowFocusedSummary && (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start shadow-2xl ">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start shadow-2xl  ">
               <div className="space-y-6">
                 {[focusedBooking].filter((b): b is BookingHistoryItemResponse => b !== null).map((item) => {
                   const draft = bookingDrafts[item.bookingId];
@@ -530,38 +591,12 @@ export function CheckoutPage() {
                   const itemPreviewDays = itemPlan ? itemPlan.durationDays * itemQuantity : 0;
                   const itemTotal = itemPlan ? Number(itemPlan.price ?? 0) * itemQuantity : Number(item.totalPrice ?? 0);
                   return (
-                    <Card key={item.bookingId} className="p-0 border-border overflow-hidden shadow-md">
+                    <Card key={item.bookingId} className="p-0 border-border overflow-hidden shadow-md bg-card/70">
                       <div className="border-b border-border px-5 py-4 bg-muted/20">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                           <div>
                             <p className="text-sm text-muted-foreground">Product information</p>
-                            <h3 className="text-2xl font-bold">{item.specName}</h3>
-                            {itemConfig && (
-                              <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
-                                <div className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                  <Monitor className="w-4 h-4 text-primary" />
-                                  Configuration: <span className="text-primary">{itemConfig.specName}</span>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Cpu className="w-4 h-4 text-primary shrink-0" />
-                                    <span className="text-foreground">{itemConfig.cpu}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Zap className="w-4 h-4 text-secondary shrink-0" />
-                                    <span className="text-foreground">{itemConfig.gpu}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <MemoryStick className="w-4 h-4 text-accent shrink-0" />
-                                    <span className="text-foreground">{itemConfig.ram} GB</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <HardDrive className="w-4 h-4 text-primary shrink-0" />
-                                    <span className="text-foreground">{itemConfig.storage} GB</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                            <h3 className="text-2xl font-bold">{itemPlan?.planName ?? item.specName}</h3>
                           </div>
                           <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                             <Button
@@ -569,22 +604,70 @@ export function CheckoutPage() {
                               variant="outline"
                               onClick={() => setShowConfigDialog(true)}
                               disabled={cancellingBookingId !== null}
-                              className="border-border"
+                              className="border-border text-primary hover:bg-primary/10 hover:text-primary"
+                              
                             >
                               Choose configuration
                             </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setCancelBookingTarget(item)}
-                              disabled={cancellingBookingId !== null}
-                              className="border-border text-destructive hover:bg-destructive/50 hover:text-destructive/90"
+                            <Select
+                              value={itemPlan?.id?.toString() ?? ""}
+                              onValueChange={(val) => {
+                                setBookingDrafts((current) => ({
+                                  ...current,
+                                  [item.bookingId]: {
+                                    ...(current[item.bookingId] ?? {
+                                      configOptions: draft?.configOptions ?? [],
+                                      selectedConfigSpecId: draft?.selectedConfigSpecId ?? null,
+                                      planOptions: draft?.planOptions ?? [],
+                                      selectedPlanId: itemPlan?.id ?? null,
+                                      quantity: 1,
+                                      originalQuantity: 1,
+                                    }),
+                                    selectedPlanId: Number(val),
+                                  },
+                                }));
+                              }}
                             >
-                              <XCircle className="w-4 h-4 mr-2" />
-                              Cancel
-                            </Button>
+                              <SelectTrigger className="w-[140px] bg-background border-border">
+                                <SelectValue placeholder="Select period" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {draft?.planOptions.map((plan) => (
+                                  <SelectItem key={plan.id} value={plan.id.toString()}>
+                                    {plan.durationDays >= 365 ? "Yearly" : plan.durationDays >= 28 ? "Monthly" : "Weekly"}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
+
+                        {itemConfig && (
+                          <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
+                            <div className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                              <Monitor className="w-4 h-4 text-primary" />
+                              Configuration: <span className="text-primary">{itemConfig.specName}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Cpu className="w-4 h-4 text-primary shrink-0" />
+                                <span className="text-foreground">{itemConfig.cpu}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Zap className="w-4 h-4 text-secondary shrink-0" />
+                                <span className="text-foreground">{itemConfig.gpu}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <MemoryStick className="w-4 h-4 text-accent shrink-0" />
+                                <span className="text-foreground">{itemConfig.ram} GB</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <HardDrive className="w-4 h-4 text-primary shrink-0" />
+                                <span className="text-foreground">{itemConfig.storage} GB</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="p-5 space-y-5">
@@ -666,22 +749,14 @@ export function CheckoutPage() {
                             </div>
                           </div>
 
-                          <div className="rounded-lg border border-border bg-background p-4 space-y-2 text-sm">
+                          <div className="rounded-lg border border-border bg-background p-4 space-y-2 text-sm items-center ">
                             <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Days per unit</span>
-                              <span className="font-semibold">{itemPlan?.durationDays ?? "—"} days</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Total days</span>
-                              <span className="font-semibold text-primary">{itemPreviewDays} days</span>
+                              <p className="text-muted-foreground">Total days</p>
+                              <p className="font-semibold text-white">{itemPreviewDays} days</p>
                             </div>
                             <div className="flex items-center justify-between gap-4">
                               <span className="text-muted-foreground">Amount</span>
-                              <span className="font-semibold text-money">{formatUsd(itemTotal)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">Plan</span>
-                              <span className="font-semibold">{itemPlan?.planName ?? "—"}</span>
+                              <span className="font-semibold text-red-500">{formatUsd(itemTotal)}</span>
                             </div>
                           </div>
                         </div>
@@ -716,7 +791,7 @@ export function CheckoutPage() {
 
                 {walletBalance !== null && previewTotal > walletBalance ? (
                   <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 mb-4 text-sm flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 mt-0.5 text-amber-600" />
+                    <AlertTriangle className="w-8 h-8 shrink-0 mt-0.5 text-amber-600" />
                     <div>
                       <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">Insufficient balance</p>
                       <p className="text-muted-foreground">Your wallet balance is not enough for this configuration yet. You can top up now and complete payment when ready.</p>
@@ -748,6 +823,17 @@ export function CheckoutPage() {
                     ) : (
                       "Top up wallet"
                     )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCancelBookingTarget(focusedBooking)}
+                    disabled={cancellingBookingId !== null || !focusedBooking}
+                    className="w-full border-border text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel Order
                   </Button>
 
                   <div className="flex items-center justify-between gap-3">
@@ -921,9 +1007,6 @@ export function CheckoutPage() {
                     <div className="font-medium">{config.specName}</div>
                     <div className="text-sm text-muted-foreground">
                       {config.cpu} • {config.gpu} • {config.ram}GB RAM • {config.storage}GB SSD
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {config.machineCount} machine{config.machineCount > 1 ? "s" : ""} available
                     </div>
                   </div>
                   <div>

@@ -25,12 +25,9 @@ public interface SessionQueueRepository extends JpaRepository<SessionQueue, Long
         value = """
             SELECT sq.*
             FROM session_queue sq
-            JOIN membership_tiers requester_tier ON requester_tier.id = sq.tier_id
-            JOIN membership_tier_spec_mappings spec_map ON spec_map.spec_id = :specId
-            JOIN membership_tiers spec_tier ON spec_tier.id = spec_map.tier_id
             WHERE LOWER(sq.status) = 'waiting'
-              AND requester_tier.tier_level >= spec_tier.tier_level
-            ORDER BY requester_tier.queue_priority ASC, sq.queue_position ASC, sq.id ASC
+              AND sq.spec_id = :specId
+            ORDER BY sq.queue_position ASC, sq.id ASC
             LIMIT 1
             FOR UPDATE
             """,
