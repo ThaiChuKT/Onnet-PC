@@ -11,9 +11,13 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class JwtService {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
     private final SecretKey signingKey;
     private final long expirationMinutes;
@@ -23,6 +27,7 @@ public class JwtService {
         @Value("${app.jwt.access-token-expiration-minutes}") long expirationMinutes
     ) {
         if (secret == null || secret.isBlank()) {
+            log.error("JWT secret is missing or empty. Set environment variable APP_JWT_SECRET.");
             throw new IllegalStateException("app.jwt.secret must be configured and non-empty");
         }
 
@@ -32,12 +37,14 @@ public class JwtService {
                 keyBytes = MessageDigest.getInstance("SHA-256")
                     .digest(secret.getBytes(StandardCharsets.UTF_8));
             } catch (NoSuchAlgorithmException ex) {
+                log.error("SHA-256 algorithm not available to derive JWT key", ex);
                 throw new IllegalStateException("Unable to derive JWT signing key (SHA-256 not available)", ex);
             }
 
             this.signingKey = Keys.hmacShaKeyFor(keyBytes);
             this.expirationMinutes = expirationMinutes;
         } catch (Exception ex) {
+            log.error("Failed to initialize JwtService: {}", ex.getMessage(), ex);
             throw new IllegalStateException("Failed to initialize JwtService: " + ex.getMessage(), ex);
         }
     }
