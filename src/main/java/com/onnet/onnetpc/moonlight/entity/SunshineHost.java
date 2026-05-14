@@ -40,6 +40,15 @@ public class SunshineHost {
     @Column(name = "notes")
     private String notes;
 
+    @Column(name = "paired_client_uuid")
+    private String pairedClientUuid;
+
+    @Column(name = "paired_client_name")
+    private String pairedClientName;
+
+    @Column(name = "paired_at")
+    private Instant pairedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

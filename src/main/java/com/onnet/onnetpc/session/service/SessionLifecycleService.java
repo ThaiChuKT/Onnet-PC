@@ -199,6 +199,7 @@ public class SessionLifecycleService {
         pc.setUpdatedAt(now);
         pcRepository.save(pc);
         promoteQueuedBookingForSpec(pc.getSpec().getId());
+        moonlightService.queueUnpairForPc(pc.getId(), "Session ended before subscription expiry");
 
         return new EndSessionResponse(
             session.getId(),
@@ -253,6 +254,7 @@ public class SessionLifecycleService {
             pc.setUpdatedAt(now);
             pcRepository.save(pc);
             promoteQueuedBookingForSpec(pc.getSpec().getId());
+            moonlightService.queueUnpairForPc(pc.getId(), "Booking expired and session was closed");
         }
     }
 

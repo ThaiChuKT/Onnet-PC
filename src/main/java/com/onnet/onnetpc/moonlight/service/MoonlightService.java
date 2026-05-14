@@ -5,11 +5,13 @@ import com.onnet.onnetpc.moonlight.dto.CreateSunshineHostRequest;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandLogItemResponse;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandResponse;
+import com.onnet.onnetpc.moonlight.entity.MoonlightHostAction;
 import com.onnet.onnetpc.moonlight.dto.SunshineHostResponse;
 import com.onnet.onnetpc.moonlight.dto.UpdateSunshineHostRequest;
 import com.onnet.onnetpc.moonlight.entity.MoonlightCommandLog;
 import com.onnet.onnetpc.moonlight.entity.SunshineHost;
 import com.onnet.onnetpc.moonlight.repository.MoonlightCommandLogRepository;
+import com.onnet.onnetpc.moonlight.repository.MoonlightHostActionRepository;
 import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
@@ -32,6 +34,7 @@ public class MoonlightService {
 
     private final SunshineHostRepository sunshineHostRepository;
     private final MoonlightCommandLogRepository moonlightCommandLogRepository;
+    private final MoonlightHostActionRepository moonlightHostActionRepository;
     private final UserRepository userRepository;
     private final boolean cliEnabled;
     private final String cliPath;
@@ -41,6 +44,7 @@ public class MoonlightService {
     public MoonlightService(
         SunshineHostRepository sunshineHostRepository,
         MoonlightCommandLogRepository moonlightCommandLogRepository,
+        MoonlightHostActionRepository moonlightHostActionRepository,
         UserRepository userRepository,
         @Value("${app.moonlight.cli.enabled:false}") boolean cliEnabled,
         @Value("${app.moonlight.cli.path:moonlight}") String cliPath,
@@ -49,6 +53,7 @@ public class MoonlightService {
     ) {
         this.sunshineHostRepository = sunshineHostRepository;
         this.moonlightCommandLogRepository = moonlightCommandLogRepository;
+        this.moonlightHostActionRepository = moonlightHostActionRepository;
         this.userRepository = userRepository;
         this.cliEnabled = cliEnabled;
         this.cliPath = cliPath;
@@ -122,6 +127,33 @@ public class MoonlightService {
     }
 
     @Transactional
+    public void queueUnpairForPc(Long pcId, String requestNote) {
+        SunshineHost host = sunshineHostRepository.findFirstByPcId(pcId).orElse(null);
+        if (host == null) {
+            return;
+        }
+
+        String actionType = host.getPairedClientUuid() == null ? "UNPAIR_ALL" : "UNPAIR";
+        MoonlightHostAction action = new MoonlightHostAction();
+        action.setHost(host);
+        action.setActionType(actionType);
+        action.setStatus("QUEUED");
+        action.setRequestSource("session-expiry");
+        action.setRequestNote(trimNullable(requestNote));
+        action.setUpdatedAt(Instant.now());
+        moonlightHostActionRepository.save(action);
+
+        MoonlightCommandLog log = new MoonlightCommandLog();
+        log.setHost(host);
+        log.setAction(actionType);
+        log.setCommandText(actionType + " queued for Sunshine helper");
+        log.setStatus("QUEUED");
+        log.setOutputText(requestNote);
+        log.setCreatedAt(Instant.now());
+        moonlightCommandLogRepository.save(log);
+    }
+
+    @Transactional
     public MoonlightCommandResponse runUserLaunch(String requesterEmail, Long hostId, MoonlightCommandRequest request) {
         User requester = findUserByEmail(requesterEmail);
 
@@ -188,6 +220,34 @@ public class MoonlightService {
         log.setCreatedAt(Instant.now());
         moonlightCommandLogRepository.save(log);
 
+        if ("PAIR".equals(action) && executeRequested) {
+            if (trimNullable(request.pin()) == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "PAIR requires a 4-digit PIN");
+            }
+
+            MoonlightHostAction actionRecord = new MoonlightHostAction();
+            actionRecord.setHost(host);
+            actionRecord.setRequestedBy(requester);
+            actionRecord.setActionType("PAIR");
+            actionRecord.setStatus("QUEUED");
+            actionRecord.setPin(trimNullable(request.pin()));
+            actionRecord.setRequestSource("dashboard");
+            actionRecord.setRequestNote("Moonlight PIN request queued from dashboard");
+            actionRecord.setUpdatedAt(Instant.now());
+            moonlightHostActionRepository.save(actionRecord);
+
+            log.setStatus("QUEUED");
+            log.setOutputText("Queued Sunshine pairing request in database");
+            log.setFinishedAt(Instant.now());
+            moonlightCommandLogRepository.save(log);
+
+            return toCommandResponse(
+                log,
+                false,
+                "Pair request queued in the database. The Sunshine host helper will submit the PIN locally."
+            );
+        }
+
         if (!executeRequested) {
             return toCommandResponse(
                 log,
@@ -224,6 +284,26 @@ public class MoonlightService {
             ? ("STREAM".equals(action) ? "Moonlight stream started." : "Moonlight command executed successfully.")
             : "Moonlight command failed.";
         return toCommandResponse(log, true, message);
+    }
+
+    @Transactional
+    public void updatePairedClient(Long hostId, String clientUuid, String clientName) {
+        SunshineHost host = findHostById(hostId);
+        host.setPairedClientUuid(trimNullable(clientUuid));
+        host.setPairedClientName(trimNullable(clientName));
+        host.setPairedAt(Instant.now());
+        host.setUpdatedAt(Instant.now());
+        sunshineHostRepository.save(host);
+    }
+
+    @Transactional
+    public void clearPairedClient(Long hostId) {
+        SunshineHost host = findHostById(hostId);
+        host.setPairedClientUuid(null);
+        host.setPairedClientName(null);
+        host.setPairedAt(null);
+        host.setUpdatedAt(Instant.now());
+        sunshineHostRepository.save(host);
     }
 
     private List<String> buildCommand(SunshineHost host, String action, MoonlightCommandRequest request) {
@@ -422,6 +502,48 @@ public class MoonlightService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public List<MoonlightHostAction> listQueuedHostActions() {
+        return moonlightHostActionRepository.findTop20ByStatusOrderByCreatedAtAsc("QUEUED");
+    }
+
+    @Transactional
+    public boolean claimHostAction(Long actionId) {
+        MoonlightHostAction action = moonlightHostActionRepository.findByIdAndStatus(actionId, "QUEUED").orElse(null);
+        if (action == null) {
+            return false;
+        }
+        action.setStatus("PROCESSING");
+        action.setUpdatedAt(Instant.now());
+        moonlightHostActionRepository.save(action);
+        return true;
+    }
+
+    @Transactional
+    public void completeHostAction(Long actionId, String resultText) {
+        MoonlightHostAction action = moonlightHostActionRepository.findById(actionId).orElse(null);
+        if (action == null) {
+            return;
+        }
+        action.setStatus("SUCCESS");
+        action.setResultText(resultText);
+        action.setProcessedAt(Instant.now());
+        action.setUpdatedAt(Instant.now());
+        moonlightHostActionRepository.save(action);
+    }
+
+    @Transactional
+    public void failHostAction(Long actionId, String resultText) {
+        MoonlightHostAction action = moonlightHostActionRepository.findById(actionId).orElse(null);
+        if (action == null) {
+            return;
+        }
+        action.setStatus("FAILED");
+        action.setResultText(resultText);
+        action.setProcessedAt(Instant.now());
+        action.setUpdatedAt(Instant.now());
+        moonlightHostActionRepository.save(action);
     }
 
     private record CommandExecutionResult(boolean success, String output) {}
