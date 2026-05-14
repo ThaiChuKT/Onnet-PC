@@ -24,7 +24,7 @@ public class JwtService {
 
     public JwtService(
         @Value("${app.jwt.secret}") String secret,
-        @Value("${app.jwt.access-token-expiration-minutes}") long expirationMinutes
+        @Value("${app.jwt.access-token-expiration-minutes:120}") long expirationMinutes
     ) {
         if (secret == null || secret.isBlank()) {
             log.error("JWT secret is missing or empty. Set environment variable APP_JWT_SECRET.");
