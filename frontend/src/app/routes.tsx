@@ -20,6 +20,7 @@ import { ChangePassword } from "./components/account/ChangePassword";
 import { RentalHistory } from "./components/account/RentalHistory";
 import { TopUp } from "./components/account/TopUp";
 import { TopUpBills } from "./components/account/TopUpBills";
+import { Mypcs } from "./components/account/Mypcs.tsx";
 import { ComputerList } from "./components/dashboard/ComputerList";
 import { AccountList } from "./components/dashboard/AccountList";
 import { RevenueStats } from "./components/dashboard/RevenueStats";
@@ -144,6 +145,10 @@ export const router = createBrowserRouter([
       {
         path: "top-up-bills",
         Component: TopUpBills,
+      },
+      {
+        path: "mypcs",
+        Component: Mypcs,
       },
     ],
   },
