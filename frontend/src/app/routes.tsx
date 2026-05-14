@@ -28,6 +28,7 @@ import { OrderManagement } from "./components/dashboard/OrderManagement";
 import { InvoiceManagement } from "./components/dashboard/InvoiceManagement";
 import { SessionManagement } from "./components/dashboard/SessionManagement";
 import { SunshineManagement } from "./components/dashboard/SunshineManagement";
+import { CreatePlans } from "./components/dashboard/CreatePlans";
 import { AccountDetailPage } from "./pages/AccountDetailPage";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { AdminRoute } from "./auth/AdminRoute";
@@ -191,6 +192,10 @@ export const router = createBrowserRouter([
       {
         path: "sunshine",
         Component: SunshineManagement,
+      },
+      {
+        path: "create-plans",
+        Component: CreatePlans,
       },
       {
         path: "packages/:tier/edit",

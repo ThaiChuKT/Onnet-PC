@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Users,
   Wifi,
+  PlusCircle,
 } from "lucide-react";
 
 const navGroups = [
@@ -20,6 +21,7 @@ const navGroups = [
     items: [
       { path: "/dashboard/computers", label: "Machines", icon: Monitor },
       { path: "/dashboard/sessions", label: "Sessions", icon: Activity },
+      { path: "/dashboard/create-plans", label: "CreatePlans", icon: PlusCircle },
       { path: "/dashboard/sunshine", label: "Sunshine", icon: Wifi },
     ],
   },
