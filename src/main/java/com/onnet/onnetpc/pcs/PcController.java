@@ -4,6 +4,7 @@ import com.onnet.onnetpc.common.response.ApiResponse;
 import com.onnet.onnetpc.pcs.dto.MachineDetailResponse;
 import com.onnet.onnetpc.pcs.dto.MachineListItemResponse;
 import com.onnet.onnetpc.pcs.dto.SubscriptionPlanPriceResponse;
+import com.onnet.onnetpc.pcs.dto.TierSpecPlanCatalogResponse;
 import com.onnet.onnetpc.pcs.service.PcService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -61,5 +62,10 @@ public class PcController {
     @GetMapping("/specs/{specId}/plans")
     public ApiResponse<List<SubscriptionPlanPriceResponse>> getSubscriptionPlans(@PathVariable Long specId) {
         return ApiResponse.success(pcService.getSubscriptionPlansBySpecId(specId));
+    }
+
+    @GetMapping("/tier-spec-plans")
+    public ApiResponse<TierSpecPlanCatalogResponse> getTierSpecPlanCatalog() {
+        return ApiResponse.success(pcService.getTierSpecPlanCatalog());
     }
 }
