@@ -401,56 +401,6 @@ export function CheckoutPage() {
       setCountdown(5);
       setConfirmBooking(null);
       await loadData();
-      useEffect(() => {
-        if (!paymentSuccess) return;
-        let timer = window.setInterval(() => {
-          setCountdown((c) => {
-            if (c <= 1) {
-              window.clearInterval(timer);
-              navigate("/account/mypcs");
-              return 0;
-            }
-            return c - 1;
-          });
-        }, 1000);
-
-        return () => {
-          window.clearInterval(timer);
-        };
-      }, [paymentSuccess, navigate]);
-
-      if (paymentSuccess) {
-        return (
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-1 pt-24 pb-12 bg-muted/30">
-              <div className="container mx-auto px-4 max-w-5xl">
-                <div className="mb-8 flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold mb-2">
-                      Secure
-                      <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                        {" "}
-                        Checkout
-                      </span>
-                    </h1>
-                    <p className="text-muted-foreground">Review your order and complete payment to activate your Cloud PC.</p>
-                  </div>
-                  <Button variant="outline" className="border-border" onClick={() => setShowReturnConfirm(true)}>
-                    Return to plans
-                  </Button>
-                </div>
-
-                <Card className="p-12 border-border text-center">
-                  <CheckoutIcon className="w-16 h-16 mx-auto mb-4 text-primary" />
-                  <h3 className="text-2xl font-bold mb-2">Payment successful</h3>
-                  <p className="text-muted-foreground mb-4">Redirecting to My PCs in {countdown} second{countdown === 1 ? "" : "s"}...</p>
-                  <Button className="bg-gradient-to-r from-primary to-accent" onClick={() => navigate("/account/mypcs")}>Go to My PCs</Button>
-                </Card>
-              </div>
-            </main>
-          </div>
-        );
-      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Payment failed");
     } finally {
@@ -528,6 +478,64 @@ export function CheckoutPage() {
   };
 
   const canShowFocusedSummary = !!focusedBooking && !!focusedPlan;
+
+  useEffect(() => {
+    if (!paymentSuccess) return;
+
+    const timer = window.setInterval(() => {
+      setCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          navigate("/account/mypcs");
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [paymentSuccess, navigate]);
+
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1 pt-24 pb-12 bg-muted/30">
+          <div className="container mx-auto px-4 max-w-5xl">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">
+                  Secure
+                  <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                    {" "}
+                    Checkout
+                  </span>
+                </h1>
+                <p className="text-muted-foreground">
+                  Review your order and complete payment to activate your Cloud PC.
+                </p>
+              </div>
+              <Button variant="outline" className="border-border" onClick={() => navigate("/packages")}>
+                Return to plans
+              </Button>
+            </div>
+
+            <Card className="p-12 border-border text-center">
+              <CheckoutIcon className="w-16 h-16 mx-auto mb-4 text-primary" />
+              <h3 className="text-2xl font-bold mb-2">Payment successful</h3>
+              <p className="text-muted-foreground mb-4">
+                Redirecting to My PCs in {countdown} second{countdown === 1 ? "" : "s"}...
+              </p>
+              <Button className="bg-gradient-to-r from-primary to-accent" onClick={() => navigate("/account/mypcs")}>
+                Go to My PCs
+              </Button>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
