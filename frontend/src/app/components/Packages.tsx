@@ -9,11 +9,41 @@ import { apiGet } from "../api/http";
 import { toast } from "sonner";
 import { TIER_SPEC_MAP } from "../lib/constants";
 
-type SubscriptionPlanPriceResponse = {
-  id: number;
+type TierSpecPlanPlanResponse = {
+  planId: number;
   planName: string;
   durationDays: number;
   price: number;
+  maxHoursPerDay: number | null;
+  active: boolean;
+};
+
+type TierSpecPlanSpecResponse = {
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  operatingSystem: string;
+  description: string;
+  pricePerHour: number;
+  exclusive: boolean;
+  available: boolean;
+  plans: TierSpecPlanPlanResponse[];
+};
+
+type TierSpecPlanTierResponse = {
+  tierId: number;
+  tierName: string;
+  tierLevel: number;
+  active: boolean;
+  specs: TierSpecPlanSpecResponse[];
+};
+
+type TierSpecPlanCatalogResponse = {
+  tiers: TierSpecPlanTierResponse[];
+  unassignedSpecs: TierSpecPlanSpecResponse[];
 };
 
 type TierPricing = {
@@ -103,24 +133,23 @@ type PackagesProps = {
 
 export function Packages({ }: PackagesProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year">("month");
-  const [plansBySpec, setPlansBySpec] = useState<Record<number, SubscriptionPlanPriceResponse[]>>({});
+  const [plansBySpec, setPlansBySpec] = useState<Record<number, TierSpecPlanPlanResponse[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const specIds = [...TIER_SPEC_MAP.basic, ...TIER_SPEC_MAP.pro, ...TIER_SPEC_MAP.ultra];
-        const results = await Promise.allSettled(
-          specIds.map((specId) => apiGet<SubscriptionPlanPriceResponse[]>(`/pcs/specs/${specId}/plans`)),
-        );
-
-        const nextPlansBySpec: Record<number, SubscriptionPlanPriceResponse[]> = {};
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled") {
-            nextPlansBySpec[specIds[index]] = result.value ?? [];
-          }
+        const catalog = await apiGet<TierSpecPlanCatalogResponse>("/pcs/tier-spec-plans");
+        const nextPlansBySpec: Record<number, TierSpecPlanPlanResponse[]> = {};
+        
+        // Bóc tách dữ liệu để tương thích với logic cũ của Frontend
+        catalog.tiers?.forEach((tier) => {
+          tier.specs?.forEach((spec) => {
+            nextPlansBySpec[spec.specId] = spec.plans ?? [];
+          });
         });
+
         setPlansBySpec(nextPlansBySpec);
       } catch (e) {
         toast.error("Could not load package pricing");
@@ -138,23 +167,28 @@ export function Packages({ }: PackagesProps) {
       const staticData = TIER_STATIC_DATA[tierName];
       const tierKey = tierName.toLowerCase() as keyof typeof TIER_SPEC_MAP;
       const tierPlans = TIER_SPEC_MAP[tierKey].flatMap((specId) => plansBySpec[specId] ?? []);
-      const weekPrices = tierPlans
-        .filter((p) => Number(p.durationDays ?? 0) >= 7 && Number(p.durationDays ?? 0) < 28)
-        .map((p) => Number(p.price ?? 0))
-        .filter((value) => value > 0);
-      const monthPrices = tierPlans
-        .filter((p) => Number(p.durationDays ?? 0) >= 28 && Number(p.durationDays ?? 0) < 365)
-        .map((p) => Number(p.price ?? 0))
-        .filter((value) => value > 0);
-      const yearPrices = tierPlans
-        .filter((p) => Number(p.durationDays ?? 0) >= 365)
-        .map((p) => Number(p.price ?? 0))
-        .filter((value) => value > 0);
 
+
+      const weeklyPlan = tierPlans.find((p) => Number(p.durationDays ?? 0) >= 7 && Number(p.durationDays ?? 0) < 28);
+      const monthlyPlan = tierPlans.find((p) => Number(p.durationDays ?? 0) >= 28 && Number(p.durationDays ?? 0) < 365);
+      const yearlyPlan = tierPlans.find((p) => Number(p.durationDays ?? 0) >= 365);
       const firstPlan = tierPlans[0];
-      const monthPrice = monthPrices[0] ?? weekPrices[0] ?? firstPlan?.price ?? 0;
-      const weekPrice = weekPrices[0] ?? (monthPrice > 0 ? monthPrice / 4 : firstPlan?.price ?? 0);
-      const yearPrice = yearPrices[0] ?? (monthPrice > 0 ? monthPrice * 12 : weekPrice * 52);
+
+
+      let baseWeekly = 0;
+      if (weeklyPlan) {
+        baseWeekly = weeklyPlan.price;
+      } else if (monthlyPlan) {
+        baseWeekly = monthlyPlan.price / 4;
+      } else if (yearlyPlan) {
+        baseWeekly = yearlyPlan.price / 40;
+      } else if (firstPlan) {
+        baseWeekly = firstPlan.price / Math.max(1, Math.round(firstPlan.durationDays / 7));
+      }
+
+      const weekPrice = weeklyPlan?.price ?? baseWeekly;
+      const monthPrice = monthlyPlan?.price ?? (baseWeekly * 4);
+      const yearPrice = yearlyPlan?.price ?? (baseWeekly * 40);
 
       return {
         ...staticData,

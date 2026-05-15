@@ -22,16 +22,41 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 
-type AdminPackageItemResponse = {
+type TierSpecPlanPlanResponse  = {
   planId: number;
   planName: string;
-  specId: number;
-  specName: string;
-  tierName: string | null;
   durationDays: number;
   price: number;
-  maxHoursPerDay: number | null;
+  maxHoursPerDay: null;
   active: boolean;
+};
+
+type TierSpecPlanSpecResponse = {
+  specId: number;
+  specName: string;
+  cpu: string;
+  gpu: string;
+  ram: number;
+  storage: number;
+  operatingSystem: string;
+  description: string;
+  pricePerHour: number;
+  exclusive: boolean;
+  available: boolean;
+  plans: TierSpecPlanPlanResponse[];
+};
+
+type TierSpecPlanTierResponse = {
+  tierId: number;
+  tierName: string;
+  tierLevel: number;
+  active: boolean;
+  specs: TierSpecPlanSpecResponse[];
+};
+
+type TierSpecPlanCatalogResponse = {
+  tiers: TierSpecPlanTierResponse[];
+  unassignedSpecs: TierSpecPlanSpecResponse[];
 };
 
 type AdminPcItemResponse = {
@@ -53,10 +78,12 @@ type PageResponse<T> = {
 
 type TierKey = "basic" | "pro" | "ultra";
 
+type CombinedPlan = TierSpecPlanPlanResponse & { specId: number; specName: string };
+
 type TierPackage = {
   tier: TierKey;
   title: string;
-  plans: AdminPackageItemResponse[];
+  plans: CombinedPlan[];
   specIds: number[];
   active: boolean;
 };
@@ -146,7 +173,7 @@ function isMachineVisible(
 }
 
 export function ComputerList() {
-  const [packages, setPackages] = useState<AdminPackageItemResponse[]>([]);
+  const [catalog, setCatalog] = useState<TierSpecPlanCatalogResponse | null>(null);
   const [machines, setMachines] = useState<AdminPcItemResponse[]>([]);
   const [activeSessions, setActiveSessions] = useState<Record<number, { sessionId: number; userFullName?: string | null; userEmail?: string | null }>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -172,17 +199,14 @@ export function ComputerList() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [packagePage, machinePage] = await Promise.all([
-        apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", {
-          page: 0,
-          size: 500,
-        }),
+      const [catalogData, machinePage] = await Promise.all([
+        apiGet<TierSpecPlanCatalogResponse>("/pcs/tier-spec-plans"),
         apiGet<PageResponse<AdminPcItemResponse>>("/admin/pcs", {
           page: 0,
           size: 200,
         }),
       ]);
-      setPackages(packagePage.content ?? []);
+      setCatalog(catalogData);
       setMachines(machinePage.content ?? []);
       try {
         const sessionsPage = await apiGet<PageResponse<{ sessionId: number; pcId: number; userFullName?: string | null; userEmail?: string | null }>>("/admin/sessions", { page: 0, size: 500, status: "active" });
@@ -212,44 +236,36 @@ export function ComputerList() {
   }, [searchTerm, statusFilter]);
 
   const tierPackages = useMemo(() => {
-    const grouped = new Map<TierKey, TierPackage>();
+    if (!catalog) return [];
 
-    for (const pkg of packages) {
-      const tier = normalizeTier(pkg.tierName) ?? detectTier(`${pkg.planName} ${pkg.specName}`);
-      if (!tier) continue;
-
-      const existing = grouped.get(tier);
-      if (!existing) {
-        grouped.set(tier, {
-          tier,
-          title: TIER_LABELS[tier],
-          plans: [pkg],
-          specIds: [pkg.specId],
-          active: !!pkg.active,
+    return TIER_ORDER.map((tierKey) => {
+      const matchedTier = catalog.tiers.find(t => normalizeTier(t.tierName) === tierKey);
+      
+      const allPlans: CombinedPlan[] = [];
+      const specIds: number[] = [];
+      
+      if (matchedTier) {
+        matchedTier.specs.forEach(spec => {
+          specIds.push(spec.specId);
+          spec.plans.forEach(plan => {
+            allPlans.push({
+              ...plan,
+              specId: spec.specId,
+              specName: spec.specName,
+            });
+          });
         });
-        continue;
       }
 
-      existing.plans.push(pkg);
-      existing.specIds = Array.from(new Set([...existing.specIds, pkg.specId]));
-      existing.active = existing.active || !!pkg.active;
-    }
-
-    return TIER_ORDER.map((tier) =>
-      grouped.get(tier) ?? {
-        tier,
-        title: TIER_LABELS[tier],
-        plans: [],
-        specIds: [],
-        active: false,
-      },
-    ).map((entry) => ({
-      ...entry,
-      plans: [...entry.plans].sort(
-        (a, b) => Number(a.durationDays ?? 0) - Number(b.durationDays ?? 0),
-      ),
-    }));
-  }, [packages]);
+      return {
+        tier: tierKey,
+        title: TIER_LABELS[tierKey],
+        plans: allPlans.sort((a, b) => a.durationDays - b.durationDays),
+        specIds: Array.from(new Set(specIds)),
+        active: matchedTier?.active ?? false,
+      };
+    });
+  }, [catalog]);
 
   const machinesBySpec = useMemo(() => {
     return machines.reduce<Record<number, AdminPcItemResponse[]>>((acc, item) => {
@@ -263,10 +279,19 @@ export function ComputerList() {
   }, [machines]);
 
   const unassignedPlans = useMemo(() => {
-    return packages
-      .filter((pkg) => !(normalizeTier(pkg.tierName) ?? detectTier(`${pkg.planName} ${pkg.specName}`)))
-      .sort((a, b) => Number(a.planId) - Number(b.planId));
-  }, [packages]);
+    if (!catalog) return [];
+    const unassigned: CombinedPlan[] = [];
+    catalog.unassignedSpecs.forEach(spec => {
+      spec.plans.forEach(plan => {
+        unassigned.push({
+          ...plan,
+          specId: spec.specId,
+          specName: spec.specName,
+        });
+      });
+    });
+    return unassigned.sort((a, b) => a.planId - b.planId);
+  }, [catalog]);
 
   const tierMachineStats = useMemo(() => {
     return tierPackages.reduce<Record<TierKey, AdminPcItemResponse[]>>(

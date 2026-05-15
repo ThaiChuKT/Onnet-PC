@@ -11,26 +11,47 @@ import { toast } from "sonner";
 
 type TierKey = "basic" | "pro" | "ultra";
 
-type AdminPackageItemResponse = {
+type TierSpecPlanPlanResponse = {
 	planId: number;
 	planName: string;
-	specId: number;
-	specName: string;
-	tierName: string | null;
 	durationDays: number;
 	price: number;
 	maxHoursPerDay: number | null;
 	active: boolean;
 };
 
-type PageResponse<T> = {
-	content: T[];
+type TierSpecPlanSpecResponse = {
+	specId: number;
+	specName: string;
+	cpu: string;
+	gpu: string;
+	ram: number;
+	storage: number;
+	operatingSystem: string;
+	description: string;
+	pricePerHour: number;
+	exclusive: boolean;
+	available: boolean;
+	plans: TierSpecPlanPlanResponse[];
 };
 
-type TierPlans = {
-	yearly: AdminPackageItemResponse | null;
-	monthly: AdminPackageItemResponse | null;
-	weekly: AdminPackageItemResponse | null;
+type TierSpecPlanTierResponse = {
+	tierId: number;
+	tierName: string;
+	tierLevel: number;
+	active: boolean;
+	specs: TierSpecPlanSpecResponse[];
+};
+
+type TierSpecPlanCatalogResponse = {
+	tiers: TierSpecPlanTierResponse[];
+	unassignedSpecs: TierSpecPlanSpecResponse[];
+};
+
+type TierPlanGroups = {
+	yearlyIds: number[];
+	monthlyIds: number[];
+	weeklyIds: number[];
 };
 
 function detectTier(text: string): TierKey | null {
@@ -45,7 +66,10 @@ function roundMoney(n: number) {
 	return Math.max(1, Math.round(n));
 }
 
-function derivePricesFrom(duration: "yearly" | "monthly" | "weekly", value: number) {
+function derivePricesFrom(
+	duration: "yearly" | "monthly" | "weekly",
+	value: number,
+) {
 	let baseWeekly = 0;
 	if (duration === "weekly") {
 		baseWeekly = value;
@@ -71,7 +95,11 @@ export function PackagePricingPage() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [syncByFormula, setSyncByFormula] = useState(true);
 
-	const [plans, setPlans] = useState<TierPlans>({ yearly: null, monthly: null, weekly: null });
+	const [planIds, setPlanIds] = useState<TierPlanGroups>({
+		yearlyIds: [],
+		monthlyIds: [],
+		weeklyIds: [],
+	});
 	const [yearlyPrice, setYearlyPrice] = useState(0);
 	const [monthlyPrice, setMonthlyPrice] = useState(0);
 	const [weeklyPrice, setWeeklyPrice] = useState(0);
@@ -86,22 +114,38 @@ export function PackagePricingPage() {
 			}
 			setIsLoading(true);
 			try {
-				const page = await apiGet<PageResponse<AdminPackageItemResponse>>("/admin/packages", { page: 0, size: 300 });
-				const matches = (page.content ?? []).filter((p) => {
-					const tier = p.tierName?.toLowerCase() || detectTier(`${p.planName} ${p.specName}`);
-					return tier === tierKey;
+				const catalog = await apiGet<TierSpecPlanCatalogResponse>(
+					"/pcs/tier-spec-plans",
+				);
+
+				const matchedTier = catalog.tiers.find(
+					(t) =>
+						t.tierName.toLowerCase() === tierKey ||
+						detectTier(t.tierName) === tierKey,
+				);
+
+				const allPlans = matchedTier
+					? matchedTier.specs.flatMap((s) => s.plans)
+					: [];
+
+				const yearlyPlans = allPlans.filter((p) => p.durationDays >= 365);
+				const monthlyPlans = allPlans.filter(
+					(p) => p.durationDays >= 28 && p.durationDays < 365,
+				);
+				const weeklyPlans = allPlans.filter((p) => p.durationDays < 28);
+
+				setPlanIds({
+					yearlyIds: yearlyPlans.map((p) => p.planId),
+					monthlyIds: monthlyPlans.map((p) => p.planId),
+					weeklyIds: weeklyPlans.map((p) => p.planId),
 				});
-
-				const yearly = matches.find((p) => Number(p.durationDays ?? 0) >= 365) ?? null;
-				const monthly = matches.find((p) => Number(p.durationDays ?? 0) >= 28 && Number(p.durationDays ?? 0) < 365) ?? null;
-				const weekly = matches.find((p) => Number(p.durationDays ?? 0) < 28) ?? null;
-
-				setPlans({ yearly, monthly, weekly });
-				setYearlyPrice(Number(yearly?.price ?? 0));
-				setMonthlyPrice(Number(monthly?.price ?? 0));
-				setWeeklyPrice(Number(weekly?.price ?? 0));
+				setYearlyPrice(Number(yearlyPlans[0]?.price ?? 0));
+				setMonthlyPrice(Number(monthlyPlans[0]?.price ?? 0));
+				setWeeklyPrice(Number(weeklyPlans[0]?.price ?? 0));
 			} catch (e) {
-				toast.error(e instanceof Error ? e.message : "Could not load package prices");
+				toast.error(
+					e instanceof Error ? e.message : "Could not load package prices",
+				);
 			} finally {
 				setIsLoading(false);
 			}
@@ -109,7 +153,10 @@ export function PackagePricingPage() {
 		void load();
 	}, [tierKey]);
 
-	const handleSyncedChange = (duration: "yearly" | "monthly" | "weekly", value: number) => {
+	const handleSyncedChange = (
+		duration: "yearly" | "monthly" | "weekly",
+		value: number,
+	) => {
 		const safeValue = roundMoney(value);
 		if (!syncByFormula) {
 			if (duration === "yearly") setYearlyPrice(safeValue);
@@ -126,15 +173,15 @@ export function PackagePricingPage() {
 
 	const handleSave = async () => {
 		const updates: Array<Promise<unknown>> = [];
-		if (plans.yearly?.planId) {
-			updates.push(apiPatch(`/admin/packages/${plans.yearly.planId}`, { price: yearlyPrice }));
-		}
-		if (plans.monthly?.planId) {
-			updates.push(apiPatch(`/admin/packages/${plans.monthly.planId}`, { price: monthlyPrice }));
-		}
-		if (plans.weekly?.planId) {
-			updates.push(apiPatch(`/admin/packages/${plans.weekly.planId}`, { price: weeklyPrice }));
-		}
+		planIds.yearlyIds.forEach((id) => {
+			updates.push(apiPatch(`/admin/packages/${id}`, { price: yearlyPrice }));
+		});
+		planIds.monthlyIds.forEach((id) => {
+			updates.push(apiPatch(`/admin/packages/${id}`, { price: monthlyPrice }));
+		});
+		planIds.weeklyIds.forEach((id) => {
+			updates.push(apiPatch(`/admin/packages/${id}`, { price: weeklyPrice }));
+		});
 
 		if (updates.length === 0) {
 			toast.error("No package plans found to update");
@@ -146,7 +193,9 @@ export function PackagePricingPage() {
 			await Promise.all(updates);
 			toast.success("Package prices updated");
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : "Could not update package prices");
+			toast.error(
+				e instanceof Error ? e.message : "Could not update package prices",
+			);
 		} finally {
 			setIsSaving(false);
 		}
@@ -154,85 +203,103 @@ export function PackagePricingPage() {
 
 	return (
 		<div className="space-y-6">
-					<div className="mb-6">
-						<Button variant="ghost" onClick={() => navigate("/dashboard/computers")}> 
-							<ArrowLeft className="w-4 h-4 mr-2" />
-							Back to machines
-						</Button>
-					</div>
+			<div className="mb-6">
+				<Button
+					variant="ghost"
+					onClick={() => navigate("/dashboard/computers")}
+				>
+					<ArrowLeft className="w-4 h-4 mr-2" />
+					Back to machines
+				</Button>
+			</div>
 
-					{isLoading && (
-						<Card className="p-10 border-border text-center">
-							<p className="text-muted-foreground">Loading package...</p>
-						</Card>
-					)}
+			{isLoading && (
+				<Card className="p-10 border-border text-center">
+					<p className="text-muted-foreground">Loading package...</p>
+				</Card>
+			)}
 
-					{!isLoading && !plans.yearly && !plans.monthly && !plans.weekly && (
-						<Card className="p-10 border-border text-center">
-							<p className="font-medium">No package plans found for this tier</p>
-						</Card>
-					)}
+			{!isLoading &&
+				planIds.yearlyIds.length === 0 &&
+				planIds.monthlyIds.length === 0 &&
+				planIds.weeklyIds.length === 0 && (
+					<Card className="p-10 border-border text-center">
+						<p className="font-medium">No package plans found for this tier</p>
+					</Card>
+				)}
 
-					{!isLoading && (plans.yearly || plans.monthly || plans.weekly) && (
-						<Card className="p-6 border-border max-w-2xl mx-auto">
-							<h1 className="text-2xl font-bold mb-2">Edit {title} prices</h1>
-							<p className="text-muted-foreground mb-6">
-								Toggle sync to auto-calculate weekly/monthly/yearly prices from one edited value.
-							</p>
+			{!isLoading &&
+				(planIds.yearlyIds.length > 0 ||
+					planIds.monthlyIds.length > 0 ||
+					planIds.weeklyIds.length > 0) && (
+					<Card className="p-6 border-border max-w-2xl mx-auto">
+						<h1 className="text-2xl font-bold mb-2">Edit {title} prices</h1>
+						<p className="text-muted-foreground mb-6">
+							Toggle sync to auto-calculate weekly/monthly/yearly prices from
+							one edited value.
+						</p>
 
-							<div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20 mb-6">
-								<div>
-									<p className="font-semibold">Sync price formula</p>
-                                    
-								</div>
-								<Switch checked={syncByFormula} onCheckedChange={setSyncByFormula} />
+						<div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/20 mb-6">
+							<div>
+								<p className="font-semibold">Sync price formula</p>
+							</div>
+							<Switch
+								checked={syncByFormula}
+								onCheckedChange={setSyncByFormula}
+							/>
+						</div>
+
+						<div className="space-y-4">
+							<div className="space-y-2">
+								<Label>Yearly price</Label>
+								<Input
+									type="number"
+									min={1}
+									value={yearlyPrice}
+									onChange={(e) =>
+										handleSyncedChange("yearly", Number(e.target.value) || 1)
+									}
+									className="text-money font-semibold"
+								/>
 							</div>
 
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<Label>Yearly price</Label>
-									<Input
-										type="number"
-										min={1}
-										value={yearlyPrice}
-										onChange={(e) => handleSyncedChange("yearly", Number(e.target.value) || 1)}
-										className="text-money font-semibold"
-									/>
-								</div>
-
-								<div className="space-y-2">
-									<Label>Monthly price</Label>
-									<Input
-										type="number"
-										min={1}
-										value={monthlyPrice}
-										onChange={(e) => handleSyncedChange("monthly", Number(e.target.value) || 1)}
-										className="text-money font-semibold"
-									/>
-								</div>
-
-								<div className="space-y-2">
-									<Label>Weekly price</Label>
-									<Input
-										type="number"
-										min={1}
-										value={weeklyPrice}
-										onChange={(e) => handleSyncedChange("weekly", Number(e.target.value) || 1)}
-										className="text-money font-semibold"
-									/>
-								</div>
-
-								<Button
-									onClick={handleSave}
-									disabled={isSaving}
-									className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-								>
-									<Save className="w-4 h-4 mr-2" />
-									{isSaving ? "Saving..." : "Save package prices"}
-								</Button>
+							<div className="space-y-2">
+								<Label>Monthly price</Label>
+								<Input
+									type="number"
+									min={1}
+									value={monthlyPrice}
+									onChange={(e) =>
+										handleSyncedChange("monthly", Number(e.target.value) || 1)
+									}
+									className="text-money font-semibold"
+								/>
 							</div>
-						</Card>
-					)}
+
+							<div className="space-y-2">
+								<Label>Weekly price</Label>
+								<Input
+									type="number"
+									min={1}
+									value={weeklyPrice}
+									onChange={(e) =>
+										handleSyncedChange("weekly", Number(e.target.value) || 1)
+									}
+									className="text-money font-semibold"
+								/>
+							</div>
+
+							<Button
+								onClick={handleSave}
+								disabled={isSaving}
+								className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+							>
+								<Save className="w-4 h-4 mr-2" />
+								{isSaving ? "Saving..." : "Save package prices"}
+							</Button>
+						</div>
+					</Card>
+				)}
 		</div>
 	);
 }
