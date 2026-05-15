@@ -159,7 +159,7 @@ export function CreatePlans() {
       storage: String(selected.storage ?? 512),
       os: selected.operatingSystem || "",
       location: selected.location || "",
-      tierName: prev.tierName || selected.tierName || "",
+      tierName: prev.tierName,
     }));
     toast.success("Configuration copied from existing plan");
   };
