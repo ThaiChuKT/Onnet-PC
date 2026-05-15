@@ -14,7 +14,7 @@ export function AIChatPage() {
 
       <main className="flex-1 bg-background pt-20">
         <section className="border-b border-border bg-card/35">
-          <div className="container mx-auto px-4 py-8">
+          <div className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-primary p-3">
                 <Sparkles className="h-6 w-6 text-primary-foreground" />
@@ -31,13 +31,15 @@ export function AIChatPage() {
           </div>
         </section>
 
-        <section className="container mx-auto px-4 py-8">
-          <ChatbotBuilderWebchat
-            accountId={accountId}
-            webchatId={webchatId}
-            color={color}
-            headerTitle="OnnetPC assistant"
-          />
+        <section className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-primary/20 bg-card/80 p-2 shadow-[0_24px_90px_rgba(0,0,0,0.32)]">
+            <ChatbotBuilderWebchat
+              accountId={accountId}
+              webchatId={webchatId}
+              color={color}
+              headerTitle="OnnetPC assistant"
+            />
+          </div>
         </section>
       </main>
 

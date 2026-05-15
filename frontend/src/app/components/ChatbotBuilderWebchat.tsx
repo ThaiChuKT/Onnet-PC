@@ -92,7 +92,7 @@ export function ChatbotBuilderWebchat({
 
   if (loadError) {
     return (
-      <div className="flex h-full min-h-[520px] items-center justify-center rounded-lg border border-border bg-muted/20 p-8 text-center">
+      <div className="flex h-full min-h-[760px] items-center justify-center rounded-lg border border-border bg-muted/20 p-8 text-center">
         <div>
           <p className="text-lg font-bold">Chat is unavailable</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -103,5 +103,10 @@ export function ChatbotBuilderWebchat({
     );
   }
 
-  return <div id={elementId} className="h-full min-h-[620px] w-full overflow-hidden rounded-lg border border-border bg-card" />;
+  return (
+    <div
+      id={elementId}
+      className="chatbot-builder-frame h-[calc(100vh-12rem)] min-h-[760px] w-full overflow-hidden rounded-lg border border-primary/30 bg-card shadow-[0_24px_80px_rgba(255,69,0,0.12)]"
+    />
+  );
 }
