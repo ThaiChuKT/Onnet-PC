@@ -206,6 +206,7 @@ export function RentalHistory() {
     return items.filter((item) => {
       const status = normalizeBookingStatus(item.status);
       if (status === "pending") return false;
+      if (statusFilter === "all" && status === "cancelled") return false;
       if (statusFilter === "all") return true;
       if (statusFilter === "active") {
         return status === "active" || activeBookingId === item.bookingId;

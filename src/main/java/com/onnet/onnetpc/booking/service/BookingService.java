@@ -412,12 +412,11 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
 
-        if (booking.getStatus().equals(BookingStatus.cancelled)){
-            bookingRepository.delete(booking);
-        } else {
+        if (booking.getStatus() == BookingStatus.pending || booking.getStatus() == BookingStatus.cancelled) {
             booking.setStatus(BookingStatus.cancelled);
-            booking.setUpdatedAt(Instant.now());
-            bookingRepository.save(booking);
+            BookingResponse response = toBookingResponse(booking);
+            bookingRepository.delete(booking);
+            return response;
         }
 
         booking.setStatus(BookingStatus.cancelled);
