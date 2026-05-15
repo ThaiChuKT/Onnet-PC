@@ -59,6 +59,7 @@ public class AuthService {
         JwtService jwtService,
         JavaMailSender mailSender,
         @Value("${app.email.verification.from:no-reply@onnetpc.local}") String verificationMailFrom,
+        @Value("${spring.mail.username:}") String mailUsername,
         @Value("${app.email.verification.expiry-minutes:15}") long verificationCodeExpiryMinutes
     ) {
         this.userRepository = userRepository;
@@ -68,7 +69,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.mailSender = mailSender;
-        this.verificationMailFrom = verificationMailFrom;
+        this.verificationMailFrom = resolveMailFrom(verificationMailFrom, mailUsername);
         this.verificationCodeExpiryMinutes = verificationCodeExpiryMinutes;
     }
 
@@ -281,5 +282,14 @@ public class AuthService {
             suffix++;
         }
         return username;
+    }
+
+    private String resolveMailFrom(String configuredFrom, String mailUsername) {
+        String username = mailUsername == null ? "" : mailUsername.trim();
+        String from = configuredFrom == null ? "" : configuredFrom.trim();
+        if (username.toLowerCase(Locale.ROOT).endsWith("@gmail.com")) {
+            return username;
+        }
+        return from.isBlank() ? username : from;
     }
 }

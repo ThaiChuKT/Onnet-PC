@@ -5,9 +5,6 @@ import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
-import com.onnet.onnetpc.memberships.MembershipTier;
-import com.onnet.onnetpc.memberships.MembershipTierRepository;
-import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandResponse;
 import com.onnet.onnetpc.moonlight.entity.SunshineHost;
@@ -43,8 +40,6 @@ public class SessionLifecycleService {
     private final PcRepository pcRepository;
     private final SessionRepository sessionRepository;
     private final SessionQueueRepository sessionQueueRepository;
-    private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
-    private final MembershipTierRepository membershipTierRepository;
     private final MoonlightService moonlightService;
     private final SunshineHostRepository sunshineHostRepository;
 
@@ -54,8 +49,6 @@ public class SessionLifecycleService {
         PcRepository pcRepository,
         SessionRepository sessionRepository,
         SessionQueueRepository sessionQueueRepository,
-        MembershipTierSpecMappingRepository tierSpecMappingRepository,
-        MembershipTierRepository membershipTierRepository,
         MoonlightService moonlightService,
         SunshineHostRepository sunshineHostRepository
     ) {
@@ -64,8 +57,6 @@ public class SessionLifecycleService {
         this.pcRepository = pcRepository;
         this.sessionRepository = sessionRepository;
         this.sessionQueueRepository = sessionQueueRepository;
-        this.tierSpecMappingRepository = tierSpecMappingRepository;
-        this.membershipTierRepository = membershipTierRepository;
         this.moonlightService = moonlightService;
         this.sunshineHostRepository = sunshineHostRepository;
     }
@@ -301,13 +292,6 @@ public class SessionLifecycleService {
             && sessionRepository.findActiveSessionIdsByPcId(pc.getId()).isEmpty();
     }
 
-    private Long resolveTierIdByBookingSpec(Booking booking) {
-        if (booking.getSpec() == null || booking.getSpec().getId() == null) {
-            return null;
-        }
-        return tierSpecMappingRepository.findTierIdBySpecId(booking.getSpec().getId()).orElse(null);
-    }
-
     private int enqueueForTierWaiting(Booking booking, User user) {
         SessionQueue existingWaiting = sessionQueueRepository
             .findByBookingIdAndStatusIgnoreCase(booking.getId(), "waiting")
@@ -316,22 +300,17 @@ public class SessionLifecycleService {
             return existingWaiting.getQueuePosition() == null ? 1 : existingWaiting.getQueuePosition();
         }
 
-        Long tierId = resolveTierIdByBookingSpec(booking);
-        if (tierId == null) {
+        if (booking.getSpec() == null || booking.getSpec().getId() == null) {
             throw new ApiException(HttpStatus.CONFLICT, "No available machine in selected package pool");
         }
 
-        Integer maxPosition = sessionQueueRepository.findMaxWaitingPositionForUpdate(tierId);
+        Integer maxPosition = sessionQueueRepository.findMaxWaitingPositionForUpdate(booking.getSpec().getId());
         int queuePosition = (maxPosition == null ? 0 : maxPosition) + 1;
-
-        MembershipTier tier = membershipTierRepository.findById(tierId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Membership tier not found"));
 
         SessionQueue queue = new SessionQueue();
         queue.setBooking(booking);
         queue.setUser(user);
         queue.setSpec(booking.getSpec());
-        queue.setTier(tier);
         queue.setQueuePosition(queuePosition);
         queue.setStatus("waiting");
         sessionQueueRepository.save(queue);
@@ -389,17 +368,17 @@ public class SessionLifecycleService {
         queued.setStatus("assigned");
         sessionQueueRepository.save(queued);
 
-        normalizeWaitingPositions(queued.getTier());
+        normalizeWaitingPositions(queued.getSpec() == null ? null : queued.getSpec().getId());
     }
 
-    private void normalizeWaitingPositions(MembershipTier tier) {
-        if (tier == null || tier.getId() == null) {
+    private void normalizeWaitingPositions(Long specId) {
+        if (specId == null) {
             return;
         }
 
         List<SessionQueue> waitingRows = sessionQueueRepository.findAll().stream()
             .filter(item -> "waiting".equalsIgnoreCase(item.getStatus()))
-            .filter(item -> item.getTier() != null && tier.getId().equals(item.getTier().getId()))
+            .filter(item -> item.getSpec() != null && specId.equals(item.getSpec().getId()))
             .sorted((a, b) -> Integer.compare(
                 a.getQueuePosition() == null ? Integer.MAX_VALUE : a.getQueuePosition(),
                 b.getQueuePosition() == null ? Integer.MAX_VALUE : b.getQueuePosition()

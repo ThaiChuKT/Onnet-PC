@@ -16,29 +16,10 @@ public class CatalogSeedConfig {
     @Bean
     ApplicationRunner seedCatalogData(JdbcTemplate jdbcTemplate) {
         return args -> {
-            seedMembershipTiers(jdbcTemplate);
             seedPcSpecs(jdbcTemplate);
-            seedTierSpecMappings(jdbcTemplate);
             seedPcs(jdbcTemplate);
             seedSubscriptionPlans(jdbcTemplate);
         };
-    }
-
-    private void seedMembershipTiers(JdbcTemplate jdbcTemplate) {
-        if (countRows(jdbcTemplate, "membership_tiers") > 0) {
-            return;
-        }
-
-        jdbcTemplate.update(
-            """
-                INSERT INTO membership_tiers
-                    (id, tier_name, tier_level, monthly_fee, discount_percentage, support_level, is_active)
-                VALUES
-                    (1, 'Basic', 1, 15.00, 0.00, 'standard', 1),
-                    (2, 'Pro', 2, 35.00, 5.00, 'priority', 1),
-                    (3, 'Ultra', 3, 65.00, 10.00, 'vip', 1)
-                """
-        );
     }
 
     private void seedPcSpecs(JdbcTemplate jdbcTemplate) {
@@ -57,22 +38,6 @@ public class CatalogSeedConfig {
                     (4, 'Pro Ryzen Performance', 'AMD Ryzen 7 7700X', 'NVIDIA RTX 4070 Super', 32, 1024, 'Windows 11', 5.00, 'High-refresh gaming and multitasking', 0, 1),
                     (5, 'Ultra Intel Ultimate', 'Intel Core i9-14900K', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, '4K gaming and workstation rendering', 1, 1),
                     (6, 'Ultra AMD Beast', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, 'AI workloads and heavy graphics', 1, 1)
-                """
-        );
-    }
-
-    private void seedTierSpecMappings(JdbcTemplate jdbcTemplate) {
-        if (countRows(jdbcTemplate, "membership_tier_spec_mappings") > 0) {
-            return;
-        }
-
-        jdbcTemplate.update(
-            """
-                INSERT INTO membership_tier_spec_mappings (tier_id, spec_id)
-                VALUES
-                    (1, 1), (1, 2),
-                    (2, 3), (2, 4),
-                    (3, 5), (3, 6)
                 """
         );
     }

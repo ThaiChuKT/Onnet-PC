@@ -24,10 +24,11 @@ public class BookingEmailService {
 
     public BookingEmailService(
         JavaMailSender mailSender,
-        @Value("${app.email.booking.from:${app.email.verification.from:no-reply@onnetpc.local}}") String bookingMailFrom
+        @Value("${app.email.booking.from:${app.email.verification.from:no-reply@onnetpc.local}}") String bookingMailFrom,
+        @Value("${spring.mail.username:}") String mailUsername
     ) {
         this.mailSender = mailSender;
-        this.bookingMailFrom = bookingMailFrom;
+        this.bookingMailFrom = resolveMailFrom(bookingMailFrom, mailUsername);
     }
 
     public void sendPaymentConfirmation(String email, Booking booking) {
@@ -57,5 +58,14 @@ public class BookingEmailService {
             + "Total paid: $" + totalPrice + "\n"
             + "Status: PAID\n\n"
             + "You can now go to Rentals and click Start session when your slot starts.";
+    }
+
+    private String resolveMailFrom(String configuredFrom, String mailUsername) {
+        String username = mailUsername == null ? "" : mailUsername.trim();
+        String from = configuredFrom == null ? "" : configuredFrom.trim();
+        if (username.toLowerCase(Locale.ROOT).endsWith("@gmail.com")) {
+            return username;
+        }
+        return from.isBlank() ? username : from;
     }
 }

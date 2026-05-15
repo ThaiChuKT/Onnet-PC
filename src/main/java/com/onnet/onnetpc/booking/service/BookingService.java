@@ -15,9 +15,6 @@ import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.booking.service.BookingEmailService;
 import com.onnet.onnetpc.common.exception.ApiException;
-import com.onnet.onnetpc.memberships.MembershipTier;
-import com.onnet.onnetpc.memberships.MembershipTierRepository;
-import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.pcs.PcStatus;
@@ -58,8 +55,6 @@ public class BookingService {
     private final PcRepository pcRepository;
     private final PcSpecRepository pcSpecRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final MembershipTierRepository membershipTierRepository;
-    private final MembershipTierSpecMappingRepository tierSpecMappingRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final ReviewRepository reviewRepository;
@@ -73,8 +68,6 @@ public class BookingService {
         PcRepository pcRepository,
         PcSpecRepository pcSpecRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
-        MembershipTierRepository membershipTierRepository,
-        MembershipTierSpecMappingRepository tierSpecMappingRepository,
         WalletRepository walletRepository,
         WalletTransactionRepository walletTransactionRepository,
         ReviewRepository reviewRepository,
@@ -87,8 +80,6 @@ public class BookingService {
         this.pcRepository = pcRepository;
         this.pcSpecRepository = pcSpecRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
-        this.membershipTierRepository = membershipTierRepository;
-        this.tierSpecMappingRepository = tierSpecMappingRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.reviewRepository = reviewRepository;
@@ -485,8 +476,6 @@ public class BookingService {
     }
 
     private PricingResult resolvePricing(Long specId, String tierName, String rentalUnit, Integer quantity) {
-        PcSpec spec = resolveSpecForPricing(specId, tierName);
-
         String unit = rentalUnit == null ? "" : rentalUnit.trim().toLowerCase(Locale.ROOT);
         if (unit.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "rentalUnit is required");
@@ -496,7 +485,13 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "quantity must be at least 1");
         }
 
+        PcSpec spec = specId == null ? null : pcSpecRepository.findById(specId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
+
         if ("hour".equals(unit)) {
+            if (spec == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "specId is required for hourly rental");
+            }
             BigDecimal hourly = spec.getPricePerHour();
             if (hourly == null || hourly.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid hourly price");
@@ -520,12 +515,8 @@ public class BookingService {
             default -> throw new ApiException(HttpStatus.BAD_REQUEST, "Unsupported rentalUnit");
         };
 
-        SubscriptionPlan plan = subscriptionPlanRepository
-            .findBySpecIdAndActiveTrueOrderByDurationDaysAsc(spec.getId())
-            .stream()
-            .filter(item -> item.getDurationDays() != null && item.getDurationDays() == durationDays)
-            .findFirst()
-            .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Selected rental plan is not available"));
+        SubscriptionPlan plan = resolveSubscriptionPlan(spec, tierName, durationDays);
+        spec = plan.getSpec();
 
         return new PricingResult(
             spec,
@@ -537,24 +528,36 @@ public class BookingService {
         );
     }
 
-    private PcSpec resolveSpecForPricing(Long specId, String tierName) {
-        if (tierName != null && !tierName.isBlank()) {
-            MembershipTier tier = membershipTierRepository.findByTierNameIgnoreCaseAndActiveTrue(tierName.trim())
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Invalid subscription tier"));
-
-            Long tierSpecId = tierSpecMappingRepository.findPrimarySpecIdByTierId(tier.getId())
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "No machine group configured for this tier"));
-
-            return pcSpecRepository.findById(tierSpecId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
+    private SubscriptionPlan resolveSubscriptionPlan(PcSpec spec, String tierName, int durationDays) {
+        if (spec != null) {
+            return subscriptionPlanRepository
+                .findBySpecIdAndActiveTrueOrderByDurationDaysAsc(spec.getId())
+                .stream()
+                .filter(item -> item.getDurationDays() != null && item.getDurationDays() == durationDays)
+                .findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Selected rental plan is not available"));
         }
 
-        if (specId == null) {
+        String tier = tierName == null ? "" : tierName.trim().toLowerCase(Locale.ROOT);
+        if (tier.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "specId or tierName is required");
         }
 
-        return pcSpecRepository.findById(specId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine group not found"));
+        return subscriptionPlanRepository
+            .findByActiveTrueOrderByPriceAscIdAsc()
+            .stream()
+            .filter(item -> item.getDurationDays() != null && item.getDurationDays() == durationDays)
+            .filter(item -> planBelongsToTier(item, tier))
+            .findFirst()
+            .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Selected subscription package is not available"));
+    }
+
+    private boolean planBelongsToTier(SubscriptionPlan plan, String tier) {
+        String planName = plan.getPlanName() == null ? "" : plan.getPlanName().toLowerCase(Locale.ROOT);
+        String specName = plan.getSpec() == null || plan.getSpec().getSpecName() == null
+            ? ""
+            : plan.getSpec().getSpecName().toLowerCase(Locale.ROOT);
+        return planName.startsWith(tier) || specName.startsWith(tier);
     }
 
     private Booking buildBooking(

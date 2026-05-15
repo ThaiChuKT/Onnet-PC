@@ -11,13 +11,13 @@ public interface SessionQueueRepository extends JpaRepository<SessionQueue, Long
         value = """
             SELECT COALESCE(MAX(queue_position), 0)
             FROM session_queue
-            WHERE tier_id = :tierId
+            WHERE spec_id = :specId
               AND status = 'waiting'
             FOR UPDATE
             """,
         nativeQuery = true
     )
-    Integer findMaxWaitingPositionForUpdate(@Param("tierId") Long tierId);
+    Integer findMaxWaitingPositionForUpdate(@Param("specId") Long specId);
 
     Optional<SessionQueue> findByBookingIdAndStatusIgnoreCase(Long bookingId, String status);
 

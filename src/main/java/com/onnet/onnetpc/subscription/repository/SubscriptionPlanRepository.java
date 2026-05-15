@@ -11,6 +11,8 @@ public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPl
 
     List<SubscriptionPlan> findBySpecIdAndActiveTrueOrderByDurationDaysAsc(Long specId);
 
+    List<SubscriptionPlan> findByActiveTrueOrderByPriceAscIdAsc();
+
     Page<SubscriptionPlan> findByActiveTrue(Pageable pageable);
 
     Optional<SubscriptionPlan> findByIdAndActiveTrue(Long id);

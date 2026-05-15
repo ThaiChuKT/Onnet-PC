@@ -46,17 +46,13 @@ type PageResponse<T> = {
   content: T[];
 };
 
-// Map specId to tier based on database tier_spec_mappings
 const SPEC_TO_TIER_MAP: Record<number, TierKey> = {
-  // Basic tier (tier_id=1)
-  1: "basic",  // Basic Intel Starter
-  2: "basic",  // Basic AMD Ryzen Core
-  // Pro tier (tier_id=2)
-  3: "pro",    // Pro Intel Gaming
-  4: "pro",    // Pro Ryzen Performance
-  // Ultra tier (tier_id=3)
-  5: "ultra",  // Ultra Intel Ultimate
-  6: "ultra",  // Ultra AMD Beast
+  1: "basic",
+  2: "basic",
+  3: "pro",
+  4: "pro",
+  5: "ultra",
+  6: "ultra",
 };
 
 const TIER_LABELS: Record<TierKey, string> = {

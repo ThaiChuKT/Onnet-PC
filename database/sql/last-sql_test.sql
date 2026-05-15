@@ -11,24 +11,6 @@ SET time_zone = "+00:00";
 -- 1. TẠO CẤU TRÚC BẢNG (DATABASE SCHEMA)
 -- ========================================================
 
-CREATE TABLE `membership_tiers` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `tier_name` varchar(255) NOT NULL,
-  `tier_level` int(11) NOT NULL,
-  `monthly_fee` decimal(38,2) NOT NULL,
-  `discount_percentage` decimal(38,2) DEFAULT NULL,
-  `storage_limit_gb` int(11) DEFAULT NULL,
-  `free_hours_per_month` int(11) DEFAULT 0,
-  `rollover_hours_limit` int(11) DEFAULT 0,
-  `advance_booking_days` int(11) DEFAULT 0,
-  `queue_priority` int(11) DEFAULT 99,
-  `can_access_exclusive_specs` tinyint(1) DEFAULT 0,
-  `support_level` varchar(255) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 CREATE TABLE `pc_specs` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `spec_name` varchar(255) DEFAULT NULL,
@@ -43,15 +25,6 @@ CREATE TABLE `pc_specs` (
   `is_available` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `membership_tier_spec_mappings` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `tier_id` bigint(20) NOT NULL,
-  `spec_id` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_membership_tier_spec` (`tier_id`,`spec_id`),
-  UNIQUE KEY `uq_membership_spec_single_tier` (`spec_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `pcs` (
@@ -75,7 +48,6 @@ CREATE TABLE `users` (
   `password_hash` varchar(255) NOT NULL,
   `avatar` varchar(255) DEFAULT NULL,
   `role` varchar(50) DEFAULT 'user',
-  `tier_id` bigint(20) DEFAULT NULL,
   `is_verified` tinyint(1) DEFAULT 0,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -83,8 +55,7 @@ CREATE TABLE `users` (
   `deleted_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
-  UNIQUE KEY `email` (`email`),
-  KEY `tier_id` (`tier_id`)
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wallets` (
@@ -255,34 +226,8 @@ CREATE TABLE `session_queue` (
   `booking_id` bigint(20) NOT NULL,
   `user_id` bigint(20) NOT NULL,
   `spec_id` bigint(20) NOT NULL,
-  `tier_id` bigint(20) DEFAULT NULL,
   `queue_position` int(11) NOT NULL,
   `status` varchar(255) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `user_memberships` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `user_id` bigint(20) NOT NULL,
-  `tier_id` bigint(20) NOT NULL,
-  `start_date` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `end_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `status` varchar(50) DEFAULT 'active',
-  `auto_renew` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `user_subscriptions` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `user_id` bigint(20) NOT NULL,
-  `plan_id` bigint(20) NOT NULL,
-  `pc_id` bigint(20) DEFAULT NULL,
-  `start_date` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `end_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `status` varchar(50) DEFAULT 'active',
-  `auto_renew` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -291,12 +236,6 @@ CREATE TABLE `user_subscriptions` (
 -- ========================================================
 -- 2. SEED DATA (DỮ LIỆU MẪU KHỞI TẠO)
 -- ========================================================
-
--- 2.1. Seed Membership Tiers
-INSERT INTO `membership_tiers` (`id`, `tier_name`, `tier_level`, `monthly_fee`, `discount_percentage`, `queue_priority`, `can_access_exclusive_specs`, `support_level`) VALUES
-(1, 'Basic', 1, 15.00, 0.00, 30, 0, 'standard'),
-(2, 'Pro', 2, 35.00, 5.00, 20, 0, 'priority'),
-(3, 'Ultra', 3, 65.00, 10.00, 10, 1, 'vip');
 
 -- 2.2. Seed PC Specs (Mỗi gói có 2 cấu hình đại diện cho Intel và Ryzen)
 INSERT INTO `pc_specs` (`id`, `spec_name`, `cpu`, `gpu`, `ram`, `storage`, `os`, `price_per_hour`, `description`, `is_exclusive`) VALUES
@@ -310,13 +249,7 @@ INSERT INTO `pc_specs` (`id`, `spec_name`, `cpu`, `gpu`, `ram`, `storage`, `os`,
 (5, 'Ultra Intel Ultimate', 'Intel Core i9-14900K', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, 'Siêu quái vật Workstation chuyên render và 4K Gaming', 1),
 (6, 'Ultra AMD Beast', 'AMD Ryzen 9 7950X', 'NVIDIA RTX 4090', 64, 2048, 'Windows 11 Pro', 10.00, 'Cực đỉnh xử lý thuật toán AI và đồ họa nặng', 1);
 
--- 2.3. Mapped Specs to Membership Tiers
-INSERT INTO `membership_tier_spec_mappings` (`tier_id`, `spec_id`) VALUES
-(1, 1), (1, 2),
-(2, 3), (2, 4), 
-(3, 5), (3, 6);
-
--- 2.4. Seed 30 PCs (Phân bổ đều: mỗi plan/tier quản lý đúng 10 máy)
+-- 2.4. Seed 30 PCs (Phân bổ đều: mỗi plan quản lý đúng 10 máy)
 INSERT INTO `pcs` (`id`, `spec_id`, `status`, `location`) VALUES
 -- 10 Máy thuộc Gói Basic (Mix cấu hình 1 và 2)
 (1, 1, 'available', 'Zone Basic - Seat 01'),
@@ -374,24 +307,24 @@ INSERT INTO `subscription_plans` (`id`, `plan_name`, `spec_id`, `duration_days`,
 (18, 'Ultra AMD - Yearly', 6, 365, 2000.00);
 
 -- 2.6. Seed 15 Users (Gồm 1 Admin và 14 thành viên trải đều các gói hội viên)
-INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `phone`, `password_hash`, `role`, `tier_id`, `is_verified`) VALUES
-(1, 'admin_cyber', 'Nguyen Van Admin', 'admin@onnetpc.com', '0911223344', '$2a$10$mhtsJJQPNjy2/oO7QzTQ7O', 'admin', NULL, 1),
+INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `phone`, `password_hash`, `role`, `is_verified`) VALUES
+(1, 'admin_cyber', 'Nguyen Van Admin', 'admin@onnetpc.com', '0911223344', '$2a$10$mhtsJJQPNjy2/oO7QzTQ7O', 'admin', 1),
 -- 5 Users hoạt động tích cực (Dùng để fake session ở phần sau)
-(2, 'quangthai26', 'Chu Nguyen Quang Thai', 'quangthai@gmail.com', '0988888888', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 3, 1),
-(3, 'hoanglong99', 'Le Hoang Long', 'hoanglong99@gmail.com', '0977777777', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 2, 1),
-(4, 'minhtu_dang', 'Dang Minh Tu', 'minhtu@gmail.com', '0966666666', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1, 1),
-(5, 'linhdan_pro', 'Tran Linh Dan', 'linhdan@gmail.com', '0955555555', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 2, 1),
-(6, 'tienanh_dev', 'Nguyen Tien Anh', 'tienanh@gmail.com', '0944444444', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 3, 1),
+(2, 'quangthai26', 'Chu Nguyen Quang Thai', 'quangthai@gmail.com', '0988888888', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1),
+(3, 'hoanglong99', 'Le Hoang Long', 'hoanglong99@gmail.com', '0977777777', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1),
+(4, 'minhtu_dang', 'Dang Minh Tu', 'minhtu@gmail.com', '0966666666', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1),
+(5, 'linhdan_pro', 'Tran Linh Dan', 'linhdan@gmail.com', '0955555555', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1),
+(6, 'tienanh_dev', 'Nguyen Tien Anh', 'tienanh@gmail.com', '0944444444', '$2a$10$0Xlm1qRYccLG7LvzWdGN8e', 'user', 1),
 -- 9 Users thông thường khác ít hoạt động hơn
-(7, 'bavuong91', 'Nguyen Ba Vuong', 'vuongba@gmail.com', '0933333333', '$2a$10$0Xlm1qRY', 'user', 1, 1),
-(8, 'khanhhuyen', 'Pham Khanh Huyen', 'huyenkhanh@gmail.com', '0922222222', '$2a$10$0Xlm1qRY', 'user', 1, 1),
-(9, 'ducmanh_it', 'Vu Duc Manh', 'manhduc@gmail.com', '0911111111', '$2a$10$0Xlm1qRY', 'user', 2, 1),
-(10, 'thuha_98', 'Le Thu Ha', 'ha_thu98@gmail.com', '0900000000', '$2a$10$0Xlm1qRY', 'user', 2, 1),
-(11, 'quocbao_vp', 'Tran Quoc Bao', 'baoquoc@gmail.com', '0899999999', '$2a$10$0Xlm1qRY', 'user', 1, 1),
-(12, 'ngocanh_cute', 'Hoang Ngoc Anh', 'ngocanh@gmail.com', '0888888888', '$2a$10$0Xlm1qRY', 'user', 3, 1),
-(13, 'duyhung_gamer', 'Do Duy Hung', 'hungduy@gmail.com', '0877777777', '$2a$10$0Xlm1qRY', 'user', 3, 1),
-(14, 'thanhthuy_2k', 'Nguyen Thanh Thuy', 'thuythanh@gmail.com', '0866666666', '$2a$10$0Xlm1qRY', 'user', 1, 1),
-(15, 'vanphuc_it', 'Bui Van Phuc', 'phucvan@gmail.com', '0855555555', '$2a$10$0Xlm1qRY', 'user', 2, 1);
+(7, 'bavuong91', 'Nguyen Ba Vuong', 'vuongba@gmail.com', '0933333333', '$2a$10$0Xlm1qRY', 'user', 1),
+(8, 'khanhhuyen', 'Pham Khanh Huyen', 'huyenkhanh@gmail.com', '0922222222', '$2a$10$0Xlm1qRY', 'user', 1),
+(9, 'ducmanh_it', 'Vu Duc Manh', 'manhduc@gmail.com', '0911111111', '$2a$10$0Xlm1qRY', 'user', 1),
+(10, 'thuha_98', 'Le Thu Ha', 'ha_thu98@gmail.com', '0900000000', '$2a$10$0Xlm1qRY', 'user', 1),
+(11, 'quocbao_vp', 'Tran Quoc Bao', 'baoquoc@gmail.com', '0899999999', '$2a$10$0Xlm1qRY', 'user', 1),
+(12, 'ngocanh_cute', 'Hoang Ngoc Anh', 'ngocanh@gmail.com', '0888888888', '$2a$10$0Xlm1qRY', 'user', 1),
+(13, 'duyhung_gamer', 'Do Duy Hung', 'hungduy@gmail.com', '0877777777', '$2a$10$0Xlm1qRY', 'user', 1),
+(14, 'thanhthuy_2k', 'Nguyen Thanh Thuy', 'thuythanh@gmail.com', '0866666666', '$2a$10$0Xlm1qRY', 'user', 1),
+(15, 'vanphuc_it', 'Bui Van Phuc', 'phucvan@gmail.com', '0855555555', '$2a$10$0Xlm1qRY', 'user', 1);
 
 -- 2.7. Khởi tạo Ví tiền tương ứng cho 15 Users
 INSERT INTO `wallets` (`id`, `user_id`, `balance`) VALUES

@@ -18,9 +18,6 @@ import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
-import com.onnet.onnetpc.memberships.MembershipTier;
-import com.onnet.onnetpc.memberships.MembershipTierRepository;
-import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.pcs.PcStatus;
@@ -41,6 +38,7 @@ import com.onnet.onnetpc.wallet.WalletTransactionType;
 import com.onnet.onnetpc.wallet.repository.WalletTransactionRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -59,8 +57,6 @@ public class AdminService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SessionRepository sessionRepository;
-    private final MembershipTierRepository membershipTierRepository;
-    private final MembershipTierSpecMappingRepository membershipTierSpecMappingRepository;
 
     public AdminService(
         UserRepository userRepository,
@@ -70,9 +66,7 @@ public class AdminService {
         ReviewRepository reviewRepository,
         WalletTransactionRepository walletTransactionRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
-        SessionRepository sessionRepository,
-        MembershipTierRepository membershipTierRepository,
-        MembershipTierSpecMappingRepository membershipTierSpecMappingRepository
+        SessionRepository sessionRepository
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
@@ -82,8 +76,6 @@ public class AdminService {
         this.walletTransactionRepository = walletTransactionRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.sessionRepository = sessionRepository;
-        this.membershipTierRepository = membershipTierRepository;
-        this.membershipTierSpecMappingRepository = membershipTierSpecMappingRepository;
     }
 
     @Transactional(readOnly = true)
@@ -507,10 +499,26 @@ public class AdminService {
             return null;
         }
 
-        return membershipTierSpecMappingRepository.findTierIdBySpecId(specId)
-            .flatMap(membershipTierRepository::findById)
-            .map(MembershipTier::getTierName)
+        return subscriptionPlanRepository.findBySpecIdAndActiveTrueOrderByDurationDaysAsc(specId)
+            .stream()
+            .map(SubscriptionPlan::getPlanName)
+            .map(this::inferTierName)
+            .filter(name -> name != null && !name.isBlank())
+            .findFirst()
             .orElse(null);
+    }
+
+    private String inferTierName(String planName) {
+        if (planName == null || planName.isBlank()) {
+            return null;
+        }
+        String firstWord = planName.trim().split("\\s+", 2)[0];
+        return switch (firstWord.toLowerCase(Locale.ROOT)) {
+            case "basic" -> "Basic";
+            case "pro" -> "Pro";
+            case "ultra" -> "Ultra";
+            default -> firstWord;
+        };
     }
 
     private AdminBookingItemResponse toAdminBooking(Booking booking) {
