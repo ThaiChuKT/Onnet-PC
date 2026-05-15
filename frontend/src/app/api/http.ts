@@ -3,11 +3,7 @@ import { clearAccessToken, getAccessToken } from "./authStorage";
 import { ApiError, type ApiResponse } from "./types";
 import { toEnglishMessage } from "../lib/englishMessage";
 
-const isLocalhost =
-  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-const baseURL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? (isLocalhost ? "http://localhost:8080/api/v1" : "/api/v1");
+const baseURL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8080/api/v1";
 
 export const http = axios.create({
   baseURL,

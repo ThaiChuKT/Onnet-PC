@@ -13,7 +13,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,11 +22,6 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-	private static final RequestMatcher FRONTEND_REQUEST_MATCHER = request -> {
-		String path = request.getRequestURI();
-		return !path.startsWith("/api/") && !path.startsWith("/actuator/");
-	};
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
 	private final String allowedOrigins;
@@ -47,9 +41,6 @@ public class SecurityConfig {
 			.cors(Customizer.withDefaults())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/assets/**", "/favicon.ico", "/index.html").permitAll()
-				.requestMatchers(FRONTEND_REQUEST_MATCHER).permitAll()
-				.requestMatchers("/").permitAll()
 				.requestMatchers("/api/v1/auth/**").permitAll()
 				.requestMatchers("/api/v1/pcs/**").permitAll()
 				.requestMatchers("/api/v1/paypal/webhook").permitAll()
