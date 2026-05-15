@@ -56,7 +56,7 @@ export function Header() {
             <Monitor className="w-6 h-6 text-white" />
           </div>
           <span className="text-xl font-bold leading-none bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            RentPC Pro
+            OnnetPC
           </span>
         </Link>
 

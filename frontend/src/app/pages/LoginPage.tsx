@@ -139,7 +139,7 @@ export function LoginPage() {
                   {isLogin ? "Sign in" : "Create account"}
                   <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                     {" "}
-                    RentPC Pro
+                    OnnetPC
                   </span>
                 </h1>
                 <p className="text-muted-foreground">

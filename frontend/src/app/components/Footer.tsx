@@ -15,7 +15,7 @@ export function Footer() {
                 <Monitor className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                RentPC Pro
+                OnnetPC
               </span>
             </div>
             <p className="text-muted-foreground text-sm mb-4">
@@ -80,7 +80,7 @@ export function Footer() {
               <li className="flex items-center gap-2">
                 <Mail className="w-5 h-5 text-primary shrink-0" />
                 <span className="text-muted-foreground text-sm">
-                  contact@rentpcpro.vn
+                  contact@onnetpc.vn
                 </span>
               </li>
             </ul>
@@ -89,7 +89,7 @@ export function Footer() {
 
         <div className="border-t border-border pt-8 text-center">
           <p className="text-muted-foreground text-sm">
-            © 2026 RentPC Pro. All rights reserved.
+            © 2026 OnnetPC. All rights reserved.
           </p>
         </div>
       </div>
