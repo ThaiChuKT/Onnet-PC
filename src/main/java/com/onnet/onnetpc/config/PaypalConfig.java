@@ -22,22 +22,40 @@ public class PaypalConfig {
 	private String frontendBaseUrl;
 
 	public String getClientId() {
-		return clientId;
+		return normalize(clientId);
 	}
 
 	public String getClientSecret() {
-		return clientSecret;
+		return normalize(clientSecret);
 	}
 
 	public String getBaseUrl() {
-		return baseUrl;
+		String normalized = normalize(baseUrl);
+		if (normalized == null || normalized.isBlank()) {
+			return "https://api-m.sandbox.paypal.com";
+		}
+		while (normalized.endsWith("/")) {
+			normalized = normalized.substring(0, normalized.length() - 1);
+		}
+		return normalized;
 	}
 
 	public String getWebhookId() {
-		return webhookId;
+		return normalize(webhookId);
 	}
 
 	public String getFrontendBaseUrl() {
-		return frontendBaseUrl;
+		String normalized = normalize(frontendBaseUrl);
+		if (normalized == null || normalized.isBlank()) {
+			return "http://localhost:5173";
+		}
+		while (normalized.endsWith("/")) {
+			normalized = normalized.substring(0, normalized.length() - 1);
+		}
+		return normalized;
+	}
+
+	private String normalize(String value) {
+		return value == null ? null : value.trim();
 	}
 }

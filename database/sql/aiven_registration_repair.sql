@@ -21,3 +21,7 @@ ALTER TABLE `sessions`
 ALTER TABLE `pcs`
   MODIFY COLUMN `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   MODIFY COLUMN `deleted_at` timestamp NULL DEFAULT NULL;
+
+ALTER TABLE `payments`
+  MODIFY COLUMN `paid_at` timestamp NULL DEFAULT NULL,
+  MODIFY COLUMN `refunded_at` timestamp NULL DEFAULT NULL;

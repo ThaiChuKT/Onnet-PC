@@ -48,6 +48,10 @@ public class DatabaseSchemaRepair {
             "ALTER TABLE `pcs` MODIFY COLUMN `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()");
         runRepair("pcs.deleted_at nullable",
             "ALTER TABLE `pcs` MODIFY COLUMN `deleted_at` timestamp NULL DEFAULT NULL");
+        runRepair("payments.paid_at nullable",
+            "ALTER TABLE `payments` MODIFY COLUMN `paid_at` timestamp NULL DEFAULT NULL");
+        runRepair("payments.refunded_at nullable",
+            "ALTER TABLE `payments` MODIFY COLUMN `refunded_at` timestamp NULL DEFAULT NULL");
     }
 
     private void runRepair(String description, String sql) {
