@@ -93,12 +93,11 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed((value) => !value)}
-                    className="inline-flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted/50 text-sm hover:bg-muted"
                     aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
                     title={sidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}
                   >
                     {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                    <span className={sidebarCollapsed ? "sr-only" : ""}>{sidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}</span>
                   </button>
                 </div>
 

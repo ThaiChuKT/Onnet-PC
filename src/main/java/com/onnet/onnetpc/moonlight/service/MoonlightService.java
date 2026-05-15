@@ -11,6 +11,8 @@ import com.onnet.onnetpc.moonlight.entity.MoonlightCommandLog;
 import com.onnet.onnetpc.moonlight.entity.SunshineHost;
 import com.onnet.onnetpc.moonlight.repository.MoonlightCommandLogRepository;
 import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
+import com.onnet.onnetpc.pcs.Pc;
+import com.onnet.onnetpc.pcs.repository.PcRepository;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import java.io.BufferedReader;
@@ -33,6 +35,7 @@ public class MoonlightService {
     private final SunshineHostRepository sunshineHostRepository;
     private final MoonlightCommandLogRepository moonlightCommandLogRepository;
     private final UserRepository userRepository;
+    private final PcRepository pcRepository;
     private final boolean cliEnabled;
     private final String cliPath;
     private final long cliTimeoutSeconds;
@@ -42,6 +45,7 @@ public class MoonlightService {
         SunshineHostRepository sunshineHostRepository,
         MoonlightCommandLogRepository moonlightCommandLogRepository,
         UserRepository userRepository,
+        PcRepository pcRepository,
         @Value("${app.moonlight.cli.enabled:false}") boolean cliEnabled,
         @Value("${app.moonlight.cli.path:moonlight}") String cliPath,
         @Value("${app.moonlight.cli.timeout-seconds:25}") long cliTimeoutSeconds,
@@ -50,6 +54,7 @@ public class MoonlightService {
         this.sunshineHostRepository = sunshineHostRepository;
         this.moonlightCommandLogRepository = moonlightCommandLogRepository;
         this.userRepository = userRepository;
+        this.pcRepository = pcRepository;
         this.cliEnabled = cliEnabled;
         this.cliPath = cliPath;
         this.cliTimeoutSeconds = cliTimeoutSeconds;
@@ -77,6 +82,7 @@ public class MoonlightService {
         host.setEnabled(request.enabled() == null ? Boolean.TRUE : request.enabled());
         host.setNotes(trimNullable(request.notes()));
         host.setCreatedBy(requester);
+        host.setPc(resolvePc(request.pcId()));
         host.setUpdatedAt(Instant.now());
 
         SunshineHost saved = sunshineHostRepository.save(host);
@@ -98,6 +104,9 @@ public class MoonlightService {
         }
         if (request.enabled() != null) {
             host.setEnabled(request.enabled());
+        }
+        if (request.pcId() != null) {
+            host.setPc(resolvePc(request.pcId()));
         }
         if (request.notes() != null) {
             host.setNotes(trimNullable(request.notes()));
@@ -361,6 +370,14 @@ public class MoonlightService {
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Sunshine host not found"));
     }
 
+    private Pc resolvePc(Long pcId) {
+        if (pcId == null) {
+            return null;
+        }
+        return pcRepository.findById(pcId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Machine not found"));
+    }
+
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
@@ -374,6 +391,7 @@ public class MoonlightService {
             host.getHostPort(),
             host.getEnabled(),
             host.getNotes(),
+            host.getPc() == null ? null : host.getPc().getId(),
             host.getCreatedBy() == null ? null : host.getCreatedBy().getId(),
             host.getCreatedAt(),
             host.getUpdatedAt()

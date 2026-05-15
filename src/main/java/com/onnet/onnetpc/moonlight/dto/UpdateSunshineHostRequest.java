@@ -18,5 +18,7 @@ public record UpdateSunshineHostRequest(
     @Size(max = 500, message = "notes cannot exceed 500 characters")
     String notes,
 
-    Boolean enabled
+    Boolean enabled,
+
+    Long pcId
 ) {}

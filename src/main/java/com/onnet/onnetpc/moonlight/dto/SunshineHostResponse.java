@@ -9,6 +9,7 @@ public record SunshineHostResponse(
     Integer hostPort,
     Boolean enabled,
     String notes,
+    Long pcId,
     Long createdByUserId,
     Instant createdAt,
     Instant updatedAt
