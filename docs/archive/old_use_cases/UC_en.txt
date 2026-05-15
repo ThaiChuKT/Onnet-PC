@@ -139,7 +139,7 @@ Main flow:
 U9 — View Membership Packages * : Users can view a list of packages (Basic, Premium, VIP...) with detailed information about benefits and monthly/annual prices.
 U10 — Register/Upgrade Membership Package * : User selects a package and pays via wallet (linked to U5). The system activates the package and records the expiration date.
 U11 — Renewal/Cancel Membership : Users renew their membership before it expires or cancel it to prevent automatic renewal.
-U12 — View current Membership benefits : Displays the current package, expiration date, and applicable offers.
+U12 — View current Membership benefits : Displays the current package, expiration date, and ble offers.
 
 
 ADMIN use case:

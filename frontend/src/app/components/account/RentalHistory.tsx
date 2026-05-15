@@ -563,7 +563,6 @@ export function RentalHistory() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <h3 className="text-xl font-bold">{rental.specName}</h3>
-                    <Badge className={cfg.className}>{cfg.label}</Badge>
                   </div>
 
                   {isQueued && (
