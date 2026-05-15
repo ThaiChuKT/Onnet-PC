@@ -10,3 +10,14 @@ ALTER TABLE `password_reset_tokens`
 ALTER TABLE `users`
   MODIFY COLUMN `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   MODIFY COLUMN `deleted_at` timestamp NULL DEFAULT NULL;
+
+ALTER TABLE `bookings`
+  MODIFY COLUMN `end_time` timestamp NULL DEFAULT NULL,
+  MODIFY COLUMN `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp();
+
+ALTER TABLE `sessions`
+  MODIFY COLUMN `end_time` timestamp NULL DEFAULT NULL;
+
+ALTER TABLE `pcs`
+  MODIFY COLUMN `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  MODIFY COLUMN `deleted_at` timestamp NULL DEFAULT NULL;

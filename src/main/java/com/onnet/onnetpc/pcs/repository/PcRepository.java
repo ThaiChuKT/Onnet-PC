@@ -44,13 +44,13 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         value = """
             SELECT *
             FROM pcs
-            WHERE deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'
+            WHERE deleted_at IS NULL
             ORDER BY id DESC
             """,
         countQuery = """
             SELECT COUNT(*)
             FROM pcs
-            WHERE deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'
+            WHERE deleted_at IS NULL
             """,
         nativeQuery = true
     )
@@ -60,14 +60,14 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
         value = """
             SELECT *
             FROM pcs
-            WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+            WHERE deleted_at IS NULL
               AND LOWER(status) = LOWER(:status)
             ORDER BY id DESC
             """,
         countQuery = """
             SELECT COUNT(*)
             FROM pcs
-            WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+            WHERE deleted_at IS NULL
               AND LOWER(status) = LOWER(:status)
             """,
         nativeQuery = true
@@ -79,7 +79,7 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
             SELECT *
             FROM pcs
             WHERE spec_id = :specId
-                            AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+                            AND deleted_at IS NULL
                             AND LOWER(status) = 'available'
                         ORDER BY COALESCE(last_used_at, '1970-01-01 00:00:00') ASC, id ASC
             LIMIT 1
@@ -94,7 +94,7 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
             SELECT p.*
             FROM pcs p
             WHERE p.spec_id IN (:specIds)
-              AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+              AND p.deleted_at IS NULL
               AND LOWER(p.status) = 'available'
             ORDER BY COALESCE(p.last_used_at, '1970-01-01 00:00:00') ASC, p.id ASC
             LIMIT 1
@@ -109,7 +109,7 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
             SELECT p.*
             FROM pcs p
             WHERE p.spec_id = :specId
-                            AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+                            AND p.deleted_at IS NULL
                             AND LOWER(p.status) = 'in_use'
               AND NOT EXISTS (
                   SELECT 1
@@ -130,7 +130,7 @@ public interface PcRepository extends JpaRepository<Pc, Long> {
                         SELECT p.*
                         FROM pcs p
                         WHERE p.spec_id IN (:specIds)
-                            AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+                            AND p.deleted_at IS NULL
                             AND LOWER(p.status) = 'in_use'
                             AND NOT EXISTS (
                                     SELECT 1
