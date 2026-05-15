@@ -41,7 +41,6 @@ public class SecurityConfig {
 			.cors(Customizer.withDefaults())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
-					.requestMatchers("/", "/favicon.ico").permitAll()
 				.requestMatchers("/api/v1/auth/**").permitAll()
 				.requestMatchers("/api/v1/pcs/**").permitAll()
 				.requestMatchers("/api/v1/paypal/webhook").permitAll()
