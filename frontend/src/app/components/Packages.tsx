@@ -47,9 +47,9 @@ const TIER_STATIC_DATA: Record<string, Omit<TierPricing, "pricing">> = {
       "Any game from Steam, Epic, Battle.net",
     ],
     benefits: [
-      "Perfect for 1080p gaming at 60+ fps",
-      "Install your games & mods freely",
-      "Most affordable entry point"
+      "Smooth 1080p gaming up to 120 FPS",
+      "Instant setup, no expensive hardware needed",
+      "Best value for everyday gaming"
     ],
     popular: false,
   },
@@ -68,9 +68,9 @@ const TIER_STATIC_DATA: Record<string, Omit<TierPricing, "pricing">> = {
       "Built for streaming & content creation",
     ],
     benefits: [
-      "High framerates for competitive gaming",
-      "Stream at high settings simultaneously",
-      "Perfect for 1440p and high-refresh gaming"
+      "High-refresh 1440p competitive gaming",
+      "Stream, game, and multitask smoothly",
+      "Priority performance for serious gamers"
     ],
     popular: true,
   },
@@ -89,9 +89,9 @@ const TIER_STATIC_DATA: Record<string, Omit<TierPricing, "pricing">> = {
       "Professional workstation & rendering",
     ],
     benefits: [
-      "Maximum performance for 4K gaming",
-      "Professional AI workload & rendering",
-      "Exclusive tier with VIP support"
+      "Ultra settings 4K gaming & smooth ray tracing",
+      "Built for creators, AI, and rendering workloads",
+      "Maximum performance with perfection-focused hardware"
     ],
     popular: false,
   },

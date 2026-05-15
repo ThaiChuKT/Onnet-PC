@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, Link2, Monitor, RefreshCw, Save, Wifi } from "lucide-react";
+import { Check, Link2, Monitor, RefreshCw, Save, Search, Wifi } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "../../api/http";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { ListPagination } from "./ListPagination";
 
 type SunshineHost = {
   id: number;
@@ -55,6 +57,7 @@ type Draft = {
 };
 
 const DEFAULT_PORT = "47989";
+const PAGE_SIZE = 4;
 
 function makeDraft(host?: SunshineHost): Draft {
   return {
@@ -76,6 +79,10 @@ export function SunshineManagement() {
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [savingPcId, setSavingPcId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -121,6 +128,57 @@ export function SunshineManagement() {
     () => hosts.filter((host) => host.pcId === null),
     [hosts],
   );
+
+  const filteredMachines = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return machines.filter((pc) => {
+      const host = hostByPcId.get(pc.pcId);
+      const assigned = Boolean(host);
+      const draft = drafts[pc.pcId] ?? makeDraft(host);
+
+      if (assignmentFilter === "assigned" && !assigned) return false;
+      if (assignmentFilter === "unassigned" && assigned) return false;
+      if (assignmentFilter === "enabled" && !draft.enabled) return false;
+      if (assignmentFilter === "disabled" && draft.enabled) return false;
+      if (statusFilter !== "all" && (pc.status ?? "").toLowerCase() !== statusFilter) return false;
+
+      if (!query) return true;
+
+      const searchable = [
+        pc.pcId,
+        pc.specName,
+        pc.cpu,
+        pc.gpu,
+        pc.ram,
+        pc.storage,
+        pc.location,
+        pc.status,
+        pc.tierName,
+        draft.hostAddress,
+        draft.hostPort,
+        draft.notes,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [assignmentFilter, drafts, hostByPcId, machines, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMachines.length / PAGE_SIZE));
+  const visibleMachines = filteredMachines.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [assignmentFilter, search, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages - 1) {
+      setPage(Math.max(0, totalPages - 1));
+    }
+  }, [page, totalPages]);
 
   const updateDraft = (pcId: number, patch: Partial<Draft>) => {
     setDrafts((current) => ({
@@ -207,6 +265,43 @@ export function SunshineManagement() {
           </Button>
         </div>
 
+        <div className="grid gap-3 border-b border-border p-5 lg:grid-cols-[minmax(240px,1fr)_180px_180px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search PC, spec, IP, status, notes"
+              className="pl-10"
+            />
+          </div>
+
+          <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Assignment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All assignments</SelectItem>
+              <SelectItem value="assigned">Assigned</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              <SelectItem value="enabled">Enabled hosts</SelectItem>
+              <SelectItem value="disabled">Disabled hosts</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Machine status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="in_use">In use</SelectItem>
+              <SelectItem value="maintenance">Maintenance</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {isLoading && (
           <div className="p-10 text-center text-muted-foreground">
             <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin" />
@@ -221,9 +316,16 @@ export function SunshineManagement() {
           </div>
         )}
 
-        {!isLoading && machines.length > 0 && (
+        {!isLoading && machines.length > 0 && filteredMachines.length === 0 && (
+          <div className="p-10 text-center text-muted-foreground">
+            <Search className="mx-auto mb-3 h-8 w-8" />
+            No Sunshine assignments match your filters.
+          </div>
+        )}
+
+        {!isLoading && visibleMachines.length > 0 && (
           <div className="divide-y divide-border">
-            {machines.map((pc) => {
+            {visibleMachines.map((pc) => {
               const existing = hostByPcId.get(pc.pcId);
               const draft = drafts[pc.pcId] ?? makeDraft(existing);
               const isSaving = savingPcId === pc.pcId;
@@ -250,7 +352,7 @@ export function SunshineManagement() {
                     <Input
                       value={draft.hostAddress}
                       onChange={(event) => updateDraft(pc.pcId, { hostAddress: event.target.value })}
-                      placeholder="58.187.67.90"
+                      placeholder="Input IP address"
                     />
                   </label>
 
@@ -294,6 +396,15 @@ export function SunshineManagement() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {!isLoading && filteredMachines.length > PAGE_SIZE && (
+          <div className="border-t border-border p-5">
+            <ListPagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredMachines.length)} of {filteredMachines.length}
+            </p>
           </div>
         )}
       </Card>
