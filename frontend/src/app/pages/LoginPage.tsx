@@ -282,23 +282,31 @@ export function LoginPage() {
                     </Link>
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
+                <p className="text-sm text-muted-foreground">
                   {isLogin ? (
                     <>
                       No account yet?{" "}
-                      <span className="text-primary font-medium">Register</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(false)}
+                        className="border-b border-transparent font-medium leading-none text-primary hover:border-primary"
+                      >
+                        Register
+                      </button>
                     </>
                   ) : (
                     <>
                       Already have an account?{" "}
-                      <span className="text-primary font-medium">Sign in</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(true)}
+                        className="border-b border-transparent font-medium leading-none text-primary hover:border-primary"
+                      >
+                        Sign in
+                      </button>
                     </>
                   )}
-                </button>
+                </p>
               </div>
 
               {!isLogin && (
