@@ -9,6 +9,8 @@ import com.onnet.onnetpc.memberships.MembershipTier;
 import com.onnet.onnetpc.memberships.MembershipTierRepository;
 import com.onnet.onnetpc.memberships.MembershipTierSpecMappingRepository;
 import com.onnet.onnetpc.moonlight.dto.MoonlightCommandRequest;
+import com.onnet.onnetpc.moonlight.dto.MoonlightCommandResponse;
+import com.onnet.onnetpc.moonlight.entity.SunshineHost;
 import com.onnet.onnetpc.moonlight.repository.SunshineHostRepository;
 import com.onnet.onnetpc.moonlight.service.MoonlightService;
 import com.onnet.onnetpc.pcs.Pc;
@@ -25,13 +27,13 @@ import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class SessionLifecycleService {
@@ -138,8 +140,6 @@ public class SessionLifecycleService {
         session.setTotalCost(booking.getTotalPrice());
         session.setStatus("active");
         Session saved = sessionRepository.save(session);
-
-        startMoonlightAfterCommit(user.getEmail(), pc.getId());
 
         return toStartResponse(saved, "Session started successfully");
     }
@@ -416,48 +416,13 @@ public class SessionLifecycleService {
         }
     }
 
-    private void startMoonlightAfterCommit(String email, Long pcId) {
-        Runnable launch = () -> launchMoonlightForPc(email, pcId);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    launch.run();
-                }
-            });
-            return;
-        }
-
-        launch.run();
-    }
-
-    private void launchMoonlightForPc(String email, Long pcId) {
-        if (pcId == null) {
-            return;
-        }
-
-        try {
-            sunshineHostRepository.findByPcId(pcId).ifPresent(host -> {
-                MoonlightCommandRequest request = new MoonlightCommandRequest(
-                    "STREAM",
-                    null,
-                    "Desktop",
-                    "1080p",
-                    60,
-                    8000,
-                    true
-                );
-                moonlightService.startUserStreamOnServer(email, host.getId(), request);
-            });
-        } catch (Exception ignored) {
-            // Session start must not fail if Moonlight cannot be launched.
-        }
-    }
-
     private StartSessionResponse toStartResponse(Session session, String message) {
         Instant now = Instant.now();
         long remainingSeconds = calculateRemainingSeconds(session.getEndTime(), now);
-        String connectionInfo = "Use machine #" + session.getPc().getId() + " at " + session.getPc().getLocation();
+        PreparedMoonlightLaunch moonlight = prepareMoonlightLaunch(session);
+        String connectionInfo = moonlight == null
+            ? "Use machine #" + session.getPc().getId() + " at " + session.getPc().getLocation()
+            : moonlight.command().command();
 
         return new StartSessionResponse(
             session.getId(),
@@ -468,9 +433,62 @@ public class SessionLifecycleService {
             session.getEndTime(),
             remainingSeconds,
             connectionInfo,
+            moonlight == null ? null : moonlight.command().hostId(),
+            moonlight == null ? null : moonlight.command().command(),
+            moonlight == null ? null : moonlight.launchUrl(),
+            moonlight == null
+                ? "No Sunshine host is linked to this machine yet."
+                : moonlight.command().message(),
             session.getStatus(),
             message
         );
+    }
+
+    private PreparedMoonlightLaunch prepareMoonlightLaunch(Session session) {
+        if (session.getPc() == null || session.getPc().getId() == null || session.getUser() == null) {
+            return null;
+        }
+
+        return sunshineHostRepository.findByPcId(session.getPc().getId())
+            .or(sunshineHostRepository::findFirstByEnabledTrueOrderByNameAsc)
+            .map(host -> {
+                String appName = "Desktop";
+                String resolution = "1080p";
+                int fps = 60;
+                int bitrateKbps = 8000;
+                MoonlightCommandRequest request = new MoonlightCommandRequest(
+                    "STREAM",
+                    null,
+                    appName,
+                    resolution,
+                    fps,
+                    bitrateKbps,
+                    false
+                );
+                MoonlightCommandResponse command = moonlightService.runUserLaunch(session.getUser().getEmail(), host.getId(), request);
+                return new PreparedMoonlightLaunch(
+                    command,
+                    buildOnnetPcLaunchUrl(host, appName, resolution, fps, bitrateKbps)
+                );
+            })
+            .orElse(null);
+    }
+
+    private String buildOnnetPcLaunchUrl(SunshineHost host, String appName, String resolution, int fps, int bitrateKbps) {
+        return "onnetpc://stream"
+            + "?host=" + encode(host.getHostAddress())
+            + "&port=" + encode(String.valueOf(host.getHostPort() == null ? 47989 : host.getHostPort()))
+            + "&app=" + encode(appName)
+            + "&resolution=" + encode(resolution)
+            + "&fps=" + fps
+            + "&bitrate=" + bitrateKbps;
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private record PreparedMoonlightLaunch(MoonlightCommandResponse command, String launchUrl) {
     }
 
     private long calculateRemainingSeconds(Instant endTime, Instant now) {

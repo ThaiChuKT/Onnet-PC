@@ -12,4 +12,6 @@ public interface SunshineHostRepository extends JpaRepository<SunshineHost, Long
     List<SunshineHost> findAllByOrderByNameAsc();
 
     Optional<SunshineHost> findByPcId(Long pcId);
+
+    Optional<SunshineHost> findFirstByEnabledTrueOrderByNameAsc();
 }

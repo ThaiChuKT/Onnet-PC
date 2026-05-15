@@ -67,6 +67,10 @@ type StartSessionResponse = {
   expectedEndTime: string;
   remainingSeconds: number;
   connectionInfo: string;
+  moonlightHostId: number | null;
+  moonlightCommand: string | null;
+  moonlightLaunchUrl: string | null;
+  moonlightMessage: string | null;
   status: string;
   message: string;
 };
@@ -246,7 +250,16 @@ export function Mypcs() {
             : item,
         ),
       );
-      toast.success(res.message || "Session started");
+      if (res.moonlightLaunchUrl) {
+        await navigator.clipboard?.writeText(res.moonlightCommand ?? res.moonlightLaunchUrl).catch(() => undefined);
+        window.location.href = res.moonlightLaunchUrl;
+        toast.success("Session started. Opening Moonlight launcher...");
+      } else if (res.moonlightCommand) {
+        await navigator.clipboard?.writeText(res.moonlightCommand).catch(() => undefined);
+        toast.success("Session started. Moonlight command copied to clipboard.");
+      } else {
+        toast.success(res.moonlightMessage || res.message || "Session started");
+      }
       await loadData("silent");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start session");
