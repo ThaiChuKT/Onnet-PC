@@ -39,7 +39,7 @@ function Require-Match {
 }
 
 $uri = [Uri]$Url
-if ($uri.Scheme -ne "onnetpc" -or $uri.Host -ne "stream") {
+if ($uri.Scheme -ne "onnetpc" -or ($uri.Host -ne "stream" -and $uri.Host -ne "stop")) {
     throw "Unsupported Onnet PC launcher URL"
 }
 
@@ -58,6 +58,41 @@ if (-not (Test-Path -LiteralPath $moonlightPath)) {
 $params = Get-QueryParameters -Uri $uri
 $hostAddress = [string]$params["host"]
 $port = if ($params.ContainsKey("port")) { [string]$params["port"] } else { "47989" }
+
+if ($uri.Host -eq "stop") {
+    if (-not [string]::IsNullOrWhiteSpace($hostAddress)) {
+        Require-Match -Name "host" -Value $hostAddress -Pattern "^[A-Za-z0-9.\-]+$"
+        Require-Match -Name "port" -Value $port -Pattern "^\d{1,5}$"
+    }
+
+    $portNumber = [int]$port
+    if ($portNumber -lt 1 -or $portNumber -gt 65535) {
+        throw "Invalid port"
+    }
+
+    $endpoint = if ($portNumber -eq 47989) { $hostAddress } else { "${hostAddress}:${portNumber}" }
+    $normalizedMoonlightPath = [System.IO.Path]::GetFullPath($moonlightPath)
+    $processes = Get-CimInstance Win32_Process |
+        Where-Object {
+            $_.ExecutablePath -and
+            ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $normalizedMoonlightPath)
+        }
+
+    if (-not [string]::IsNullOrWhiteSpace($endpoint)) {
+        $matchingProcesses = $processes | Where-Object {
+            $_.CommandLine -and $_.CommandLine.Contains($endpoint)
+        }
+        if ($matchingProcesses) {
+            $processes = $matchingProcesses
+        }
+    }
+
+    foreach ($process in $processes) {
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    exit 0
+}
+
 $app = if ($params.ContainsKey("app")) { [string]$params["app"] } else { "Desktop" }
 $resolution = if ($params.ContainsKey("resolution")) { [string]$params["resolution"] } else { "1080p" }
 $fps = if ($params.ContainsKey("fps")) { [string]$params["fps"] } else { "60" }

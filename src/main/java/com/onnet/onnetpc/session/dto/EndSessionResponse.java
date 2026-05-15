@@ -7,6 +7,8 @@ public record EndSessionResponse(
     Long bookingId,
     Instant endedAt,
     boolean noRefundApplied,
+    String moonlightStopUrl,
+    String moonlightMessage,
     String status,
     String message
 ) {

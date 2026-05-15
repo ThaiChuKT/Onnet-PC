@@ -174,6 +174,7 @@ public class SessionLifecycleService {
         session.setEndTime(now);
         session.setStatus("ended");
         sessionRepository.save(session);
+        String moonlightStopUrl = buildMoonlightStopUrl(session);
 
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(session.getBooking().getId(), user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
@@ -196,6 +197,10 @@ public class SessionLifecycleService {
             booking.getId(),
             now,
             true,
+            moonlightStopUrl,
+            moonlightStopUrl == null
+                ? "Session ended. Close Moonlight manually if it is still connected."
+                : "Session ended. Opening local launcher to disconnect Moonlight.",
             session.getStatus(),
             hasRemainingTime
                 ? "Session stopped. You can start again until booking time ends."
@@ -461,6 +466,19 @@ public class SessionLifecycleService {
             + "&resolution=" + encode(resolution)
             + "&fps=" + fps
             + "&bitrate=" + bitrateKbps;
+    }
+
+    private String buildMoonlightStopUrl(Session session) {
+        if (session.getPc() == null || session.getPc().getId() == null) {
+            return "onnetpc://stop";
+        }
+
+        return sunshineHostRepository.findByPcId(session.getPc().getId())
+            .or(sunshineHostRepository::findFirstByEnabledTrueOrderByNameAsc)
+            .map(host -> "onnetpc://stop"
+                + "?host=" + encode(host.getHostAddress())
+                + "&port=" + encode(String.valueOf(host.getHostPort() == null ? 47989 : host.getHostPort())))
+            .orElse("onnetpc://stop");
     }
 
     private String encode(String value) {

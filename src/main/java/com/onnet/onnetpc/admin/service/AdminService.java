@@ -217,6 +217,8 @@ public class AdminService {
             booking.getId(),
             now,
             true,
+            null,
+            "Session force-ended on the server. The customer may need to close Moonlight locally.",
             session.getStatus(),
             hasRemainingTime
                 ? "Session force-ended by admin. Booking remains paid for remaining time."

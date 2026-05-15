@@ -1,7 +1,7 @@
 .chatbot-builder-frame,
 .chatbot-builder-frame iframe {
   height: 100% !important;
-  min-height: 760px !important;
+  min-height: 660px !important;
   width: 100% !important;
   border: 0 !important;
   background: var(--card) !important;

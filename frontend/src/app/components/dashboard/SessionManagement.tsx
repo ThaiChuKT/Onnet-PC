@@ -64,6 +64,8 @@ type EndSessionResponse = {
   bookingId: number;
   endedAt: string;
   noRefundApplied: boolean;
+  moonlightStopUrl: string | null;
+  moonlightMessage: string | null;
   status: string;
   message: string;
 };

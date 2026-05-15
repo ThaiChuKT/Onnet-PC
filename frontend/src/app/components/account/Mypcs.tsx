@@ -80,6 +80,8 @@ type EndSessionResponse = {
   bookingId: number;
   endedAt: string;
   noRefundApplied: boolean;
+  moonlightStopUrl: string | null;
+  moonlightMessage: string | null;
   status: string;
   message: string;
 };
@@ -285,7 +287,12 @@ export function Mypcs() {
             : item,
         ),
       );
-      toast.success(res.message || "Session ended");
+      if (res.moonlightStopUrl) {
+        window.location.href = res.moonlightStopUrl;
+        toast.success(res.moonlightMessage || "Session ended. Disconnecting Moonlight...");
+      } else {
+        toast.success(res.message || "Session ended");
+      }
       await loadData("silent");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not end session");
