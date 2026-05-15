@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
-import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, TrendingUp, Search } from "lucide-react";
+import { ShoppingCart, Eye, CheckCircle, XCircle, Clock, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatch } from "../../api/http";
 import { toast } from "sonner";

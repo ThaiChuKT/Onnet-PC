@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Activity, Power, Search } from "lucide-react";
-import { formatUsd } from "../../lib/formatUsd";
 import { toEnglishMessage } from "../../lib/englishMessage";
 import { ListPagination } from "./ListPagination";
 
