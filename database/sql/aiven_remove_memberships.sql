@@ -2,6 +2,7 @@
 -- Run after deploying code that no longer references these tables/columns.
 
 DROP PROCEDURE IF EXISTS drop_fk_if_exists;
+DROP PROCEDURE IF EXISTS drop_column_if_exists;
 
 DELIMITER //
 CREATE PROCEDURE drop_fk_if_exists(IN table_name_in VARCHAR(64), IN column_name_in VARCHAR(64))
@@ -39,8 +40,31 @@ CALL drop_fk_if_exists('user_subscriptions', 'pc_id');
 
 DROP PROCEDURE IF EXISTS drop_fk_if_exists;
 
-ALTER TABLE `users` DROP COLUMN IF EXISTS `tier_id`;
-ALTER TABLE `session_queue` DROP COLUMN IF EXISTS `tier_id`;
+DELIMITER //
+CREATE PROCEDURE drop_column_if_exists(IN table_name_in VARCHAR(64), IN column_name_in VARCHAR(64))
+BEGIN
+  DECLARE column_count INT DEFAULT 0;
+
+  SELECT COUNT(*)
+    INTO column_count
+    FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = table_name_in
+     AND COLUMN_NAME = column_name_in;
+
+  IF column_count > 0 THEN
+    SET @sql = CONCAT('ALTER TABLE `', table_name_in, '` DROP COLUMN `', column_name_in, '`');
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END//
+DELIMITER ;
+
+CALL drop_column_if_exists('users', 'tier_id');
+CALL drop_column_if_exists('session_queue', 'tier_id');
+
+DROP PROCEDURE IF EXISTS drop_column_if_exists;
 
 DROP TABLE IF EXISTS `user_subscriptions`;
 DROP TABLE IF EXISTS `user_memberships`;
