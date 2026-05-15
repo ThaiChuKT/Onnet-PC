@@ -54,7 +54,7 @@ frontend/coverage/
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
-src/main/resources/application.properties
+
 
 ### OS ###
 .DS_Store
