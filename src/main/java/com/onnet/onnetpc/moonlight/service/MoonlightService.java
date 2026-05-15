@@ -207,7 +207,7 @@ public class MoonlightService {
         }
 
         String action = normalizeAction(request.action());
-        if ("PAIR".equals(action) && Boolean.TRUE.equals(request.executeOnServer) && trimNullable(request.pin()) == null) {
+        if ("PAIR".equals(action) && Boolean.TRUE.equals(request.executeOnServer()) && trimNullable(request.pin()) == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PAIR requires a 4-digit PIN when executing on server");
         }
         List<String> command = buildCommand(host, action, request);

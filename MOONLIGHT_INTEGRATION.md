@@ -6,7 +6,8 @@ This integration uses Sunshine as host service and Moonlight as client.
 Onnet-PC manages Sunshine hosts from the web dashboard and can execute Moonlight CLI commands from backend (Option B).
 Pair and unpair coordination now goes through the Onnet-PC database queue so a helper on the Sunshine host can perform the local Sunshine API calls automatically.
 
-Current test host provided: 'ip'
+Current test host provided:
+- `58.187.67.90:47989`
 
 ## What is implemented
 
@@ -33,12 +34,9 @@ Authenticated user endpoints:
   - `PROBE` -> `moonlight list <host>`
   - `PAIR` -> `moonlight pair <host> [--pin <pin>]`
   - `STREAM` -> `moonlight stream <host> [options]`
-<<<<<<< Updated upstream
-- Can prepare command only (copy command flow), or execute on server (`executeOnServer=true`) if enabled.
-=======
 - Can prepare command only (copy command flow), execute PROBE/STREAM on the backend when enabled, or queue PAIR in the database for the Sunshine host helper.
 - When a booking/session ends, the backend queues an `UNPAIR` job for the paired Sunshine client if one is known.
->>>>>>> Stashed changes
+- Session start no longer depends on backend Moonlight auto-launch.
 
 ### Frontend behavior
 
@@ -63,7 +61,7 @@ This migration creates:
 - `moonlight_host_actions`
 - `moonlight_command_logs`
 
-It also seeds the provided host `ip` if not already present.
+It also seeds the provided host `58.187.67.90` if not already present.
 
 ## Required backend config for Option B
 

@@ -30,8 +30,6 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class SessionLifecycleService {
@@ -138,8 +136,6 @@ public class SessionLifecycleService {
         session.setTotalCost(booking.getTotalPrice());
         session.setStatus("active");
         Session saved = sessionRepository.save(session);
-
-        startMoonlightAfterCommit(user.getEmail(), pc.getId());
 
         return toStartResponse(saved, "Session started successfully");
     }
@@ -429,44 +425,6 @@ public class SessionLifecycleService {
                 sessionQueueRepository.save(row);
             }
             position++;
-        }
-    }
-
-    private void startMoonlightAfterCommit(String email, Long pcId) {
-        Runnable launch = () -> launchMoonlightForPc(email, pcId);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    launch.run();
-                }
-            });
-            return;
-        }
-
-        launch.run();
-    }
-
-    private void launchMoonlightForPc(String email, Long pcId) {
-        if (pcId == null) {
-            return;
-        }
-
-        try {
-            sunshineHostRepository.findByPcId(pcId).ifPresent(host -> {
-                MoonlightCommandRequest request = new MoonlightCommandRequest(
-                    "STREAM",
-                    null,
-                    "Desktop",
-                    "1080p",
-                    60,
-                    8000,
-                    true
-                );
-                moonlightService.startUserStreamOnServer(email, host.getId(), request);
-            });
-        } catch (Exception ignored) {
-            // Session start must not fail if Moonlight cannot be launched.
         }
     }
 
