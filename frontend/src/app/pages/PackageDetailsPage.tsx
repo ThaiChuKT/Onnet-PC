@@ -203,15 +203,6 @@ export function PackageDetailsPage() {
     return Array.from(grouped.values()).sort((a, b) => Number(a.specId) - Number(b.specId));
   }, [machines]);
 
-  const metrics = useMemo(() => {
-    const uniqueSpecs = new Set(machines.map((machine) => machine.specId));
-
-    return {
-      total: machines.length,
-      specs: uniqueSpecs.size,
-    };
-  }, [machines]);
-
   return (
     <div className="min-h-screen flex flex-col">
       <Header />

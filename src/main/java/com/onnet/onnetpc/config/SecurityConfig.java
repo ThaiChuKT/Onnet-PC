@@ -45,8 +45,9 @@ public class SecurityConfig {
 				.requestMatchers("/api/v1/pcs/**").permitAll()
 				.requestMatchers("/api/v1/paypal/webhook").permitAll()
 				.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+				.requestMatchers("/api/v1/**").authenticated()
 				.requestMatchers("/actuator/health", "/actuator/info").permitAll()
-				.anyRequest().authenticated()
+				.anyRequest().permitAll()
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
