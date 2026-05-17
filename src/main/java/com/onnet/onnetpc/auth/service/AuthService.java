@@ -264,7 +264,15 @@ public class AuthService {
             mailSender.send(message);
             return true;
         } catch (Exception ex) {
-            LOGGER.error("Failed to send verification email to {} via SMTP", email, ex);
+            Throwable root = rootCause(ex);
+            LOGGER.error(
+                "Failed to send verification email to {} via SMTP. from={}, rootType={}, rootMessage={}",
+                email,
+                verificationMailFrom,
+                root.getClass().getName(),
+                root.getMessage(),
+                ex
+            );
             return false;
         }
     }
@@ -291,5 +299,13 @@ public class AuthService {
             return username;
         }
         return from.isBlank() ? username : from;
+    }
+
+    private Throwable rootCause(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current;
     }
 }
