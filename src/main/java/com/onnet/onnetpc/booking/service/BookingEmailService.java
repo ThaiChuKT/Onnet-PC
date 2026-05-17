@@ -24,7 +24,7 @@ public class BookingEmailService {
         this.emailService = emailService;
     }
 
-    public void sendPaymentConfirmation(String email, Booking booking) {
+    public boolean sendPaymentConfirmation(String email, Booking booking) {
         EmailSendResult result = emailService.sendText(
             email,
             "OnnetPC booking payment confirmation #" + booking.getId(),
@@ -39,6 +39,7 @@ public class BookingEmailService {
                 result.errorMessage()
             );
         }
+        return result.sent();
     }
 
     private String buildContent(Booking booking) {

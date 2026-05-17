@@ -1,6 +1,7 @@
 package com.onnet.onnetpc.booking.controller;
 
 import com.onnet.onnetpc.booking.dto.BookingHistoryItemResponse;
+import com.onnet.onnetpc.booking.dto.BookingPaymentRequest;
 import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;
 import com.onnet.onnetpc.booking.dto.BookingResponse;
 import com.onnet.onnetpc.booking.dto.CreateBookingRequest;
@@ -61,8 +62,12 @@ public class BookingController {
     }
 
     @PostMapping("/{bookingId}/pay-wallet")
-    public ApiResponse<BookingPaymentResponse> payWithWallet(Authentication authentication, @PathVariable Long bookingId) {
-        return ApiResponse.success(bookingService.payWithWallet(authentication.getName(), bookingId));
+    public ApiResponse<BookingPaymentResponse> payWithWallet(
+        Authentication authentication,
+        @PathVariable Long bookingId,
+        @RequestBody(required = false) BookingPaymentRequest request
+    ) {
+        return ApiResponse.success(bookingService.payWithWallet(authentication.getName(), bookingId, request));
     }
 
     @PostMapping("/{bookingId}/cancel")

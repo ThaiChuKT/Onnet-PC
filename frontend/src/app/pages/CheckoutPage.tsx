@@ -72,6 +72,7 @@ type BookingPaymentResponse = {
   walletBalance: number;
   message?: string;
   mergedIntoBookingId?: number | null;
+  receiptSent?: boolean | null;
 };
 
 type BookingResponseDto = {
@@ -394,9 +395,15 @@ export function CheckoutPage() {
       }
 
       setPayingBookingId(id);
-      const res = await apiPost<BookingPaymentResponse>(`/bookings/${id}/pay-wallet`);
+      const res = await apiPost<BookingPaymentResponse, { sendReceipt: boolean }>(
+        `/bookings/${id}/pay-wallet`,
+        { sendReceipt: receiveEmail },
+      );
       setWalletBalance(Number(res.walletBalance));
       toast.success(res.message || "Payment completed from your wallet");
+      if (receiveEmail && res.receiptSent === false) {
+        toast.warning("Payment completed, but the receipt email could not be sent.");
+      }
       setPaymentSuccess(true);
       setCountdown(5);
       setConfirmBooking(null);

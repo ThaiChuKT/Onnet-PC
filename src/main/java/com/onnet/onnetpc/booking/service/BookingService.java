@@ -1,6 +1,7 @@
 package com.onnet.onnetpc.booking.service;
 
 import com.onnet.onnetpc.booking.dto.BookingHistoryItemResponse;
+import com.onnet.onnetpc.booking.dto.BookingPaymentRequest;
 import com.onnet.onnetpc.booking.dto.BookingPaymentResponse;
 import com.onnet.onnetpc.booking.dto.BookingResponse;
 import com.onnet.onnetpc.booking.dto.CreateBookingRequest;
@@ -306,7 +307,7 @@ public class BookingService {
     }
 
     @Transactional
-    public BookingPaymentResponse payWithWallet(String email, Long bookingId) {
+    public BookingPaymentResponse payWithWallet(String email, Long bookingId, BookingPaymentRequest request) {
         User user = findUserByEmail(email);
         Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, user.getId())
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
@@ -372,14 +373,15 @@ public class BookingService {
                 booking.setUpdatedAt(now);
                 bookingRepository.save(booking);
 
-                bookingEmailService.sendPaymentConfirmation(user.getEmail(), paidTarget);
+                boolean receiptSent = sendReceiptIfRequested(user, paidTarget, request);
 
                 return new BookingPaymentResponse(
                     booking.getId(),
                     normalizeStatus(booking.getStatus()),
                     newBalance,
-                    "Payment received. Time has been added to your existing active package.",
-                    paidTarget.getId()
+                    paymentMessage("Payment received. Time has been added to your existing active package.", request, receiptSent),
+                    paidTarget.getId(),
+                    receiptSent
                 );
             }
         }
@@ -388,14 +390,15 @@ public class BookingService {
         booking.setUpdatedAt(now);
         bookingRepository.save(booking);
 
-        bookingEmailService.sendPaymentConfirmation(user.getEmail(), booking);
+        boolean receiptSent = sendReceiptIfRequested(user, booking, request);
 
         return new BookingPaymentResponse(
             booking.getId(),
             normalizeStatus(booking.getStatus()),
             newBalance,
-            "Payment successful. Your package is now active.",
-            null
+            paymentMessage("Payment successful. Your package is now active.", request, receiptSent),
+            null,
+            receiptSent
         );
     }
 
@@ -525,6 +528,22 @@ public class BookingService {
             Duration.ofDays((long) durationDays * quantity),
             plan.getPrice().multiply(BigDecimal.valueOf(quantity))
         );
+    }
+
+    private boolean sendReceiptIfRequested(User user, Booking booking, BookingPaymentRequest request) {
+        if (request != null && !request.shouldSendReceipt()) {
+            return false;
+        }
+        return bookingEmailService.sendPaymentConfirmation(user.getEmail(), booking);
+    }
+
+    private String paymentMessage(String baseMessage, BookingPaymentRequest request, boolean receiptSent) {
+        if (request != null && !request.shouldSendReceipt()) {
+            return baseMessage;
+        }
+        return receiptSent
+            ? baseMessage + " Receipt sent to your email."
+            : baseMessage + " Receipt could not be sent right now.";
     }
 
     private SubscriptionPlan resolveSubscriptionPlan(PcSpec spec, String tierName, int durationDays) {

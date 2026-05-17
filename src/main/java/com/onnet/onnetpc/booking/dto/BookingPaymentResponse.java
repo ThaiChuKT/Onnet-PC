@@ -7,6 +7,7 @@ public record BookingPaymentResponse(
     String status,
     BigDecimal walletBalance,
     String message,
-    Long mergedIntoBookingId
+    Long mergedIntoBookingId,
+    Boolean receiptSent
 ) {
 }
