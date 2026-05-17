@@ -1,14 +1,13 @@
 package com.onnet.onnetpc.booking.service;
 
 import com.onnet.onnetpc.booking.entity.Booking;
+import com.onnet.onnetpc.email.EmailSendResult;
+import com.onnet.onnetpc.email.TransactionalEmailService;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,28 +18,26 @@ public class BookingEmailService {
         .withLocale(Locale.US)
         .withZone(ZoneId.systemDefault());
 
-    private final JavaMailSender mailSender;
-    private final String bookingMailFrom;
+    private final TransactionalEmailService emailService;
 
-    public BookingEmailService(
-        JavaMailSender mailSender,
-        @Value("${app.email.booking.from:${app.email.verification.from:no-reply@onnetpc.local}}") String bookingMailFrom,
-        @Value("${spring.mail.username:}") String mailUsername
-    ) {
-        this.mailSender = mailSender;
-        this.bookingMailFrom = resolveMailFrom(bookingMailFrom, mailUsername);
+    public BookingEmailService(TransactionalEmailService emailService) {
+        this.emailService = emailService;
     }
 
     public void sendPaymentConfirmation(String email, Booking booking) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(bookingMailFrom);
-            message.setTo(email);
-            message.setSubject("OnnetPC booking payment confirmation #" + booking.getId());
-            message.setText(buildContent(booking));
-            mailSender.send(message);
-        } catch (Exception ex) {
-            LOGGER.error("Failed to send booking payment confirmation email for booking {}", booking.getId(), ex);
+        EmailSendResult result = emailService.sendText(
+            email,
+            "OnnetPC booking payment confirmation #" + booking.getId(),
+            buildContent(booking)
+        );
+        if (!result.sent()) {
+            LOGGER.error(
+                "Failed to send booking payment confirmation email for booking {} via {}. rootType={}, rootMessage={}",
+                booking.getId(),
+                result.provider(),
+                result.errorType(),
+                result.errorMessage()
+            );
         }
     }
 
@@ -60,12 +57,4 @@ public class BookingEmailService {
             + "You can now go to Rentals and click Start session when your slot starts.";
     }
 
-    private String resolveMailFrom(String configuredFrom, String mailUsername) {
-        String username = mailUsername == null ? "" : mailUsername.trim();
-        String from = configuredFrom == null ? "" : configuredFrom.trim();
-        if (username.toLowerCase(Locale.ROOT).endsWith("@gmail.com")) {
-            return username;
-        }
-        return from.isBlank() ? username : from;
-    }
 }

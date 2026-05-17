@@ -14,6 +14,8 @@ import com.onnet.onnetpc.auth.repository.EmailVerificationTokenRepository;
 import com.onnet.onnetpc.auth.repository.PasswordResetTokenRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
 import com.onnet.onnetpc.common.security.JwtService;
+import com.onnet.onnetpc.email.EmailSendResult;
+import com.onnet.onnetpc.email.TransactionalEmailService;
 import com.onnet.onnetpc.users.User;
 import com.onnet.onnetpc.users.UserRole;
 import com.onnet.onnetpc.users.repository.UserRepository;
@@ -29,8 +31,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +46,7 @@ public class AuthService {
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final JavaMailSender mailSender;
-    private final String verificationMailFrom;
+    private final TransactionalEmailService emailService;
     private final long verificationCodeExpiryMinutes;
 
     public AuthService(
@@ -57,9 +56,7 @@ public class AuthService {
         WalletRepository walletRepository,
         PasswordEncoder passwordEncoder,
         JwtService jwtService,
-        JavaMailSender mailSender,
-        @Value("${app.email.verification.from:no-reply@onnetpc.local}") String verificationMailFrom,
-        @Value("${spring.mail.username:}") String mailUsername,
+        TransactionalEmailService emailService,
         @Value("${app.email.verification.expiry-minutes:15}") long verificationCodeExpiryMinutes
     ) {
         this.userRepository = userRepository;
@@ -68,8 +65,7 @@ public class AuthService {
         this.walletRepository = walletRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.mailSender = mailSender;
-        this.verificationMailFrom = resolveMailFrom(verificationMailFrom, mailUsername);
+        this.emailService = emailService;
         this.verificationCodeExpiryMinutes = verificationCodeExpiryMinutes;
     }
 
@@ -252,29 +248,23 @@ public class AuthService {
     }
 
     private boolean sendVerificationCodeEmail(String email, String code) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(verificationMailFrom);
-            message.setTo(email);
-            message.setSubject("Your OnnetPC verification code");
-            message.setText(
-                "Your OnnetPC verification code is: " + code + "\n\n"
-                    + "This code expires in " + verificationCodeExpiryMinutes + " minutes."
-            );
-            mailSender.send(message);
-            return true;
-        } catch (Exception ex) {
-            Throwable root = rootCause(ex);
+        EmailSendResult result = emailService.sendText(
+            email,
+            "Your OnnetPC verification code",
+            "Your OnnetPC verification code is: " + code + "\n\n"
+                + "This code expires in " + verificationCodeExpiryMinutes + " minutes."
+        );
+        if (!result.sent()) {
             LOGGER.error(
-                "Failed to send verification email to {} via SMTP. from={}, rootType={}, rootMessage={}",
+                "Failed to send verification email to {} via {}. from={}, rootType={}, rootMessage={}",
                 email,
-                verificationMailFrom,
-                root.getClass().getName(),
-                root.getMessage(),
-                ex
+                result.provider(),
+                emailService.fromAddress(),
+                result.errorType(),
+                result.errorMessage()
             );
-            return false;
         }
+        return result.sent();
     }
 
     private String generateUsernameFromEmail(String email) {
@@ -292,20 +282,4 @@ public class AuthService {
         return username;
     }
 
-    private String resolveMailFrom(String configuredFrom, String mailUsername) {
-        String username = mailUsername == null ? "" : mailUsername.trim();
-        String from = configuredFrom == null ? "" : configuredFrom.trim();
-        if (username.toLowerCase(Locale.ROOT).endsWith("@gmail.com")) {
-            return username;
-        }
-        return from.isBlank() ? username : from;
-    }
-
-    private Throwable rootCause(Throwable throwable) {
-        Throwable current = throwable;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        return current;
-    }
 }

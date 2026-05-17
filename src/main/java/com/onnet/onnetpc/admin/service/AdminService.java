@@ -19,6 +19,8 @@ import com.onnet.onnetpc.booking.enums.BookingStatus;
 import com.onnet.onnetpc.booking.enums.BookingType;
 import com.onnet.onnetpc.booking.repository.BookingRepository;
 import com.onnet.onnetpc.common.exception.ApiException;
+import com.onnet.onnetpc.email.EmailSendResult;
+import com.onnet.onnetpc.email.TransactionalEmailService;
 import com.onnet.onnetpc.pcs.Pc;
 import com.onnet.onnetpc.pcs.PcSpec;
 import com.onnet.onnetpc.pcs.PcStatus;
@@ -45,8 +47,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,11 +61,10 @@ public class AdminService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SessionRepository sessionRepository;
-    private final JavaMailSender mailSender;
+    private final TransactionalEmailService emailService;
     private final String mailHost;
     private final int mailPort;
     private final String mailUsername;
-    private final String mailFrom;
 
     public AdminService(
         UserRepository userRepository,
@@ -76,11 +75,10 @@ public class AdminService {
         WalletTransactionRepository walletTransactionRepository,
         SubscriptionPlanRepository subscriptionPlanRepository,
         SessionRepository sessionRepository,
-        JavaMailSender mailSender,
+        TransactionalEmailService emailService,
         @Value("${spring.mail.host:smtp.gmail.com}") String mailHost,
         @Value("${spring.mail.port:587}") int mailPort,
-        @Value("${spring.mail.username:}") String mailUsername,
-        @Value("${app.email.verification.from:no-reply@onnetpc.local}") String mailFrom
+        @Value("${spring.mail.username:}") String mailUsername
     ) {
         this.userRepository = userRepository;
         this.pcRepository = pcRepository;
@@ -90,11 +88,10 @@ public class AdminService {
         this.walletTransactionRepository = walletTransactionRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.sessionRepository = sessionRepository;
-        this.mailSender = mailSender;
+        this.emailService = emailService;
         this.mailHost = mailHost;
         this.mailPort = mailPort;
         this.mailUsername = mailUsername == null ? "" : mailUsername.trim();
-        this.mailFrom = resolveMailFrom(mailFrom, this.mailUsername);
     }
 
     public EmailTestResponse sendTestEmail(String to) {
@@ -103,35 +100,22 @@ public class AdminService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "A valid target email is required");
         }
 
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(target);
-            message.setSubject("OnnetPC SMTP test");
-            message.setText("OnnetPC SMTP is working. Sent at " + Instant.now() + ".");
-            mailSender.send(message);
+        EmailSendResult result = emailService.sendText(
+            target,
+            "OnnetPC email test",
+            "OnnetPC email delivery is working via " + emailService.provider() + ". Sent at " + Instant.now() + "."
+        );
 
-            return new EmailTestResponse(
-                true,
-                mailHost,
-                mailPort,
-                maskEmail(mailUsername),
-                mailFrom,
-                null,
-                null
-            );
-        } catch (Exception ex) {
-            Throwable root = rootCause(ex);
-            return new EmailTestResponse(
-                false,
-                mailHost,
-                mailPort,
-                maskEmail(mailUsername),
-                mailFrom,
-                root.getClass().getSimpleName(),
-                root.getMessage()
-            );
-        }
+        return new EmailTestResponse(
+            result.sent(),
+            result.provider(),
+            mailHost,
+            mailPort,
+            maskEmail(mailUsername),
+            emailService.fromAddress(),
+            result.errorType(),
+            result.errorMessage()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -723,15 +707,6 @@ public class AdminService {
         return status.name();
     }
 
-    private String resolveMailFrom(String configuredFrom, String username) {
-        String from = configuredFrom == null ? "" : configuredFrom.trim();
-        String normalizedUsername = username == null ? "" : username.trim();
-        if (normalizedUsername.toLowerCase(Locale.ROOT).endsWith("@gmail.com")) {
-            return normalizedUsername;
-        }
-        return from.isBlank() ? normalizedUsername : from;
-    }
-
     private String maskEmail(String email) {
         if (email == null || email.isBlank() || !email.contains("@")) {
             return "";
@@ -745,11 +720,4 @@ public class AdminService {
         return local.substring(0, 2) + "***" + domain;
     }
 
-    private Throwable rootCause(Throwable throwable) {
-        Throwable current = throwable;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        return current;
-    }
 }
