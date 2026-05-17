@@ -184,8 +184,9 @@ export function AccountList() {
   const handleDelete = async (user: AdminUserItemResponse) => {
     if (!confirm("Are you sure you want to delete this account?")) return;
     try {
-      await apiDelete<string>(`/admin/users/${user.id}`);
+      const deleted = await apiDelete<AdminUserItemResponse>(`/admin/users/${user.id}`);
       toast.success("Account deleted");
+      setUsers((current) => current.filter((item) => item.id !== deleted.id));
       await loadUsers();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Unable to delete account");

@@ -154,7 +154,7 @@ public class AdminService {
     }
 
     @Transactional
-    public void softDeleteUser(Long userId) {
+    public AdminUserItemResponse softDeleteUser(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
 
@@ -162,10 +162,15 @@ public class AdminService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot delete admin account");
         }
 
-        user.setActive(false);
-        user.setDeletedAt(Instant.now());
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        Instant now = Instant.now();
+        int updatedRows = userRepository.softDeleteNonAdminById(userId, now, now);
+        if (updatedRows == 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Account could not be deleted");
+        }
+
+        User deletedUser = userRepository.findById(userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found after delete"));
+        return toAdminUser(deletedUser);
     }
 
     @Transactional(readOnly = true)

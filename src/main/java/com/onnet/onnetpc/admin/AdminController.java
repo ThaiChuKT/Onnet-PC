@@ -58,9 +58,8 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{userId}")
-    public ApiResponse<String> deleteUser(@PathVariable Long userId) {
-        adminService.softDeleteUser(userId);
-        return ApiResponse.success("User deleted");
+    public ApiResponse<AdminUserItemResponse> deleteUser(@PathVariable Long userId) {
+        return ApiResponse.success(adminService.softDeleteUser(userId));
     }
 
     @GetMapping("/users/{userId}/payments")
