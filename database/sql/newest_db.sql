@@ -21,38 +21,8 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '6ec40d16-5199-11f1-8dd6-f2510ffee6c5:1-168,
+SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '6ec40d16-5199-11f1-8dd6-f2510ffee6c5:1-170,
 b9709598-4fe7-11f1-a995-7eb1e69dbb46:1-523';
-
---
--- Table structure for table `ai_recommendations`
---
-
-DROP TABLE IF EXISTS `ai_recommendations`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `ai_recommendations` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `user_id` bigint NOT NULL,
-  `recommended_spec_id` bigint NOT NULL,
-  `reason` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `FKrg99ksk9fvv30tyys0359nnqk` (`recommended_spec_id`),
-  KEY `FKawyie1nntxfgm46oh0tdk91q5` (`user_id`),
-  CONSTRAINT `FKawyie1nntxfgm46oh0tdk91q5` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKrg99ksk9fvv30tyys0359nnqk` FOREIGN KEY (`recommended_spec_id`) REFERENCES `pc_specs` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `ai_recommendations`
---
-
-LOCK TABLES `ai_recommendations` WRITE;
-/*!40000 ALTER TABLE `ai_recommendations` DISABLE KEYS */;
-/*!40000 ALTER TABLE `ai_recommendations` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `bookings`
@@ -326,33 +296,6 @@ LOCK TABLES `reviews` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `session_files`
---
-
-DROP TABLE IF EXISTS `session_files`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `session_files` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `session_id` bigint NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `file_path` varchar(500) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `file_size` bigint DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `session_files`
---
-
-LOCK TABLES `session_files` WRITE;
-/*!40000 ALTER TABLE `session_files` DISABLE KEYS */;
-/*!40000 ALTER TABLE `session_files` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `session_queue`
 --
 
@@ -596,4 +539,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-17 12:35:57
+-- Dump completed on 2026-05-17 12:45:16
