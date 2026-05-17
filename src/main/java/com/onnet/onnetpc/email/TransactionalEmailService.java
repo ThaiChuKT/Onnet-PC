@@ -29,7 +29,6 @@ public class TransactionalEmailService {
 
     public TransactionalEmailService(
         JavaMailSender mailSender,
-        ObjectMapper objectMapper,
         @Value("${app.email.provider:smtp}") String provider,
         @Value("${spring.mail.username:}") String smtpUsername,
         @Value("${app.email.verification.from:no-reply@onnetpc.local}") String defaultFrom,
@@ -38,7 +37,7 @@ public class TransactionalEmailService {
         @Value("${app.email.resend.base-url:https://api.resend.com}") String resendBaseUrl
     ) {
         this.mailSender = mailSender;
-        this.objectMapper = objectMapper;
+        this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
