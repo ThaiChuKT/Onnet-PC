@@ -30,6 +30,24 @@ public class DatabaseSchemaRepair {
             return;
         }
 
+        runRepair("bookings zero updated_at cleanup",
+            "UPDATE `bookings` SET `updated_at` = COALESCE(`created_at`, current_timestamp()) WHERE `updated_at` = '0000-00-00 00:00:00'");
+        runRepair("bookings zero end_time cleanup",
+            "UPDATE `bookings` SET `end_time` = NULL WHERE `end_time` = '0000-00-00 00:00:00'");
+        runRepair("users zero updated_at cleanup",
+            "UPDATE `users` SET `updated_at` = COALESCE(`created_at`, current_timestamp()) WHERE `updated_at` = '0000-00-00 00:00:00'");
+        runRepair("users zero deleted_at cleanup",
+            "UPDATE `users` SET `deleted_at` = NULL WHERE `deleted_at` = '0000-00-00 00:00:00'");
+        runRepair("pcs zero updated_at cleanup",
+            "UPDATE `pcs` SET `updated_at` = current_timestamp() WHERE `updated_at` = '0000-00-00 00:00:00'");
+        runRepair("pcs zero deleted_at cleanup",
+            "UPDATE `pcs` SET `deleted_at` = NULL WHERE `deleted_at` = '0000-00-00 00:00:00'");
+        runRepair("sessions zero end_time cleanup",
+            "UPDATE `sessions` SET `end_time` = NULL WHERE `end_time` = '0000-00-00 00:00:00'");
+        runRepair("payments zero paid_at cleanup",
+            "UPDATE `payments` SET `paid_at` = NULL WHERE `paid_at` = '0000-00-00 00:00:00'");
+        runRepair("payments zero refunded_at cleanup",
+            "UPDATE `payments` SET `refunded_at` = NULL WHERE `refunded_at` = '0000-00-00 00:00:00'");
         runRepair("email_verification_tokens.used_at nullable",
             "ALTER TABLE `email_verification_tokens` MODIFY COLUMN `used_at` timestamp NULL DEFAULT NULL");
         runRepair("password_reset_tokens.used_at nullable",
