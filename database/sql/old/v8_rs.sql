@@ -606,8 +606,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `full_name`, `email`, `phone`, `password_hash`, `avatar`, `role`, `tier_id`, `is_verified`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 'kruwulvn', 'Khanh', 'kruwulvn@gmail.com', '123123123', '$2a$10$mhtsJJQPNjy2/oO7QzTQ7O9JhRm1IVBxpfbespKbjIaBBOs4qaoIq', NULL, 'admin', NULL, 1, 1, '2026-03-27 13:00:42', '2026-05-11 16:44:43', '2026-03-27 13:00:42'),
-(2, 'scwar69', 'John Smith', 'scwar69@gmail.com', '123123123', '$2a$10$0Xlm1qRYccLG7LvzWdGN8eX0bVfjAiKZfvNnV4A728qSTa6bAcehG', NULL, 'user', NULL, 1, 1, '2026-05-11 12:09:51', '2026-05-11 22:02:12', '2026-05-11 12:09:51');
+(1, 'kruwulvn', 'a$10$mhtsJJQPNjy2/oO7QzTQ7O9JhRm1IVBxpfbespKbjIaBBOs4qaoIq', NULL, 'admin', NULL, 1, 1, '2026-03-27 13:00:42', '2026-05-11 16:44:43', '2026-03-27 13:00:42'),
+(2, 'scwar69', 'John Smith', 'scwar69@gmail.com', '123123123', '$2a$10$0Xlm1qRYccLG7LvzWdGN8eX0bVfjAiKZfvNnV4A728qSTa6bAcehG', NULL, 'user', NULL, 1, 1, '2026-05-11 12:09:51', '2026-05-11 22:02:12', '2026-05-11 12:09:51');Khanh', 'kruwulvn@gmail.com', '123123123', '$2
 
 -- --------------------------------------------------------
 
