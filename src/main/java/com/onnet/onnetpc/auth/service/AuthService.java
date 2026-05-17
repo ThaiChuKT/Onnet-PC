@@ -77,15 +77,19 @@ public class AuthService {
         User targetUser;
         if (existingUser.isPresent()) {
             targetUser = existingUser.get();
-            if (Boolean.TRUE.equals(targetUser.getVerified())) {
+            boolean restoringDeletedAccount = targetUser.getDeletedAt() != null;
+            if (!restoringDeletedAccount && Boolean.TRUE.equals(targetUser.getVerified())) {
                 throw new ApiException(HttpStatus.CONFLICT, "Email already exists");
             }
             targetUser.setFullName(request.fullName());
             targetUser.setPhone(request.phone());
             targetUser.setPasswordHash(passwordEncoder.encode(request.password()));
             targetUser.setActive(true);
+            targetUser.setDeletedAt(null);
+            targetUser.setVerified(false);
             targetUser.setUpdatedAt(Instant.now());
             targetUser = userRepository.save(targetUser);
+            ensureWalletExists(targetUser);
         } else {
             User user = new User();
             user.setFullName(request.fullName());
@@ -99,11 +103,7 @@ public class AuthService {
             user.setUpdatedAt(Instant.now());
             targetUser = userRepository.save(user);
 
-            Wallet wallet = new Wallet();
-            wallet.setUser(targetUser);
-            wallet.setBalance(BigDecimal.ZERO);
-            wallet.setUpdatedAt(Instant.now());
-            walletRepository.save(wallet);
+            ensureWalletExists(targetUser);
         }
 
         tokenRepository.deleteByUserId(targetUser.getId());
@@ -245,6 +245,17 @@ public class AuthService {
     private String generateVerificationCode() {
         int code = 100000 + SECURE_RANDOM.nextInt(900000);
         return String.valueOf(code);
+    }
+
+    private void ensureWalletExists(User user) {
+        if (walletRepository.findByUserId(user.getId()).isPresent()) {
+            return;
+        }
+        Wallet wallet = new Wallet();
+        wallet.setUser(user);
+        wallet.setBalance(BigDecimal.ZERO);
+        wallet.setUpdatedAt(Instant.now());
+        walletRepository.save(wallet);
     }
 
     private boolean sendVerificationCodeEmail(String email, String code) {
