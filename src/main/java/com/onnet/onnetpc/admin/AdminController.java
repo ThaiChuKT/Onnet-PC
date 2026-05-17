@@ -8,6 +8,7 @@ import com.onnet.onnetpc.admin.dto.AdminSessionItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserPaymentItemResponse;
 import com.onnet.onnetpc.admin.dto.AdminUserItemResponse;
 import com.onnet.onnetpc.admin.dto.CreatePcRequest;
+import com.onnet.onnetpc.admin.dto.EmailTestResponse;
 import com.onnet.onnetpc.admin.dto.SetBookingStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetReviewStatusRequest;
 import com.onnet.onnetpc.admin.dto.SetUserActiveRequest;
@@ -103,6 +104,11 @@ public class AdminController {
     @PostMapping("/sessions/{sessionId}/force-end")
     public ApiResponse<EndSessionResponse> forceEndSession(@PathVariable Long sessionId) {
         return ApiResponse.success(adminService.forceEndSession(sessionId));
+    }
+
+    @PostMapping("/email/test")
+    public ApiResponse<EmailTestResponse> sendTestEmail(@RequestParam String to) {
+        return ApiResponse.success(adminService.sendTestEmail(to));
     }
 
     @GetMapping("/packages")
